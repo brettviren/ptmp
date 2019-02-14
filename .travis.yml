@@ -1,0 +1,21 @@
+# see https://github.com/ZeroCM/zcm/blob/master/.travis.yml
+language: cpp
+
+os:
+- linux
+
+
+dist: xenial
+
+script: ./waf configure build 
+
+addons:
+  apt:
+    packages:
+      - uuid-dev
+      - libsystemd-dev
+      - liblz4-dev
+      - libcurl4-nss-dev
+      - libzmq-dev
+      - libczmq-dev
+      

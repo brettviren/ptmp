@@ -1,1 +1,4 @@
 *~
+build
+.lock-waf*
+.waf*
