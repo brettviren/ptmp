@@ -1,7 +1,7 @@
 // -*- c++ -*- // ish
 
 syntax = "proto3";
-package ptmp;
+package ptmp.data;
 
 message TrigPrim {    
 

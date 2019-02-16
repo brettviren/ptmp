@@ -2,10 +2,11 @@
 
 Prototype Trigger Message Passing aka Pretty Temporary
 
-* What's here
+* What's here?
 
-This package provides a simple API providing access to a ZeroMQ based data flow pipeline.  
-
+This package a simple API to sink and source trigger messages while
+supporting a rich and high performance, but intentionally simplified,
+ZeroMQ based data flow network defined by user configuration.  As this network is based on ZeroMQ it may exist over a mix of transports (inter-thread, inter-process and inter-computer) as determined by the configuration.
 
 * Messages
 
@@ -15,23 +16,30 @@ The messages supported by PTMP are defined in terms of ZeroMQ frames.  The first
 
 2) waveform data, currently not supported.
 
-** Message versions 
-
-The messages are not explicitly versioned.  If a backwards
-incompatible change is required for the payload message a new message
-type number will be defined.
-
 * Configuration
 
-A PTMP network is composed of components communicating via ZeroMQ sockets.  The components provided directly by the PTMP package are defined in terms of CZMQ actors.  The sender and receiver API classes will dynamically instantiate an actor to handle its end of the network.
+The PTMP API classes require a string which specifies details about
+their connection to the PTMP network.  This string is in JSON format
+and expressing a object (dictionary) with the following attributes.
 
+- socket :: a socket configuration object.
+
+Additional attributes may be added in the future.  The ~socket~ object
+has the following attributes:
+
+- type :: a ZeroMQ socket type name ("PAIR", "PUB", "SUB", etc)
+- bind :: an array of addresses in canonical ZeroMQ form that the socket should bind
+- connect :: an array of addresses in canonical ZeroMQ form that the socket should connect
+
+ZeroMQ restrictions apply.  For example a PAIR socket may only bind or connect to one address.  Others can bind or connect to multiple addresses.
 
 * TODO
 
 - [X] message schema
 - [X] initial build system
 - [X] travis ci hookup
-- [ ] add and cleanup dynamic factory from dexnet
+- [X] add and cleanup dynamic factory from dexnet
+- [X] add JSON library
 - [ ] write sender/receiver API classes
 - [ ] define configuration schema
 - [ ] write initial pub/sub actors

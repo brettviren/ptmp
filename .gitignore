@@ -3,3 +3,5 @@ build
 .lock-waf*
 .waf*
 *.pyc
+cut
+install
