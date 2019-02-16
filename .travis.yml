@@ -1,9 +1,11 @@
-# see https://github.com/ZeroCM/zcm/blob/master/.travis.yml
+
 language: cpp
+
+cache:
+- ccache
 
 os:
 - linux
-
 
 dist: xenial
 
@@ -14,3 +16,7 @@ before_install:
   - pushd protobuf-3.6.1 && ./configure --prefix=/usr && make && sudo make install && popd
 
 script: ./waf configure build 
+
+
+
+# see https://github.com/ZeroCM/zcm/blob/master/.travis.yml
