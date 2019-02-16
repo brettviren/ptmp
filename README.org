@@ -1,0 +1,44 @@
+#+title: PTMP
+
+Prototype Trigger Message Passing aka Pretty Temporary
+
+* What's here
+
+This package provides a simple API providing access to a ZeroMQ based data flow pipeline.  
+
+
+* Messages
+
+The messages supported by PTMP are defined in terms of ZeroMQ frames.  The first frame is an integer giving the message type.  The second and subsequent frame contents depend on that message type.  The message types are:
+
+1) a set of TPs, frame 2 is a serialized ~TPSet~ protobuf.
+
+2) waveform data, currently not supported.
+
+** Message versions 
+
+The messages are not explicitly versioned.  If a backwards
+incompatible change is required for the payload message a new message
+type number will be defined.
+
+* Configuration
+
+A PTMP network is composed of components communicating via ZeroMQ sockets.  The components provided directly by the PTMP package are defined in terms of CZMQ actors.  The sender and receiver API classes will dynamically instantiate an actor to handle its end of the network.
+
+
+* TODO
+
+- [X] message schema
+- [X] initial build system
+- [X] travis ci hookup
+- [ ] add and cleanup dynamic factory from dexnet
+- [ ] write sender/receiver API classes
+- [ ] define configuration schema
+- [ ] write initial pub/sub actors
+- [ ] test program with direct sender/receiver connection
+- [ ] test program with pub/sub
+- [ ] test program that demonstrates a second sub
+- [ ] test that deploys/runs the above 
+- [ ] rate test with ~inproc~, ~ipc~ and ~tcp~
+- [ ] push/pull test
+

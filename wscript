@@ -9,7 +9,7 @@ def options(opt):
     
 def configure(cfg):
     cfg.load('compiler_c compiler_cxx')
-    # cfg.load('protoc_cxx','waftools')
+    cfg.load('protoc_cxx','waftools')
     # cfg.load('boost', tooldir='waftools')
     # cfg.check(header_name="dlfcn.h", uselib_store='DYNAMO',
     #           lib=['dl'], mandatory=True)
@@ -21,4 +21,11 @@ def configure(cfg):
     cfg.env.CXXFLAGS += to_list(cfg.options.cxxflags)
 
 def build(bld):
+    bld(
+        name="ptmp_messages",
+        features="protoc cxx",
+        source="pb/ptmp.proto",
+        includes="pb",
+    )    
+
     pass
