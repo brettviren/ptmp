@@ -2,6 +2,12 @@
 
 Prototype Trigger Message Passing aka Pretty Temporary
 
+* Status
+
+[[https://travis-ci.org/brettviren/ptmp][file:https://travis-ci.org/brettviren/ptmp.svg]]
+
+This package now has basic functionality.  See the [[To Do]] section for details.
+
 * What's here?
 
 This package a simple API to sink and source trigger messages while
@@ -114,7 +120,7 @@ missing messages:
 ....
 #+END_EXAMPLE
 
-If we tell the sender to wait just a scant millisecond between
+If we tell the senderto wait just a scant few milliseconds between
 creating its PUB socket and starting to the receiver sees the start of
 the stream.
 
@@ -130,6 +136,8 @@ One then gets
 1 - 1 = 0 : 1.41917s
 ...
 #+END_EXAMPLE
+
+Over a physical network, more time will be needed.  On a 1 Gbps network, a 2ms delay was required to avoid losing the initial messages.
 
 ** Deep queues
 
@@ -181,22 +189,78 @@ C++ in which it is written.  Some things to watch out for are:
 
 - neglecting that ~NULL~ terminator in function calls that take variadic args (my fav!)
 
+** Throughput
+
+To test throughput, printing of any per-message info is turned off.
+
+1M-10M messages, ~localhost~ testing (127.0.0.1 IP address), ~check_sendrecv~ used.
+
+| pattern  | transport | hal      | haiku    | yobox   |
+|          |           | i5-252-M | i7-4770K | i5-7500 |
+|----------+-----------+----------+----------+---------|
+| pubsub   | inproc    | 364 kHz  | 606 kHz  | 557 kHz |
+| pubsub   | ipc       | 175 kHz  | 502 kHz  | 469 kHz |
+| pubsub   | tcp       | 156 kHz  | 599 kHz  | 522 kHz |
+| pipe     | tcp       | 120 kHz  | 311 kHz  | 279 kHz |
+| pipe     | inproc    | 162 kHz  | 312 kHz  | 282 kHz |
+| pushpull | inproc    | 158 kHz  | 311 kHz  | 278 kHz |
+|----------+-----------+----------+----------+---------|
+
+TCP testing from haiku to yobox over 1 Gbps home network with two intervening switches.  ~check_send~ and ~check_recv~ used.
+
+| pattern  | send    | recv    | num | notes         |
+|----------+---------+---------+-----+---------------|
+| pubsub   | 1.7 MHz | 630 kHz | 1M  |               |
+| pubsub   | 2.2 MHz | 750 kHz | 10M | loss          |
+| pubsub   | 790 kHz | 775 kHz | 10M | 1us/100 sleep |
+| pushpull | 797 kHz | 418 kHz | 1M  |               |
+| pushpull | 777 kHz | 740 kHz | 10M |               |
+|----------+---------+---------+-----+---------------|
+
+The PUB/SUB connection is "faster" because of message loss due to SUB not keeping up with PUB.  Slowing down the sender with a call to ~usleep(1)~ every 100th message can achieve the same rate as PUSH/PULL with no loss.
+
+It's important to note that this is not a suggestion to add sleeps
+inside a production loop.  Just PUB can be incredibly fast and a SUB
+that is too slow will simply lose messages.  No matter what,
+somethings gotta give.  If one wants the slow consumers to slow down
+the upstream ("back pressure") then PUSH/PULL can work better.  What
+the above demonstrates is that ZeroMQ is not a bottleneck.  And, these
+messages are serialized via protobuf, so no problem there.  While
+sending, both hosts are at about 110% CPU usage.  The test jobs memory
+footprints are stable at a bit less than 10 MB RSS and 150 MB VIRT.
+
+Two or three SUBs to one PUB misses more packets and a 1/10 ~usleep(1)~
+is needed.  With ~usleep()~ removed, three PULLs on one PUSH runs at about 300 kHz per PULL.  As PUSH is round-robin, the miss detection in ~send_recv~ fires and prints log info all the time so this is slowing down the network to some extent.  With the logging removed, the individual PULLs see 600-800 kHz and the PUSH makes 1.2 Mhz.
 
 
-* TODO
 
-- [X] message schema
-- [X] initial build system
-- [X] travis ci hookup
-- [X] add and cleanup dynamic factory from dexnet
+* To Do
+
+** Basic functionality
+
+- [X] trigger primitives message schema
+- [X] build system
+- [X] Travis-CI hookup
 - [X] add JSON library
-- [ ] write sender/receiver API classes
-- [ ] define configuration schema
-- [ ] write initial pub/sub actors
-- [ ] test program with direct sender/receiver connection
-- [ ] test program with pub/sub
-- [ ] test program that demonstrates a second sub
-- [ ] test that deploys/runs the above 
-- [ ] rate test with ~inproc~, ~ipc~ and ~tcp~
-- [ ] push/pull test
+- [X] write sender/receiver API classes
+- [X] define configuration schema
+- [X] test programs spanning transports and supported socket types
+- [X] test that demonstrates multiple subs
 
+** Extended functionality
+
+A more full vision exists which starts with PTMP and includes elements that have been prototyped, tested or are in production use in [[https://github.com/brettviren/digrex/tree/master/dexnet][dexnet]] and the [[https://wirecell.github.io][Wire-Cell Toolkit]].  This vision can be described with a set of high level conceptual features:
+
+- use ZeroMQ actors as basic building block for an application development framework.
+
+- follow a "ported graph" model for the design of the network.  A fundamental node in this graph is a ZeroMQ actor and an aggregate node is some subgraph of nodes.
+
+- provide dynamic aggregation of nodes into subgraph executables via a plugin based dynamic factory mechanism (~upif~).
+
+- drive this aggregation via configuration based on Jsonnet and the ~pgraph~ Jsonnet functions.  Extend this configuration network wide.
+
+- develop reusable discovery and presence nodes based on Zyre.
+
+- use discovery/presence to develop self-healing and zero-downtime reconfiguration mechanisms.
+
+This list is roughly ordered in layers of implementation.  Ie, the first must be done before the next.  It is also ordered in terms of requiring additional effort, group buy-in and larger scale cooperation.

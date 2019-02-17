@@ -41,13 +41,15 @@ zsock_t* ptmp::internals::endpoint(const std::string& config)
     if (socktype == 2) {        // fixme: support topics?
         zsock_set_subscribe(sock, "");
         int old = zsock_rcvhwm(sock);
-        zsys_info("sub hwm was %d", old);
-        zsock_set_rcvhwm(sock, 1000*old);
+        const int hwm = old * 1000;
+        zsys_info("increase sub hwm from %d to %d", old, hwm);
+        zsock_set_rcvhwm(sock, hwm);
     }
     if (socktype == 1) {
-        int old = zsock_sndhwm(sock);
-        zsys_info("pub hwm was %d", old);
-        zsock_set_sndhwm(sock, 1000*old);
+        const int old = zsock_sndhwm(sock);
+        const int hwm = old * 1000;
+        zsys_info("increase pub hwm from %d to %d", old, hwm);
+        zsock_set_sndhwm(sock, hwm);
     }
     for (auto jaddr : jsock["bind"]) {
         std::string addr = jaddr;

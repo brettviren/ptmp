@@ -53,7 +53,9 @@ int main(int argc, char* argv[])
 
         //zclock_sleep(1);
 
-        //usleep(1);
+        // if (ind % 100 == 1) {
+        //     usleep(1);
+        // }
     }
     auto tend = zclock_usecs();
 

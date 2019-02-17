@@ -35,7 +35,7 @@ def utesting(bld, name, use=''):
     for chk in checksrc:        # like tests but don't run
         bld.program(source=[chk],
                     target = chk.change_ext(''),
-                    install_path = None,
+                    install_path = '${PREFIX}/bin/',
                     rpath = rpath,
                     includes = ['inc','build','test'],
                     use = use + [name])

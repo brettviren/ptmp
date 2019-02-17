@@ -47,8 +47,6 @@ def build(bld):
               rpath = rpath,
               source=pbs+src, target='ptmp', use=uses)
     bld.install_files('${PREFIX}/include/ptmp', pb_headers)
-    
-
 
 
     bld.utesting('ptmp', uses)
