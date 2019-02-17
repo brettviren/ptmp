@@ -33,6 +33,156 @@ has the following attributes:
 
 ZeroMQ restrictions apply.  For example a PAIR socket may only bind or connect to one address.  Others can bind or connect to multiple addresses.
 
+* Tuning and Exception Handling
+
+Like with any asynchronous communication, certain exceptional
+occurrences must be handled.  
+
+In boring universe things nothing exceptional ever happens.  Receivers
+start and wait for messages, senders start and start sending,
+receivers receive, senders send, forever and ever.  No message is ever
+lost, repeated nor corrupted.
+
+Reality is, of course, exceptional.  The rest of this section
+describes some of these realities and how PTMP or the application can
+or must deal with them.
+
+** High Water Mark
+
+ZeroMQ has the notion of a "high water mark" (HWM) for its internal
+send and receive queues associated with a socket.  The socket type
+determines what happens to the next message when it is to enter the
+queue.  In particular, for PUB/SUB the message will be *dropped* while
+for PAIR and PUSH/PULL the caller will be *blocked*.  Neither is
+desirable but as fantastic as ZeroMQ is, no magic may be invoked.
+Something's gotta give.  
+
+The HWM mark can be increased but at the cost of increased system
+memory usage (or exhaustion if the HWM is set to be unbound),
+increased latency variance, delay in detecting the real problem.  Some
+tuning of the HWM can and should be done taking in to account message
+rate, rate variance and the sensitivity of the application to being blocked or having messages dropped.
+
+In testing this aspect, it's important to recognize that ZeroMQ can
+send messages into its queues and a horrendous rate if nothing stops
+it.  As a consequence, any HWM tuning determined by the tests may be horribly suboptimal for an actual application.
+
+** Senders stop sending
+
+ZeroMQ has robustness against endpoints disappearing, especially if
+they eventually reappear.  Socket connections need not break in the
+interim.  However, when a sender goes away the receiver obviously
+stops getting new messages (eventually, see [[Deep queues]]).  If the
+receiver hangs on the sender's every word then its app may hang as
+well (if it's programmed to hang).
+
+Each attempt to receive a message may be given a timeout.  The
+application can then determine if the message was actually received by
+checking the Boolean return value.  If it's ~false~ then the app can
+decide what to do (exit, send user error, tell run control, connect to
+a backup sender, burn down the counting house, or something equally
+helpful).
+
+** No receivers to receive 
+
+ZeroMQ sockets are individuals.  They don't need others.  In particular, a sender can happily sit around with no one to send to, subject to its HWM rule.  In particular, a PUB will happily spray away messages to no one and typically limited only by how fast the sender application can provide them.  By the time a SUB shows up, the party may be over.  If any SUBs must not miss messages, they should start first.  They can ~bind~ while the PUB can ~connect~ if that pattern makes sense.
+
+However, even with if one does a ~bind~ first with the SUB and later a
+~connect~ with the PUB a brief delay is needed for the PUB to process
+the SUB's subscription.  If the sender app immediately starts sending
+messages after the PUB is created, those messages may not reach the
+SUB.  The time it takes for ZeroMQ to setup the subscription is on
+order millisecond.  Advanced patterns are described in the ZeroMQ
+guide to handle this without imposing a brutish ~zclock_sleep()~ of a ms
+or so, but PTMP does not implement them.
+
+This case can be exercised: 
+
+#+BEGIN_EXAMPLE
+  (shell 1)$ ./build/test/check_recv 10 SUB bind ipc://junk.txt
+  (shell 2)$ ./build/test/check_send 10000 PUB connect ipc://junk.txt 0 
+#+END_EXAMPLE
+
+The SUB receiver starts first and binds so is ready and waiting as
+soon as the PUB sender deigns to show up.  When the PUB gets going, it
+REALLY gets going and the receiver will likely show some number of
+missing messages:
+
+#+BEGIN_EXAMPLE
+0 - 1797 = -1797 : 2.74924s
+1 - 1798 = -1797 : 2.74928s
+....
+#+END_EXAMPLE
+
+If we tell the sender to wait just a scant millisecond between
+creating its PUB socket and starting to the receiver sees the start of
+the stream.
+
+#+BEGIN_EXAMPLE
+  (shell 1)$ ./build/test/check_recv 10 SUB bind ipc://junk.txt
+  (shell 2)$ ./build/test/check_send 10000 PUB connect ipc://junk.txt 1
+#+END_EXAMPLE
+
+One then gets
+
+#+BEGIN_EXAMPLE
+0 - 0 = 0 : 1.41913s
+1 - 1 = 0 : 1.41917s
+...
+#+END_EXAMPLE
+
+** Deep queues
+
+The messages involved in PTMP are rather small and given system RAM it
+may be enticing to set HWM very high to "just be safe".  This can be
+done but needs understanding of possible latency this may introduce.
+
+Take for example, a receiver is not keeping up and it takes hours for
+the sender to outpace it enough that the receiver's HWM is reached.
+The receiver finally can notify the app and thus some human of the
+problem.  Is it okay to wait that long?  
+
+Or, say a sender freaks out and sends a bazillion messages which are
+dutifully absorbed by the deep HWM buffers.  Then in a fit of
+neuroses, the sender dies with a farewell message.  Meanwhile the
+receiver will happily process that deep buffer, possibly for hours and
+hours before getting the sad final note.  Do you want one application
+to exhibit such insensitivity to the plight of another?  Maybe.  Maybe
+not.
+
+** Fast quit
+
+ZeroMQ buffers messages both on the sender and receiver side.  Of course, if the application tears itself down while those buffers are in use then their messages must go unprocessed.  One consequence of this is that the PTMP API classes are expected to be long-lived, where long is relative to how long it takes those buffers to drain.  It is easy to construct situations where an app happily squirts a bunch of messages and then destroys its sender and those messages never reach a receiver.  This is particularly likely if a blocking socket pattern (PAIR, PUSH/PULL) is chosen and the app is much faster than the network or the receiver.
+
+This can be reproduced with:
+
+#+BEGIN_EXAMPLE
+  (shell 1)$ ./build/test/check_recv 10000 PAIR bind ipc://junk.txt
+  (shell 2)$ ./build/test/check_send 10000 PAIR connect ipc://junk.txt 
+#+END_EXAMPLE 
+
+Depending on the speed of your computer the ~check_recv~ will hang after getting some number of messages because the ~check_send~ quit so fast after sending its load.  Running the test while telling ~check_send~ to hold its horses for a second will let ~check_recv~ finish.
+
+#+BEGIN_EXAMPLE
+  (shell 1)$ ./build/test/check_recv 10000 PAIR bind ipc://junk.txt
+  (shell 2)$ ./build/test/check_send 10000 PAIR connect ipc://junk.txt 0 1000
+#+END_EXAMPLE
+
+** Stupid sexy segfaults
+
+For the most part, the PTMP API should not expose to the application
+anything that can segfault.  But, during development ZeroMQ certainly
+lets the programmer do blatant dumbness especially given the C-like
+C++ in which it is written.  Some things to watch out for are:
+
+- wrongly specifying a size for a given C++ type.
+
+- creating but not destroying some ZeroMQ object.
+
+- neglecting that ~NULL~ terminator in function calls that take variadic args (my fav!)
+
+
+
 * TODO
 
 - [X] message schema

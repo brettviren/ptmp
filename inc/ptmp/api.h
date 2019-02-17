@@ -38,8 +38,11 @@ namespace ptmp {
         TPReceiver(const std::string& config);
         ~TPReceiver();
 
-        /// Recieve next TPSet, by filling.
-        void operator()(data::TPSet& tps);
+        /// Receive next TPSet, by filling.  If a timeout occurs, or
+        /// otherwise a break is received, this will return false.  If
+        /// a message is received but is corrupted this will throw
+        /// runtime_error.
+        bool operator()(data::TPSet& tps, int timeout_msec=-1);
 
         TPReceiver() =default;
         TPReceiver(const TPReceiver&) =delete;

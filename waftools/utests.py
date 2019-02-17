@@ -10,6 +10,7 @@ def build(bld):
 
 @conf
 def utesting(bld, name, use=''):
+    checksrc = bld.path.ant_glob('test/check_*.cc')
     testsrc = bld.path.ant_glob('test/test_*.cc')
     test_scripts = bld.path.ant_glob('test/test_*.sh') + bld.path.ant_glob('test/test_*.py')
 
@@ -29,10 +30,19 @@ def utesting(bld, name, use=''):
         ret = list(ret)
         ret.insert(0, bld.path.find_or_declare(bld.out_dir).abspath())
         return ret
+    rpath = get_rpath(use + [name])
+
+    for chk in checksrc:        # like tests but don't run
+        bld.program(source=[chk],
+                    target = chk.change_ext(''),
+                    install_path = None,
+                    rpath = rpath,
+                    includes = ['inc','build','test'],
+                    use = use + [name])
+
 
     for test_main in testsrc:
         #print 'Building %s test: %s using %s' % (name, test_main, use)
-        rpath = get_rpath(use + [name])
         #print rpath
         bld.program(features = 'test', 
                     source = [test_main], 
@@ -42,6 +52,9 @@ def utesting(bld, name, use=''):
                     rpath = rpath,
                     includes = ['inc','build','test'],
                     use = use + [name])
+
+    bld.add_group()
+
     for test_script in test_scripts:
         interp = "${BASH}"
         if test_script.abspath().endswith(".py"):

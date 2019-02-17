@@ -13,28 +13,26 @@ ptmp::TPReceiver::~TPReceiver()
     m_sock = 0;
 }
 
-void ptmp::TPReceiver::operator()(data::TPSet& tps)
+bool ptmp::TPReceiver::operator()(data::TPSet& tps, int toms)
 {
-    zmsg_t* msg = zmsg_recv(m_sock->get()); // blocks
+    zmsg_t* msg = m_sock->msg(toms);
     if (!msg) {
-        std::cerr << "got no message\n";
-        return;
+        return false;
     }
 
     zframe_t* fid = zmsg_first(msg);
-    if (!msg) {
-        std::cerr << "got no id frame\n";
-        return;
+    if (!fid) {
+        throw std::runtime_error("null id frame");
     }
     int topic = *(int*)zframe_data(fid);
 
     zframe_t* pay = zmsg_next(msg);
-    if (!msg) {
-        std::cerr << "got no payload frame\n";
-        return;
+    if (!pay) {
+        throw std::runtime_error("null payload frame");
     }
     tps.ParseFromArray(zframe_data(pay), zframe_size(pay));
 
     zmsg_destroy(&msg);
+    return true;
 }
 

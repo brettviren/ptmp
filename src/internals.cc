@@ -40,12 +40,15 @@ zsock_t* ptmp::internals::endpoint(const std::string& config)
     zsock_t* sock = zsock_new(socktype);
     if (socktype == 2) {        // fixme: support topics?
         zsock_set_subscribe(sock, "");
+        int old = zsock_rcvhwm(sock);
+        zsys_info("sub hwm was %d", old);
+        zsock_set_rcvhwm(sock, 1000*old);
     }
-    // if (socktype == 1) {
-    //     int old = zsock_sndhwm(sock);
-    //     zsys_info("pub hwm was %d", old);
-    //     zsock_set_sndhwm(sock, 10*old);
-    // }
+    if (socktype == 1) {
+        int old = zsock_sndhwm(sock);
+        zsys_info("pub hwm was %d", old);
+        zsock_set_sndhwm(sock, 1000*old);
+    }
     for (auto jaddr : jsock["bind"]) {
         std::string addr = jaddr;
         zsock_bind(sock, addr.c_str(), NULL);
@@ -59,10 +62,21 @@ zsock_t* ptmp::internals::endpoint(const std::string& config)
 
 ptmp::internals::Socket::Socket(const std::string& config)
     : m_sock(endpoint(config))
+    , m_poller(zpoller_new(m_sock, NULL))
 {
 }
 
 ptmp::internals::Socket::~Socket()
 {
+    std::cerr << "Socket destroy\n";
+    zpoller_destroy(&m_poller);
     zsock_destroy(&m_sock);
+
 }
+zmsg_t* ptmp::internals::Socket::msg(int timeout_msec)
+{
+    void* which = zpoller_wait(m_poller, timeout_msec);
+    if (!which) return NULL;
+    return zmsg_recv((zsock_t*)which);
+}
+

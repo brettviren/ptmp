@@ -14,10 +14,15 @@ namespace ptmp {
 
         class Socket {
             zsock_t* m_sock;
+            zpoller_t* m_poller;
         public:
             Socket(const std::string& config);
             ~Socket();
             zsock_t* get() { return m_sock; }
+
+            // Return a message.  Negative timeout waits inefinitely.
+            zmsg_t* msg(int timeout_msec=-1);
+
         };
     }
 }

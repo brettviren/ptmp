@@ -11,11 +11,15 @@ using json = nlohmann::json;
 int main(int argc, char* argv[])
 {
     if (argc < 5) {
-        cerr << "usage: test_recv N <type> <bind|connect> <endpoint>" << endl;
+        cerr << "usage: test_recv N <type> <bind|connect> <endpoint> [timeout]" << endl;
         return 0;
     }
 
     const int count = atoi(argv[1]);
+    int timeout = -1;
+    if (argc > 5) {
+        timeout = atoi(argv[5]);
+    }
 
     json jcfg;
     jcfg["socket"]["type"] = argv[2];
@@ -28,7 +32,11 @@ int main(int argc, char* argv[])
 
     auto tbeg = zclock_usecs();
     for (int ind=0; ind<count; ++ind) {
-        recv(tps);
+        bool ok = recv(tps, timeout);
+        if (!ok) {
+            cerr << "timeout at " << ind << " after " << timeout << "\n";
+            break;
+        }
         const int now = tps.count();
         cerr << ind << " - " << now << " = " << ind-now << " : " << (zclock_usecs()-tbeg)*1e-6 << "s\n";
     }
