@@ -3,6 +3,7 @@ language: cpp
 
 cache:
 - ccache
+- apt
 
 os:
 - linux
@@ -10,13 +11,18 @@ os:
 dist: xenial
 
 before_install:
-  - sudo apt-get install -y uuid-dev libsystemd-dev liblz4-dev libcurl4-nss-dev libzmq5-dev libczmq-dev
-  - wget https://github.com/protocolbuffers/protobuf/releases/download/v3.6.1/protobuf-cpp-3.6.1.tar.gz
-  - tar -xzf protobuf-cpp-3.6.1.tar.gz
-  - pushd protobuf-3.6.1 && ./configure --prefix=/usr && make && sudo make install && popd
+  - sudo apt-get install -y uuid-dev libsystemd-dev liblz4-dev libcurl4-nss-dev libzmq5-dev libczmq-dev protobuf-compiler libprotobuf-dev
 
-script: ./waf configure build 
+# - wget https://github.com/protocolbuffers/protobuf/releases/download/v3.6.1/protobuf-cpp-3.6.1.tar.gz
+# - tar -xzf protobuf-cpp-3.6.1.tar.gz
+# - pushd protobuf-3.6.1 && ./configure --prefix=/usr && make && sudo make install && popd
+
+script:
+  - ./waf configure build
 
 
 
-# see https://github.com/ZeroCM/zcm/blob/master/.travis.yml
+
+# for inspiration see
+# - https://github.com/ZeroCM/zcm/blob/master/.travis.yml
+# - https://github.com/root-project/rootbench/blob/master/.travis.yml

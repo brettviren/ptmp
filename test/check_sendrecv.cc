@@ -1,4 +1,5 @@
 #include "ptmp/api.h"
+#include "ptmp/testing.h"
 
 #include "json.hpp"
 
@@ -15,6 +16,7 @@ void sender(zsock_t* pipe, void* args)
     std::string cfg = *(std::string*)(args);
     ptmp::TPSender send(cfg);
     ptmp::data::TPSet tps;
+    ptmp::testing::init(tps);
     
     zsock_signal(pipe, 0);      // ready
     char* go = zstr_recv(pipe); // should actually check what msg is...
@@ -26,7 +28,7 @@ void sender(zsock_t* pipe, void* args)
             zsys_info("sender got stop at %d", count);
             break;
         }
-        tps.set_count(count);
+        ptmp::testing::set_count_clock(tps);
         send(tps);
         zsock_send(pipe, "44", 0, count);
         //zsys_info("0: %d", count);
@@ -40,6 +42,7 @@ void recver(zsock_t* pipe, void* args)
     std::string cfg = *(std::string*)(args);
     ptmp::TPReceiver recv(cfg);
     ptmp::data::TPSet tps;
+    ptmp::testing::init(tps);
     
     zsock_signal(pipe, 0);      // ready
     char* go = zstr_recv(pipe); // should actually check what msg is...

@@ -1,0 +1,33 @@
+#+title: To Do
+
+* Basic functionality
+
+Here's a check list of work needed (or done).
+
+- [X] trigger primitives message schema
+- [X] build system
+- [X] Travis-CI hookup
+- [X] add JSON library
+- [X] write sender/receiver API classes
+- [X] define configuration schema
+- [X] test programs spanning transports and supported socket types
+- [X] test that demonstrates multiple subs
+- [ ] application settable HWM
+
+* Extended functionality
+
+A more full vision exists which starts with PTMP and includes elements that have been prototyped, tested or are in production use in [[https://github.com/brettviren/digrex/tree/master/dexnet][dexnet]] and the [[https://wirecell.github.io][Wire-Cell Toolkit]].  This vision can be described with a set of high level conceptual features:
+
+- use ZeroMQ actors as basic building block for an application development framework.
+
+- follow a "ported graph" model for the design of the network.  A fundamental node in this graph is a ZeroMQ actor and an aggregate node is some subgraph of nodes.
+
+- provide dynamic aggregation of nodes into subgraph executables via a plugin based dynamic factory mechanism (~upif~).
+
+- drive this aggregation via configuration based on Jsonnet and the ~pgraph~ Jsonnet functions.  Extend this configuration network wide.
+
+- develop reusable discovery and presence nodes based on Zyre.
+
+- use discovery/presence to develop self-healing and zero-downtime reconfiguration mechanisms.
+
+This list is roughly ordered in layers of implementation.  Ie, the first must be done before the next.  It is also ordered in terms of requiring additional effort, group buy-in and larger scale cooperation.

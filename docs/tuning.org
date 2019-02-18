@@ -1,0 +1,263 @@
+#+title: Understanding and tuning
+
+* Understanding the network
+
+In boring universe nothing exceptional ever happens.  Receivers start
+and wait for messages, senders start and start sending, receivers
+receive, senders send, forever and ever.  No message is ever lost,
+repeated nor corrupted.
+
+Reality is, of course, exceptional.  The rest of this section
+describes some of these realities and how PTMP or the application can
+or must deal with them.
+
+** High Water Mark and Drop vs Block
+
+ZeroMQ has the notion of a "high water mark" (HWM) for its internal
+send or receive queues which are associated with a socket.  The socket
+type determines what happens to the next message when it is to enter
+the queue and the socket has reached HWM (ZMQ says the socket is in
+the "mute" state).  In particular, for PUB/SUB the message will be
+*dropped* while for PAIR and PUSH/PULL the caller will be *blocked*.
+
+Of course, neither blocking or dropping is desirable but it is
+important to understand that as fantastic as ZeroMQ is, no magic may
+be invoked.  Something's gotta give.  Time marches on unceasingly.  If
+buffers are full either we have to wait until they empty or we have to
+throw away data.  Throwing away data is scary, but waiting just means
+that we push the problem *upstream* and upstream in the DAQ is where the
+problem just becomes harder.
+
+Now you might say, well just increase the HWM!  The problem is solved!
+The HWM mark can indeed be increased but it comes at some cost.  This
+cost may be modest and bearable but needs to be understood.  The costs
+include: increased system memory usage (or exhaustion if the HWM is
+set to be unbound), increased latency variance, and delay in detecting
+the real problem.  These issues are discussed further below.
+
+Some tuning of the HWM can and should be done taking in to account the
+expected and measured message rates, their variance and the
+sensitivity of the particular application to being blocked or having
+messages dropped.
+
+In testing this, it's important to recognize that ZeroMQ can send
+messages into its queues and a horrendous rate if nothing stops it.
+As a consequence, any HWM tuning determined by the tests may be
+horribly suboptimal for an actual application.  This packages provides
+some simple tests, and they are described below.  They can provide
+both horrendous rates as well as try to emulate more reasonable loads.
+
+** Senders stop sending
+
+ZeroMQ has robustness against endpoints disappearing, especially if
+they eventually reappear.  Socket connections need not break in the
+interim.  However, when a sender goes away the receiver obviously
+stops getting new messages (eventually, see [[Deep queues]]).  If the
+receiver hangs on the sender's every word then its app may hang as
+well (if it's programmed to hang).
+
+Each attempt to receive a message may be given a timeout.  The
+application can then determine if the message was actually received by
+checking the Boolean return value.  If it's ~false~ then the app can
+decide what to do (exit, send user error, tell run control, connect to
+a backup sender, burn down the counting house, or something equally
+helpful).
+
+** No receivers to receive 
+
+ZeroMQ sockets are individuals.  They don't strictly need others.  In
+particular, a sender can happily sit around sending message with no
+one else to receive them.  Subject to its HWM rule, and if allowed to
+by its driving application, it can do so and a blistering rate.
+
+In particular, a PUB socket will happily spray away messages to no one
+and typically limited only by how fast the sender application can
+provide them.  By the time a SUB shows up, the party may be long over.
+At the very least, if any SUBs must not miss messages, they should
+start first and ideally be the ends that ~bind~.  The PUB end can then
+be the one to ~connect~ to them.  Of course, this pattern may seem
+"backward" in some applications and need not be followed.
+
+However, even with if one does follow this backward attachment
+pattern, a brief delay may still needed for the PUB to process the
+SUB's subscription.  Otherwise, if the sender app immediately starts
+sending messages after the PUB is created, those messages may not
+reach the SUB.  The time it takes for ZeroMQ to setup the subscription
+is on order millisecond.  Advanced patterns are described in the
+ZeroMQ guide to handle "late joiner syndrome" without imposing a
+brutish ~zclock_sleep()~ of a ms or so, but PTMP does not (yet)
+implement them.
+
+This case can be exercised like: 
+
+#+BEGIN_EXAMPLE
+  (shell 1)$ ./build/test/check_recv 10 SUB bind ipc://junk.txt
+  (shell 2)$ ./build/test/check_send 10000 PUB connect ipc://junk.txt 0 
+#+END_EXAMPLE
+
+The SUB receiver starts first and binds so is ready and waiting as
+soon as the PUB sender deigns to show up.  When the PUB gets going, it
+REALLY gets going and the receiver will likely show some number of
+missing messages:
+
+#+BEGIN_EXAMPLE
+0 - 1797 = -1797 : 2.74924s
+1 - 1798 = -1797 : 2.74928s
+....
+#+END_EXAMPLE
+
+If we tell the senderto wait just a scant few milliseconds between
+creating its PUB socket and starting to the receiver sees the start of
+the stream.
+
+#+BEGIN_EXAMPLE
+  (shell 1)$ ./build/test/check_recv 10 SUB bind ipc://junk.txt
+  (shell 2)$ ./build/test/check_send 10000 PUB connect ipc://junk.txt 1
+#+END_EXAMPLE
+
+One then gets
+
+#+BEGIN_EXAMPLE
+0 - 0 = 0 : 1.41913s
+1 - 1 = 0 : 1.41917s
+...
+#+END_EXAMPLE
+
+Over a physical network, more time will be needed.  On a 1 Gbps
+network, a 2ms delay was required to avoid losing the initial
+messages.
+
+Note, in the case of the DAQ, such early loss of messages may simply
+be taken in stride.  While the DAQ components are assembling, it
+should be acceptable to miss some data.
+
+** Deep queues
+
+The messages involved in PTMP are rather small and given ample system
+RAM it may be enticing to set HWM very high "just to be safe".  This
+can certainly be done but needs some understanding of the possible
+unwanted (peak) latency this may introduce.  
+
+Take for example a receiver which is not keeping up.  It may take
+hours for the sender to outpace it enough that the receiver's HWM is
+reached.  If the socket follows a drop strategy, hitting the HWM can
+be detected by the receiver eventually seeing the gap in message
+sequence number.  If it took a long time to reach the HWM it may take
+another long time for that gap to work its way through the receiver
+queue.  On the other hand if the HWM strategy is to block, then the
+sender may detect it if it employees a send timeout.  With no timeout
+the user may "detect" the problem due to the sender appearing to hang.
+
+Another example: say a sender freaks out and sends a bazillion
+messages which are dutifully absorbed by the deep HWM buffers.  Then
+in a fit of neuroses, the sender dies with a farewell message.
+Meanwhile the receiver will happily process that deep buffer, possibly
+for hours and hours before getting the sad final note.  Do you want
+one application to exhibit such insensitivity to the plight of
+another?  Maybe.  Maybe not.
+
+The sender and receiver must be developed with these possibilities in
+mind.  The application developer must answer:
+
+- how does that HWM translate to real time response in different
+  scenarios?
+
+- how deep should HWM be to ride out acceptable variances and how deep
+  is "too deep"?
+
+- should we block or should we drop messages on HWM?  Given a choice,
+  how do we detect both and how do we respond?
+
+
+** Fast quit
+
+ZeroMQ buffers messages both on the sender and receiver side.  Of
+course, if the application tears itself down while those buffers are
+in use then their messages must go unprocessed.  One consequence of
+this is that the PTMP API classes are expected to be long-lived, where
+long is relative to how long it takes those buffers to drain.  It is
+easy to construct situations where an app happily squirts a bunch of
+messages and then destroys its sender and those messages never reach a
+receiver.  This is particularly likely if a blocking socket pattern
+(PAIR, PUSH/PULL) is chosen and the app is much faster than the
+network or the receiver.
+
+This can be reproduced with:
+
+#+BEGIN_EXAMPLE
+  (shell 1)$ ./build/test/check_recv 10000 PAIR bind ipc://junk.txt
+  (shell 2)$ ./build/test/check_send 10000 PAIR connect ipc://junk.txt 
+#+END_EXAMPLE 
+
+Depending on the speed of your computer the ~check_recv~ will hang after getting some number of messages because the ~check_send~ quit so fast after sending its load.  Running the test while telling ~check_send~ to hold its horses for a second will let ~check_recv~ finish.
+
+#+BEGIN_EXAMPLE
+  (shell 1)$ ./build/test/check_recv 10000 PAIR bind ipc://junk.txt
+  (shell 2)$ ./build/test/check_send 10000 PAIR connect ipc://junk.txt 0 1000
+#+END_EXAMPLE
+
+** Stupid sexy segfaults
+
+For the most part, the PTMP API should not expose to the application
+anything that can segfault.  But, during development ZeroMQ certainly
+lets the programmer do blatant dumbness especially given the C-like
+C++ in which it is written.  Some things to watch out for are:
+
+- wrongly specifying a size for a given C++ type.
+
+- creating but not destroying some ZeroMQ object.
+
+- neglecting that ~NULL~ terminator in function calls that take variadic args (my fav!)
+
+* Throughput Performance
+
+To test throughput, printing of any per-message info is turned off.
+
+1M-10M messages, ~localhost~ testing (127.0.0.1 IP address), ~check_sendrecv~ used.
+
+| pattern  | transport | hal      | haiku    | yobox   |
+|          |           | i5-252-M | i7-4770K | i5-7500 |
+|----------+-----------+----------+----------+---------|
+| pubsub   | inproc    | 364 kHz  | 606 kHz  | 557 kHz |
+| pubsub   | ipc       | 175 kHz  | 502 kHz  | 469 kHz |
+| pubsub   | tcp       | 156 kHz  | 599 kHz  | 522 kHz |
+| pipe     | tcp       | 120 kHz  | 311 kHz  | 279 kHz |
+| pipe     | inproc    | 162 kHz  | 312 kHz  | 282 kHz |
+| pushpull | inproc    | 158 kHz  | 311 kHz  | 278 kHz |
+|----------+-----------+----------+----------+---------|
+
+TCP testing from haiku to yobox over 1 Gbps home network with two
+intervening switches.  ~check_send~ and ~check_recv~ used.
+
+| pattern  | send    | recv    | num | notes         |
+|----------+---------+---------+-----+---------------|
+| pubsub   | 1.7 MHz | 630 kHz | 1M  |               |
+| pubsub   | 2.2 MHz | 750 kHz | 10M | loss          |
+| pubsub   | 790 kHz | 775 kHz | 10M | 1us/100 sleep |
+| pushpull | 797 kHz | 418 kHz | 1M  |               |
+| pushpull | 777 kHz | 740 kHz | 10M |               |
+|----------+---------+---------+-----+---------------|
+
+The PUB/SUB connection is "faster" because of message loss due to SUB
+not keeping up with PUB.  Slowing down the sender with a call to
+~usleep(1)~ every 100th message can achieve the same rate as PUSH/PULL
+with no loss.
+
+It's important to note that this is not a suggestion to add sleeps
+inside a production loop.  Just PUB can be incredibly fast and a SUB
+that is too slow will simply lose messages.  No matter what,
+somethings gotta give.  If one wants the slow consumers to slow down
+the upstream ("back pressure") then PUSH/PULL can work better.  What
+the above demonstrates is that ZeroMQ is not a bottleneck.  And, these
+messages are serialized via protobuf, so no problem there.  While
+sending, both hosts are at about 110% CPU usage.  The test jobs memory
+footprints are stable at a bit less than 10 MB RSS and 150 MB VIRT.
+
+Two or three SUBs to one PUB misses more packets and a 1/10 ~usleep(1)~
+is needed.  With ~usleep()~ removed, three PULLs on one PUSH runs at
+about 300 kHz per PULL.  As PUSH is round-robin, the miss detection in
+~send_recv~ fires and prints log info all the time so this is slowing
+down the network to some extent.  With the logging removed, the
+individual PULLs see 600-800 kHz and the PUSH makes 1.2 Mhz.
+
+

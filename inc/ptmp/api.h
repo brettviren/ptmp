@@ -6,8 +6,7 @@
 
 #include <string>
 
-// brings in class in ptmp::data:: namespace
-#include "ptmp/ptmp.pb.h"
+#include "ptmp/data.h"
 
 
 namespace ptmp {

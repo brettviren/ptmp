@@ -2,31 +2,72 @@
 
 Prototype Trigger Message Passing aka Pretty Temporary
 
+* Introduction 
+
+This package provides trigger messages transport for the protoDUNE DAQ prototyping development toward full DUNE Far Detector DAQ.
+
+A simple API is provided which hides details of the transport
+mechanism.  The application simply sees a sink or a source of trigger
+messages.  Driven by user configuration, an intervening network may be
+defined.  This can be a simple sink-to-source pipeline or may be
+structured into a rich data flow network which may include redundant
+flow paths and intervening filtering/processing with redundancy and
+load balancing.  The sink/source applications need not be complicated by this richness.
+
+Message transport is based on ZeroMQ which provides robustness and
+performance (see the section on throughput performance in the [[./docs/tuning.org][tuning]]
+document).  Thus, the PTMP network may exist over a mix of transports
+(inter-thread, inter-process and inter-computer) as determined by the
+configuration.  The payload message frames are currently serialized
+using protobuf ([[./ptmp/ptmp.proto][schema]]).
+
+
 * Status
+
+This package has basic functionality.  See [[./todo.org][To Do]] document for checklist
+and notes on future development. 
+
+This button determines if recent builds and tests pass on Travis-CI:
 
 [[https://travis-ci.org/brettviren/ptmp][file:https://travis-ci.org/brettviren/ptmp.svg]]
 
-This package now has basic functionality.  See the [[To Do]] section for details.
+Note, a failure here is not necessarily indicative of a real problem.
 
-* What's here?
+* Installation 
 
-This package a simple API to sink and source trigger messages while
-supporting a rich and high performance, but intentionally simplified,
-ZeroMQ based data flow network defined by user configuration.  As this network is based on ZeroMQ it may exist over a mix of transports (inter-thread, inter-process and inter-computer) as determined by the configuration.
+The PTMP package should build with any reasonably up to date C++
+compiler.  GCC 7 is used in development.  Prerequisite software
+dependencies are:
 
-* Messages
+- libzmq
+- CZMQ
+- protobuf (v2)
 
-The messages supported by PTMP are defined in terms of ZeroMQ frames.  The first frame is an integer giving the message type.  The second and subsequent frame contents depend on that message type.  The message types are:
+See the [[./.travis.yml][Travis-CI file]] for an ~apt~ installation line.  There is also a
+[[./installdeps.sh][script]] to assist building the dependencies from source.
 
-1) a set of TPs, frame 2 is a serialized ~TPSet~ protobuf.
+* Application Development
 
-2) waveform data, currently not supported.
+Application is either a "sender" or a "receiver" of trigger messages.
+See the following example applications.  Running them without command
+line arguments will give a usage message.
+
+- [[./test/check_send.cc][check_send]] :: send messages via ~ipc~ or ~tcp~.
+- [[./test/check_recv.cc][check_recv]] :: receive messages via ~ipc~ or ~tcp~.
+- [[./test/check_sendrecv.cc][check_sendrecv]] :: send and receive messages via ~inproc~, ~ipc~ or ~tcp~.
+
+Application programmers (and possibly their users) should also read
+the section [[Configuration]] below.
 
 * Configuration
 
-The PTMP API classes require a string which specifies details about
-their connection to the PTMP network.  This string is in JSON format
-and expressing a object (dictionary) with the following attributes.
+The PTMP API classes require a string which will be used to configure
+the connection to the PTMP network.  This string *must* be provided by
+the application.  The application may of course hard-wire it or allow
+the application user to provide it.
+
+This string is in JSON format and expressing a object (dictionary)
+with the following attributes (currently just one).
 
 - socket :: a socket configuration object.
 
@@ -37,230 +78,15 @@ has the following attributes:
 - bind :: an array of addresses in canonical ZeroMQ form that the socket should bind
 - connect :: an array of addresses in canonical ZeroMQ form that the socket should connect
 
-ZeroMQ restrictions apply.  For example a PAIR socket may only bind or connect to one address.  Others can bind or connect to multiple addresses.
+The usual ZeroMQ restrictions apply.  For example a PAIR socket may
+only bind or connect to one address.  Others can bind or connect to
+multiple addresses.
 
 * Tuning and Exception Handling
 
-Like with any asynchronous communication, certain exceptional
-occurrences must be handled.  
+The document [[./docs/tuning.org][tuning]] collects some information that will help
+understand how the PTMP network behaves, where things can be tuned to
+meet different goals and also some known features of a high
+performance, asynchronous communication network that are best taken
+into account.
 
-In boring universe things nothing exceptional ever happens.  Receivers
-start and wait for messages, senders start and start sending,
-receivers receive, senders send, forever and ever.  No message is ever
-lost, repeated nor corrupted.
-
-Reality is, of course, exceptional.  The rest of this section
-describes some of these realities and how PTMP or the application can
-or must deal with them.
-
-** High Water Mark
-
-ZeroMQ has the notion of a "high water mark" (HWM) for its internal
-send and receive queues associated with a socket.  The socket type
-determines what happens to the next message when it is to enter the
-queue.  In particular, for PUB/SUB the message will be *dropped* while
-for PAIR and PUSH/PULL the caller will be *blocked*.  Neither is
-desirable but as fantastic as ZeroMQ is, no magic may be invoked.
-Something's gotta give.  
-
-The HWM mark can be increased but at the cost of increased system
-memory usage (or exhaustion if the HWM is set to be unbound),
-increased latency variance, delay in detecting the real problem.  Some
-tuning of the HWM can and should be done taking in to account message
-rate, rate variance and the sensitivity of the application to being blocked or having messages dropped.
-
-In testing this aspect, it's important to recognize that ZeroMQ can
-send messages into its queues and a horrendous rate if nothing stops
-it.  As a consequence, any HWM tuning determined by the tests may be horribly suboptimal for an actual application.
-
-** Senders stop sending
-
-ZeroMQ has robustness against endpoints disappearing, especially if
-they eventually reappear.  Socket connections need not break in the
-interim.  However, when a sender goes away the receiver obviously
-stops getting new messages (eventually, see [[Deep queues]]).  If the
-receiver hangs on the sender's every word then its app may hang as
-well (if it's programmed to hang).
-
-Each attempt to receive a message may be given a timeout.  The
-application can then determine if the message was actually received by
-checking the Boolean return value.  If it's ~false~ then the app can
-decide what to do (exit, send user error, tell run control, connect to
-a backup sender, burn down the counting house, or something equally
-helpful).
-
-** No receivers to receive 
-
-ZeroMQ sockets are individuals.  They don't need others.  In particular, a sender can happily sit around with no one to send to, subject to its HWM rule.  In particular, a PUB will happily spray away messages to no one and typically limited only by how fast the sender application can provide them.  By the time a SUB shows up, the party may be over.  If any SUBs must not miss messages, they should start first.  They can ~bind~ while the PUB can ~connect~ if that pattern makes sense.
-
-However, even with if one does a ~bind~ first with the SUB and later a
-~connect~ with the PUB a brief delay is needed for the PUB to process
-the SUB's subscription.  If the sender app immediately starts sending
-messages after the PUB is created, those messages may not reach the
-SUB.  The time it takes for ZeroMQ to setup the subscription is on
-order millisecond.  Advanced patterns are described in the ZeroMQ
-guide to handle this without imposing a brutish ~zclock_sleep()~ of a ms
-or so, but PTMP does not implement them.
-
-This case can be exercised: 
-
-#+BEGIN_EXAMPLE
-  (shell 1)$ ./build/test/check_recv 10 SUB bind ipc://junk.txt
-  (shell 2)$ ./build/test/check_send 10000 PUB connect ipc://junk.txt 0 
-#+END_EXAMPLE
-
-The SUB receiver starts first and binds so is ready and waiting as
-soon as the PUB sender deigns to show up.  When the PUB gets going, it
-REALLY gets going and the receiver will likely show some number of
-missing messages:
-
-#+BEGIN_EXAMPLE
-0 - 1797 = -1797 : 2.74924s
-1 - 1798 = -1797 : 2.74928s
-....
-#+END_EXAMPLE
-
-If we tell the senderto wait just a scant few milliseconds between
-creating its PUB socket and starting to the receiver sees the start of
-the stream.
-
-#+BEGIN_EXAMPLE
-  (shell 1)$ ./build/test/check_recv 10 SUB bind ipc://junk.txt
-  (shell 2)$ ./build/test/check_send 10000 PUB connect ipc://junk.txt 1
-#+END_EXAMPLE
-
-One then gets
-
-#+BEGIN_EXAMPLE
-0 - 0 = 0 : 1.41913s
-1 - 1 = 0 : 1.41917s
-...
-#+END_EXAMPLE
-
-Over a physical network, more time will be needed.  On a 1 Gbps network, a 2ms delay was required to avoid losing the initial messages.
-
-** Deep queues
-
-The messages involved in PTMP are rather small and given system RAM it
-may be enticing to set HWM very high to "just be safe".  This can be
-done but needs understanding of possible latency this may introduce.
-
-Take for example, a receiver is not keeping up and it takes hours for
-the sender to outpace it enough that the receiver's HWM is reached.
-The receiver finally can notify the app and thus some human of the
-problem.  Is it okay to wait that long?  
-
-Or, say a sender freaks out and sends a bazillion messages which are
-dutifully absorbed by the deep HWM buffers.  Then in a fit of
-neuroses, the sender dies with a farewell message.  Meanwhile the
-receiver will happily process that deep buffer, possibly for hours and
-hours before getting the sad final note.  Do you want one application
-to exhibit such insensitivity to the plight of another?  Maybe.  Maybe
-not.
-
-** Fast quit
-
-ZeroMQ buffers messages both on the sender and receiver side.  Of course, if the application tears itself down while those buffers are in use then their messages must go unprocessed.  One consequence of this is that the PTMP API classes are expected to be long-lived, where long is relative to how long it takes those buffers to drain.  It is easy to construct situations where an app happily squirts a bunch of messages and then destroys its sender and those messages never reach a receiver.  This is particularly likely if a blocking socket pattern (PAIR, PUSH/PULL) is chosen and the app is much faster than the network or the receiver.
-
-This can be reproduced with:
-
-#+BEGIN_EXAMPLE
-  (shell 1)$ ./build/test/check_recv 10000 PAIR bind ipc://junk.txt
-  (shell 2)$ ./build/test/check_send 10000 PAIR connect ipc://junk.txt 
-#+END_EXAMPLE 
-
-Depending on the speed of your computer the ~check_recv~ will hang after getting some number of messages because the ~check_send~ quit so fast after sending its load.  Running the test while telling ~check_send~ to hold its horses for a second will let ~check_recv~ finish.
-
-#+BEGIN_EXAMPLE
-  (shell 1)$ ./build/test/check_recv 10000 PAIR bind ipc://junk.txt
-  (shell 2)$ ./build/test/check_send 10000 PAIR connect ipc://junk.txt 0 1000
-#+END_EXAMPLE
-
-** Stupid sexy segfaults
-
-For the most part, the PTMP API should not expose to the application
-anything that can segfault.  But, during development ZeroMQ certainly
-lets the programmer do blatant dumbness especially given the C-like
-C++ in which it is written.  Some things to watch out for are:
-
-- wrongly specifying a size for a given C++ type.
-
-- creating but not destroying some ZeroMQ object.
-
-- neglecting that ~NULL~ terminator in function calls that take variadic args (my fav!)
-
-** Throughput
-
-To test throughput, printing of any per-message info is turned off.
-
-1M-10M messages, ~localhost~ testing (127.0.0.1 IP address), ~check_sendrecv~ used.
-
-| pattern  | transport | hal      | haiku    | yobox   |
-|          |           | i5-252-M | i7-4770K | i5-7500 |
-|----------+-----------+----------+----------+---------|
-| pubsub   | inproc    | 364 kHz  | 606 kHz  | 557 kHz |
-| pubsub   | ipc       | 175 kHz  | 502 kHz  | 469 kHz |
-| pubsub   | tcp       | 156 kHz  | 599 kHz  | 522 kHz |
-| pipe     | tcp       | 120 kHz  | 311 kHz  | 279 kHz |
-| pipe     | inproc    | 162 kHz  | 312 kHz  | 282 kHz |
-| pushpull | inproc    | 158 kHz  | 311 kHz  | 278 kHz |
-|----------+-----------+----------+----------+---------|
-
-TCP testing from haiku to yobox over 1 Gbps home network with two intervening switches.  ~check_send~ and ~check_recv~ used.
-
-| pattern  | send    | recv    | num | notes         |
-|----------+---------+---------+-----+---------------|
-| pubsub   | 1.7 MHz | 630 kHz | 1M  |               |
-| pubsub   | 2.2 MHz | 750 kHz | 10M | loss          |
-| pubsub   | 790 kHz | 775 kHz | 10M | 1us/100 sleep |
-| pushpull | 797 kHz | 418 kHz | 1M  |               |
-| pushpull | 777 kHz | 740 kHz | 10M |               |
-|----------+---------+---------+-----+---------------|
-
-The PUB/SUB connection is "faster" because of message loss due to SUB not keeping up with PUB.  Slowing down the sender with a call to ~usleep(1)~ every 100th message can achieve the same rate as PUSH/PULL with no loss.
-
-It's important to note that this is not a suggestion to add sleeps
-inside a production loop.  Just PUB can be incredibly fast and a SUB
-that is too slow will simply lose messages.  No matter what,
-somethings gotta give.  If one wants the slow consumers to slow down
-the upstream ("back pressure") then PUSH/PULL can work better.  What
-the above demonstrates is that ZeroMQ is not a bottleneck.  And, these
-messages are serialized via protobuf, so no problem there.  While
-sending, both hosts are at about 110% CPU usage.  The test jobs memory
-footprints are stable at a bit less than 10 MB RSS and 150 MB VIRT.
-
-Two or three SUBs to one PUB misses more packets and a 1/10 ~usleep(1)~
-is needed.  With ~usleep()~ removed, three PULLs on one PUSH runs at about 300 kHz per PULL.  As PUSH is round-robin, the miss detection in ~send_recv~ fires and prints log info all the time so this is slowing down the network to some extent.  With the logging removed, the individual PULLs see 600-800 kHz and the PUSH makes 1.2 Mhz.
-
-
-
-* To Do
-
-** Basic functionality
-
-- [X] trigger primitives message schema
-- [X] build system
-- [X] Travis-CI hookup
-- [X] add JSON library
-- [X] write sender/receiver API classes
-- [X] define configuration schema
-- [X] test programs spanning transports and supported socket types
-- [X] test that demonstrates multiple subs
-
-** Extended functionality
-
-A more full vision exists which starts with PTMP and includes elements that have been prototyped, tested or are in production use in [[https://github.com/brettviren/digrex/tree/master/dexnet][dexnet]] and the [[https://wirecell.github.io][Wire-Cell Toolkit]].  This vision can be described with a set of high level conceptual features:
-
-- use ZeroMQ actors as basic building block for an application development framework.
-
-- follow a "ported graph" model for the design of the network.  A fundamental node in this graph is a ZeroMQ actor and an aggregate node is some subgraph of nodes.
-
-- provide dynamic aggregation of nodes into subgraph executables via a plugin based dynamic factory mechanism (~upif~).
-
-- drive this aggregation via configuration based on Jsonnet and the ~pgraph~ Jsonnet functions.  Extend this configuration network wide.
-
-- develop reusable discovery and presence nodes based on Zyre.
-
-- use discovery/presence to develop self-healing and zero-downtime reconfiguration mechanisms.
-
-This list is roughly ordered in layers of implementation.  Ie, the first must be done before the next.  It is also ordered in terms of requiring additional effort, group buy-in and larger scale cooperation.
