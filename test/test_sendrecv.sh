@@ -5,6 +5,7 @@ echo $BASH_SOURCE
 top="$(dirname $(dirname $BASH_SOURCE))"
 
 set -e
+set -x
 
 for tran in inproc://sendrecv ipc://sendrecv.fifo tcp://127.0.0.1:23456
 do
