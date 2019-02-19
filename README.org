@@ -4,7 +4,8 @@ Prototype Trigger Message Passing aka Pretty Temporary
 
 * Introduction 
 
-This package provides trigger messages transport for the protoDUNE DAQ prototyping development toward full DUNE Far Detector DAQ.
+This package provides trigger messages transport for the protoDUNE DAQ
+prototyping development toward full DUNE Far Detector DAQ.
 
 A simple API is provided which hides details of the transport
 mechanism.  The application simply sees a sink or a source of trigger
@@ -24,7 +25,7 @@ using protobuf ([[./ptmp/ptmp.proto][schema]]).
 
 * Status
 
-This package has basic functionality.  See [[./todo.org][To Do]] document for checklist
+This package has basic functionality.  See [[./docs/todo.org][To Do]] document for checklist
 and notes on future development. 
 
 This button determines if recent builds and tests pass on Travis-CI:
@@ -44,17 +45,44 @@ dependencies are:
 - protobuf (v2)
 
 See the [[./.travis.yml][Travis-CI file]] for an ~apt~ installation line.  There is also a
-[[./installdeps.sh][script]] to assist building the dependencies from source.
+[[./installdeps.sh][script]] to assist building the dependencies from source.  With
+prerequisites available, issue:
+
+#+BEGIN_EXAMPLE
+  $ ./waf --prefix=<path> configure build install
+  $ ls <path>/{lib,include,bin}/
+#+END_EXAMPLE 
+
+Replace ~<path>~ with a into which you want the software to install.  If
+you want to just test it locally you may omit ~--prefix~ and the ~install~
+command.
+
+As part of the build, a number of tests will be built and run.  See
+the [[./docs/tuning.org][tuning]] document for some details on these tests.
 
 * Application Development
 
-Application is either a "sender" or a "receiver" of trigger messages.
-See the following example applications.  Running them without command
-line arguments will give a usage message.
+Application may be a "sender" or a "receiver" of trigger messages by
+instantiating a ~TPSender~ or ~TPReceiver~, respectively, with their
+configuration string.  These instances should be long-lived.  They are
+/callable/ objects.  The sender will take a ~const TPSet&~ to read and
+send to the network as a single message and the receiver takes a
+non-const ~TPSet&~ to be filled when a message arrives.  The receiver
+also takes an optional second argument which is a timeout in msec.  If
+no message arrives w/in that time the call will return the value
+~false~.  The receiver may ~throw std::runtime_error~ if a message is
+received which can not be deserialized into the ~TPSet~ object.
 
-- [[./test/check_send.cc][check_send]] :: send messages via ~ipc~ or ~tcp~.
-- [[./test/check_recv.cc][check_recv]] :: receive messages via ~ipc~ or ~tcp~.
-- [[./test/check_sendrecv.cc][check_sendrecv]] :: send and receive messages via ~inproc~, ~ipc~ or ~tcp~.
+The following applications provide reference applications.  Running
+them without command line arguments will give a usage message.
+
+- [[./test/check_send.cc][check_send]] :: send empty ~TPSet~ via ~ipc~ or ~tcp~ in a simple manner.
+- [[./test/check_send.cc][check_send_rates]] :: a more sophisticated version of the above which
+     adds a model for inter-message timing variability as well as
+     filling ~TPSet~ with some number of actual TPs.
+- [[./test/check_recv.cc][check_recv]] :: receive messages via ~ipc~ or ~tcp~.  Works with either senders.
+- [[./test/check_sendrecv.cc][check_sendrecv]] :: a self contained sender+receiver that can use
+     ~inproc~ as well as ~ipc~ or ~tcp~.
 
 Application programmers (and possibly their users) should also read
 the section [[Configuration]] below.

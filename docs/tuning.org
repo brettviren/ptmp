@@ -11,6 +11,9 @@ Reality is, of course, exceptional.  The rest of this section
 describes some of these realities and how PTMP or the application can
 or must deal with them.
 
+*Note: the command line interface to the reference applications has changed since the examples were written.  Run them with out any arguments to get a brief synopsis of their use.*
+
+
 ** High Water Mark and Drop vs Block
 
 ZeroMQ has the notion of a "high water mark" (HWM) for its internal

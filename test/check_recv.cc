@@ -1,6 +1,7 @@
 #include "ptmp/api.h"
 
 #include "json.hpp"
+#include "CLI11.hpp"
 
 #include <czmq.h>
 #include <iostream>
@@ -10,22 +11,31 @@ using json = nlohmann::json;
 
 int main(int argc, char* argv[])
 {
-    if (argc < 5) {
-        cerr << "usage: test_recv N <type> <bind|connect> <endpoint> [timeout]" << endl;
-        return 0;
-    }
+    CLI::App app{"Receive TPSets"};
 
-    const int count = atoi(argv[1]);
-    int timeout = -1;
-    if (argc > 5) {
-        timeout = atoi(argv[5]);
-    }
+    int count=0;
+    app.add_option("-n,--ntpsets", count, "Number of TPSet messages to send.  0 (default) runs for ever")->required();
+
+    std::string socktype="PUB";
+    app.add_option("-p,--socket-pattern", socktype, "The ZeroMQ socket pattern for endpoint [PUB, PAIR, PUSH]");
+    std::string attach="bind";
+    app.add_option("-a,--socket-attachment", attach, "The socket attachement method [bind|connect] for this endpoint");
+    std::vector<std::string> endpoints;
+    app.add_option("-e,--socket-endpoints", endpoints, "The socket endpoint addresses in ZeroMQ format (tcp:// or ipc://)")->expected(-1);
+
+    int timeout=-1;
+    app.add_option("-T,--timeout-ms", timeout, "Number of ms to wait for a message, default is indefinite (-1)");
+
+    CLI11_PARSE(app, argc, argv);
+
 
     json jcfg;
-    jcfg["socket"]["type"] = argv[2];
-    jcfg["socket"][argv[3]][0] = argv[4];
+    jcfg["socket"]["type"] = socktype;
+    for (const auto& endpoint : endpoints) {
+        jcfg["socket"][attach].push_back(endpoint);
+    }
     cerr << jcfg << endl;
-    
+
     ptmp::TPReceiver recv(jcfg.dump());
 
     ptmp::data::TPSet tps;

@@ -13,6 +13,12 @@ Here's a check list of work needed (or done).
 - [X] test programs spanning transports and supported socket types
 - [X] test that demonstrates multiple subs
 - [ ] application settable HWM
+- [X] tests which emulate expected TP finders in terms of specifying
+  mean and variance of some rates.
+
+* Discussion and Decisions Needed
+
+- Decide on the [[../ptmp/ptmp.proto][message schema]].
 
 * Extended functionality
 
