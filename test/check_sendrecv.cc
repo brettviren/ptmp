@@ -13,18 +13,23 @@ using json = nlohmann::json;
 
 void sender(zsock_t* pipe, void* args)
 {
+    zsys_info("sender starting");
     std::string cfg = *(std::string*)(args);
     ptmp::TPSender send(cfg);
     ptmp::data::TPSet tps;
     ptmp::testing::init(tps);
     
     zsock_signal(pipe, 0);      // ready
+    zsys_info("sender ready");
     char* go = zstr_recv(pipe); // should actually check what msg is...
+    zsys_info("sender looping");
 
+    zpoller_t* poller = zpoller_new(pipe, NULL);
     int count = 0;
     while (true) {
-        zmsg_t* ctrl = zmsg_recv_nowait(pipe);
-        if (ctrl) {
+	//zsys_info("0: %d, check pipe", count);
+        void* which = zpoller_wait(poller, 0);
+        if (which) {
             zsys_info("sender got stop at %d", count);
             break;
         }
@@ -39,27 +44,33 @@ void sender(zsock_t* pipe, void* args)
 }
 void recver(zsock_t* pipe, void* args)
 {
+    zsys_info("recver starting");
     std::string cfg = *(std::string*)(args);
     ptmp::TPReceiver recv(cfg);
     ptmp::data::TPSet tps;
     ptmp::testing::init(tps);
     
     zsock_signal(pipe, 0);      // ready
+    zsys_info("recver ready");
     char* go = zstr_recv(pipe); // should actually check what msg is...
+    zsys_info("recver looping");
 
+    zpoller_t* poller = zpoller_new(pipe, NULL);
     int count=0;
     int got_count = 0;
+    const int timeout = 10000;
     while (true) {
-        zmsg_t* ctrl = zmsg_recv_nowait(pipe);
-        if (ctrl) {
+	//zsys_info("1: %d, check pipe", count);
+        void* which = zpoller_wait(poller, 0);
+        if (which) {
             zsys_info("recver got stop at %d, last got: %d", count, got_count);
             break;
         }
         try {
-            bool ok = recv(tps, 1000);
+            bool ok = recv(tps, timeout);
             if (!ok) {
-                zsys_info("recver timout at %d count, last got %d",
-                          count, got_count);
+                zsys_info("recver timout at %d count, last got %d, timeout is %d",
+                          count, got_count, timeout);
                 break;
             }
         }
@@ -70,7 +81,7 @@ void recver(zsock_t* pipe, void* args)
         }
         got_count = tps.count();
         zsock_send(pipe, "44", 1, got_count);
-        //zsys_info("1: %d %d", got_count(), count);
+        //zsys_info("1: %d %d", got_count, count);
         ++count;
     }
     zsys_info("recver exiting");
@@ -78,6 +89,8 @@ void recver(zsock_t* pipe, void* args)
 
 int main(int argc, char* argv[])
 {
+    zsys_init();
+
     if (argc < 5) {
         cerr << "usage: test_sendrecv N <bind|connect> <attachtype> <address>"
              << endl;
@@ -115,20 +128,33 @@ int main(int argc, char* argv[])
 
     const std::string sendstr = jsend.dump();
     const std::string recvstr = jrecv.dump();
-    zactor_t* sactor = zactor_new(sender, (void*)&sendstr);
-    zactor_t* ractor = zactor_new(recver, (void*)&recvstr);
+    zactor_t *sactor=NULL, *ractor=NULL;
 
-    zstr_send(ractor, "start");
-    zstr_send(sactor, "start");
+    
+    if (bc == "bind") {		// sender binds
+	sactor = zactor_new(sender, (void*)&sendstr);
+	zstr_send(sactor, "start");
+
+	ractor = zactor_new(recver, (void*)&recvstr);
+	zstr_send(ractor, "start");
+    }
+    else {			// recv binds
+	ractor = zactor_new(recver, (void*)&recvstr);
+	zstr_send(ractor, "start");
+
+	sactor = zactor_new(sender, (void*)&sendstr);
+	zstr_send(sactor, "start");
+    }
 
     zpoller_t* poller = zpoller_new(zactor_sock(sactor),
                                     zactor_sock(ractor), NULL);
     auto tbeg = zclock_usecs();
     int sn=0, num=0;
+    const int timeout = 10000;
     while (true) {
-        void* which = zpoller_wait(poller, 1000);
+        void* which = zpoller_wait(poller, timeout);
         if (!which) {
-            zsys_info("main loop break");
+	    zsys_info("main loop break at loop %d with timeout %d ms", num, timeout);
             break;
         }
         zsock_recv((zsock_t*)which, "44", &sn, &num);
@@ -154,3 +180,7 @@ int main(int argc, char* argv[])
 
     return 0;
 }
+// Local Variables:
+// mode: c++
+// c-basic-offset: 4
+// End:

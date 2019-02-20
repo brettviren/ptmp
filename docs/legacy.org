@@ -75,4 +75,34 @@ source /cvmfs/larsoft.opensciencegrid.org/products/setup
 setup gcc v7_3_0
 export CC=`which gcc`
 export CXX=`which g++`
+./installdeps.sh install-legacy tmp-legacy legacy
 #+end_example
+
+CZMQ 3.0.2 fails to build with GCC 7.
+
+#+begin_example
+In file included from src/zgossip.c:160:0:
+src/zgossip_engine.inc: In function 's_client_free':
+src/zgossip_engine.inc:262:23: error: 'snprintf' output truncated before the last format character [-Werror=format-truncation=]
+             "%6d:%-33s", self->unique_id, string);
+                       ^
+src/zgossip_engine.inc:261:9: note: 'snprintf' output between 41 and 46 bytes into a destination of size 40
+         snprintf (self->log_prefix, sizeof (self->log_prefix) - 1,
+         ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+             "%6d:%-33s", self->unique_id, string);
+             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#+end_example
+
+This is an apparently spurious warning (turned to error by CZMQ strict build options).  This gets around the problem:
+
+#+begin_example
+make CFLAGS=-Wno-format-truncation install
+#+end_example
+
+Build completes, including PTMP.  The ~test_sendrecv.sh~ hangs on:
+
+#+begin_example
+  ./build/test/check_sendrecv 100000 connect pipe inproc://sendrecv
+#+end_example
+
+There seems to be some sensitivity to order of socket creation when ~inproc~ PAIR is used.
