@@ -1,4 +1,5 @@
 #include "ptmp/api.h"
+#include "ptmp/testing.h"
 
 #include <czmq.h>
 
@@ -18,10 +19,12 @@ int main()
 })");
 
     ptmp::data::TPSet tps;
+    ptmp::testing::init(tps);
 
     auto tbeg = zclock_usecs();
     const int count = 1000000;
     for (int ind=0; ind<count; ++ind) {
+        ptmp::testing::set_count_clock(tps);
         send(tps);
         recv(tps);
     }
