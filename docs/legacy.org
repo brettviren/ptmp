@@ -1,0 +1,78 @@
+#+title: Legacy Software Support
+
+ProtoDUNE DAQ apparently runs ancient software.  Here documents
+attempts to support that.
+
+* The base
+
+Phil reports an OS install of ZeroMQ of 3.2.5 (legacy version), not
+CZMQ available.  CZMQ 3.0.2 seems to correspond to this ZeroMQ.  A
+protobuf from UPS at version 3.3.1 is available which should pose no
+problem.
+
+Protobuf 3.3.1 is not available on protocolbuffers/protobuf's GitHub
+releases area.  3.3.0 and 3.4.0 are.
+
+https://github.com/protocolbuffers/protobuf/releases/download/v3.3.0/protobuf-cpp-3.3.0.tar.gz
+https://github.com/protocolbuffers/protobuf/releases/download/v3.4.0/protobuf-cpp-3.4.0.tar.gz
+
+It is tagged, however
+
+https://github.com/protocolbuffers/protobuf/archive/v3.3.1.tar.gz
+
+There is also a 3.3.2, so if building from source and limiting to
+3.3.x, it seems that's better.  Nonetheless, we'll go for strict
+compliance.  Note, the tagged versions are the kitchen sink, not
+language-specific.
+
+* Building legacy development environment
+
+The [[../installdeps.sh][installdeps.sh]] script is extended to be given a comma-separated list of options as the third argument:
+
+ - legacy :: install the versions above
+ - force :: build new packages regardless of any that may be found installed already
+
+* Building legacy on Ubuntu 18.04
+
+CZMQ 3.0.2 apparently has some deprecated usage of glibc.  Warnings are turned into errors so this kills the build.
+
+#+begin_example
+src/zdir.c: In function 'zdir_new':
+src/zdir.c:201:9: error: 'readdir_r' is deprecated [-Werror=deprecated-declarations]
+         int rc = readdir_r (handle, entry, &result);
+         ^~~
+In file included from src/../include/czmq_prelude.h:262:0,
+                 from src/../include/czmq_library.h:24,
+                 from src/../include/czmq.h:30,
+                 from src/zdir.c:35:
+/usr/include/dirent.h:183:12: note: declared here
+ extern int readdir_r (DIR *__restrict __dirp,
+            ^~~~~~~~~
+src/zdir.c:204:13: error: 'readdir_r' is deprecated [-Werror=deprecated-declarations]
+             rc = readdir_r (handle, entry, &result);
+             ^~
+In file included from src/../include/czmq_prelude.h:262:0,
+                 from src/../include/czmq_library.h:24,
+                 from src/../include/czmq.h:30,
+                 from src/zdir.c:35:
+/usr/include/dirent.h:183:12: note: declared here
+ extern int readdir_r (DIR *__restrict __dirp,
+            ^~~~~~~~~
+cc1: all warnings being treated as errors
+Makefile:1027: recipe for target 'src/src_libczmq_la-zdir.lo' failed
+make[1]: *** [src/src_libczmq_la-zdir.lo] Error 1
+make[1]: Leaving directory '/home/bv/dev/ptmp/tmp-legacy/czmq-3.0.2'
+Makefile:1338: recipe for target 'all-recursive' failed
+make: *** [all-recursive] Error 1
+#+end_example
+
+* Building legacy on SL7
+
+Use RACF.
+
+#+begin_example
+source /cvmfs/larsoft.opensciencegrid.org/products/setup
+setup gcc v7_3_0
+export CC=`which gcc`
+export CXX=`which g++`
+#+end_example

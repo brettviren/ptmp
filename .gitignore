@@ -8,3 +8,5 @@ install
 log.*
 *.log
 tmp
+install*
+tmp*
