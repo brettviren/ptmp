@@ -23,7 +23,7 @@ def configure(cfg):
                   args=['--cflags', '--libs'], mandatory=True)
     cfg.check_cfg(package='libczmq', uselib_store='CZMQ',
                   args=['--cflags', '--libs'], use='ZMQ', mandatory=True)
-    cfg.env.CXXFLAGS += ['-std=c++17']
+    cfg.env.CXXFLAGS += ['-std=c++11']
     cfg.env.CXXFLAGS += to_list(cfg.options.cxxflags)
 
 def build(bld):
