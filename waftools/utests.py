@@ -10,6 +10,7 @@ def build(bld):
 
 @conf
 def utesting(bld, name, use=''):
+    appsrc = bld.path.ant_glob('apps/*.cc')
     checksrc = bld.path.ant_glob('test/check_*.cc')
     testsrc = bld.path.ant_glob('test/test_*.cc')
     test_scripts = bld.path.ant_glob('test/test_*.sh') + bld.path.ant_glob('test/test_*.py')
@@ -31,6 +32,14 @@ def utesting(bld, name, use=''):
         ret.insert(0, bld.path.find_or_declare(bld.out_dir).abspath())
         return ret
     rpath = get_rpath(use + [name])
+
+    for app in appsrc:        # fixme: except for source pattern these are like checks
+        bld.program(source=[app],
+                    target = app.change_ext(''),
+                    install_path = '${PREFIX}/bin/',
+                    rpath = rpath,
+                    includes = ['inc','build','test'],
+                    use = use + [name])
 
     for chk in checksrc:        # like tests but don't run
         bld.program(source=[chk],
