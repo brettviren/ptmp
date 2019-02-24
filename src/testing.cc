@@ -1,8 +1,13 @@
+#include "ptmp/api.h"
 #include "ptmp/testing.h"
+
+#include "json.hpp"
 
 #include <czmq.h>
 
 #include <algorithm>
+
+using json = nlohmann::json;
 
 // This is a bare function used to test upif.
 extern "C" {
@@ -102,4 +107,96 @@ void ptmp::testing::exponential_sleeps_t::operator()() {
     if (count % usleepskip != 1) { return; }
     int us = expo_dist(generator);
     usleep(us);
+}
+
+void ptmp_testing_sender(zsock_t* pipe, void* args)
+{
+    zsys_info("sender starting");
+    json jcfg = json::parse((const char*)(args));
+    json jsock;
+    jsock["socket"] = jcfg["sockets"][0];
+
+    ptmp::data::TPSet tps;
+    ptmp::testing::init(tps);
+    
+    zsock_signal(pipe, 0);      // ready
+    zsys_info("send ready");
+
+    zsock_t* sock = ptmp::internals::endpoint(jsock.dump());
+
+    zpoller_t* poller = zpoller_new(pipe, NULL);
+    int count = 0;
+    while (true) {
+	zsys_info("0: %d, check pipe", count);
+        void* which = zpoller_wait(poller, 0);
+        if (which) {
+            zsys_info("send got stop at %d", count);
+            break;
+        }
+        ptmp::testing::set_count_clock(tps);
+
+        zsys_info("0: sending");
+        // depending on socket pattern, this may block if HWM
+        
+
+        zsys_info("0: %d", count);
+        ++count;
+        //usleep(1);
+    }
+
+    zsys_info("send exiting");
+}
+
+void ptmp_testing_recver(zsock_t* pipe, void* args)
+{
+    zsys_info("recv starting");
+    json jcfg = json::parse((const char*)(args));
+    json jsock;
+    jsock["socket"] = jcfg["sockets"][0];
+
+    ptmp::data::TPSet tps;
+    ptmp::testing::init(tps);
+    
+    zsock_signal(pipe, 0);      // ready
+    zsys_info("recv ready");
+
+    zsock_t* sock = ptmp::internals::endpoint(jsock.dump());
+
+    zpoller_t* poller = zpoller_new(pipe, sock, NULL);
+    int count=0;
+    int got_count = 0;
+    const int timeout = 1000;
+    while (true) {
+	zsys_info("1: %d, check pipe", count);
+        void* which = zpoller_wait(poller, 0);
+        if (!which) {
+            zsys_info("recv terminate at %d, last got: %d", count, got_count);
+            break;
+        }
+        if (which == pipe) {
+            zmsg_t* msg = zmsg_recv((zsock_t*)which);
+            zsys_info("recv got pipe msg at %d, last got: %d", count, got_count);
+            break;
+        }
+        if (which == sock) {
+            zmsg_t* msg = zmsg_recv((zsock_t*)which);
+            zsys_info("recv got sock msg at %d, last got: %d", count, got_count);
+            try {
+                ptmp::internals::recv(msg, tps);
+            }
+            catch (const std::runtime_error& err) {
+                zsys_info("recv error at %d count, last got %d: %s",
+                          count, got_count, err.what());
+                break;
+            }
+            got_count = tps.count();
+
+            zsys_info("1: %d %d", got_count, count);
+            ++count;
+            continue;
+        }
+        zsys_error("unknown socket"); 
+    }
+
+    zsys_info("recv exiting");
 }

@@ -12,6 +12,9 @@ namespace ptmp {
 
         zsock_t* endpoint(const std::string& config);
 
+        void recv(zmsg_t* &msg, data::TPSet& tps);
+        void send(zsock_t* sock, const ptmp::data::TPSet& tps);
+
         class Socket {
             zsock_t* m_sock;
             zpoller_t* m_poller;

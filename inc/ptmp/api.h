@@ -7,13 +7,10 @@
 #include <string>
 
 #include "ptmp/data.h"
-
+#include "ptmp/internals.h"
 
 namespace ptmp {
 
-    namespace internals {
-        class Socket;
-    }
 
     class TPSender {
         internals::Socket* m_sock;

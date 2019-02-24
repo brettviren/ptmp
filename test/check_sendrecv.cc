@@ -58,15 +58,15 @@ using json = nlohmann::json;
 void sender(zsock_t* pipe, void* args)
 {
     zsys_info("sender starting");
-    std::string cfg = *(std::string*)(args);
-    ptmp::TPSender send(cfg);
+    json jcfg = json::parse((const char*)(args));
+    json jsock;
+    jsock["socket"] = jcfg["sockets"][0];
+    ptmp::TPSender send(jsock.dump());
     ptmp::data::TPSet tps;
     ptmp::testing::init(tps);
     
     zsock_signal(pipe, 0);      // ready
     zsys_info("send ready");
-    char* go = zstr_recv(pipe); // should actually check what msg is...
-    zsys_info("send looping");
 
     zpoller_t* poller = zpoller_new(pipe, NULL);
     int count = 0;
@@ -92,18 +92,19 @@ void sender(zsock_t* pipe, void* args)
 
     zsys_info("send exiting");
 }
+
 void recver(zsock_t* pipe, void* args)
 {
     zsys_info("recv starting");
-    std::string cfg = *(std::string*)(args);
-    ptmp::TPReceiver recv(cfg);
+    json jcfg = json::parse((const char*)(args));
+    json jsock;
+    jsock["socket"] = jcfg["sockets"][0];
+    ptmp::TPReceiver recv(jsock.dump());
     ptmp::data::TPSet tps;
     ptmp::testing::init(tps);
     
     zsock_signal(pipe, 0);      // ready
     zsys_info("recv ready");
-    char* go = zstr_recv(pipe); // should actually check what msg is...
-    zsys_info("recv looping");
 
     zpoller_t* poller = zpoller_new(pipe, NULL);
     int count=0;
@@ -148,6 +149,7 @@ void recver(zsock_t* pipe, void* args)
     zsys_info("recv exiting after %d late messages", late);
 }
 
+
 int main(int argc, char* argv[])
 {
     zsys_init();
@@ -162,30 +164,33 @@ int main(int argc, char* argv[])
     const std::string at = argv[3];
     const std::string address = argv[4];
     json jsend, jrecv;
+    json jsock_send, jsock_recv;
     if (at == "pair" or at == "pipe") {
-        jsend["socket"]["type"] = "PAIR";
-        jrecv["socket"]["type"] = "PAIR";
+        jsock_send["type"] = "PAIR";
+        jsock_recv["type"] = "PAIR";
     }
     else if (at == "pubsub") {
-        jsend["socket"]["type"] = "PUB";
-        jrecv["socket"]["type"] = "SUB";
+        jsock_send["type"] = "PUB";
+        jsock_recv["type"] = "SUB";
     }
     else if (at == "pushpull") {
-        jsend["socket"]["type"] = "PUSH";
-        jrecv["socket"]["type"] = "PULL";
+        jsock_send["type"] = "PUSH";
+        jsock_recv["type"] = "PULL";
     }
     else {
         cerr << "Unknown attchement type: " << at << endl;
         return 1;
     }
     if (bc == "bind") {
-        jsend["socket"]["bind"][0] = address;
-        jrecv["socket"]["connect"][0] = address;
+        jsock_send["bind"][0] = address;
+        jsock_recv["connect"][0] = address;
     }
     else {
-        jsend["socket"]["connect"][0] = address;
-        jrecv["socket"]["bind"][0] = address;
+        jsock_send["connect"][0] = address;
+        jsock_recv["bind"][0] = address;
     }
+    jsend["sockets"][0] = jsock_send;
+    jrecv["sockets"][0] = jsock_recv;
 
     const std::string sendstr = jsend.dump();
     const std::string recvstr = jrecv.dump();
@@ -193,18 +198,12 @@ int main(int argc, char* argv[])
 
     
     if (bc == "bind") {		// sender binds
-	sactor = zactor_new(sender, (void*)&sendstr);
-	zstr_send(sactor, "start");
-
-	ractor = zactor_new(recver, (void*)&recvstr);
-	zstr_send(ractor, "start");
+	sactor = zactor_new(sender, (void*)sendstr.c_str());
+	ractor = zactor_new(recver, (void*)recvstr.c_str());
     }
     else {			// recv binds
-	ractor = zactor_new(recver, (void*)&recvstr);
-	zstr_send(ractor, "start");
-
-	sactor = zactor_new(sender, (void*)&sendstr);
-	zstr_send(sactor, "start");
+	ractor = zactor_new(recver, (void*)recvstr.c_str());
+	sactor = zactor_new(sender, (void*)sendstr.c_str());
     }
 
     zpoller_t* poller = zpoller_new(zactor_sock(sactor),

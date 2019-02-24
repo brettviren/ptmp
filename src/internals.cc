@@ -1,4 +1,5 @@
-#include "internals.h"
+#include "ptmp/data.h"
+#include "ptmp/internals.h"
 #include "json.hpp"
 
 #include <string> 
@@ -82,3 +83,36 @@ zmsg_t* ptmp::internals::Socket::msg(int timeout_msec)
     return zmsg_recv((zsock_t*)which);
 }
 
+
+void ptmp::internals::recv(zmsg_t* &msg, ptmp::data::TPSet& tps)
+{
+    zframe_t* fid = zmsg_first(msg);
+    if (!fid) {
+        throw std::runtime_error("null id frame");
+    }
+    int topic = *(int*)zframe_data(fid);
+
+    zframe_t* pay = zmsg_next(msg);
+    if (!pay) {
+        throw std::runtime_error("null payload frame");
+    }
+    tps.ParseFromArray(zframe_data(pay), zframe_size(pay));
+
+    zmsg_destroy(&msg);
+}
+
+void ptmp::internals::send(zsock_t* sock, const ptmp::data::TPSet& tps)
+{
+    const int topic = 0;
+
+    zmsg_t* msg = zmsg_new();
+    zframe_t* fid = zframe_new(&topic, sizeof(int));
+    zmsg_append(msg, &fid);
+
+    size_t siz = tps.ByteSize();
+    zframe_t* pay = zframe_new(NULL, siz);
+    tps.SerializeToArray(zframe_data(pay), zframe_size(pay));
+    zmsg_append(msg, &pay);
+
+    zmsg_send(&msg, sock);
+}

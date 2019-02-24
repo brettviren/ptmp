@@ -3,6 +3,7 @@
 
 #include "ptmp/data.h"
 
+#include <czmq.h>
 #include <random>
 
 namespace ptmp {
@@ -43,9 +44,16 @@ namespace ptmp {
             exponential_sleeps_t(int t, int s);
             void operator()();
         };
+        
+        
     }
 }
 
+// Some actor functions kept as "C" to allow upif.
+extern "C" {
+void ptmp_testing_sender(zsock_t* pipe, void* args);
+void ptmp_testing_recver(zsock_t* pipe, void* args);
+}
 #endif
 
     

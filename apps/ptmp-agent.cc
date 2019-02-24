@@ -69,6 +69,7 @@ int main(int argc, char* argv[])
 
     typedef void (*zactor_fnp)(zsock_t* pipe, void* args);
     std::vector<zactor_t*> actors;
+    std::vector<std::string> bucket;
     for (auto jactor: jcfg["actors"]) {
         std::string funcname = jactor["function"];
         zactor_fnp actorfuncptr;
@@ -77,12 +78,15 @@ int main(int argc, char* argv[])
             std::cerr << "No such actor function: \"" << funcname << "\".  Load a plugin?\n";
             return -1;
         }
-        std::string cfgstr = jactor.dump();
-        auto a = zactor_new(*actorfuncptr, (void*)&cfgstr);
+        const std::string cfg = jactor.dump();
+        bucket.push_back(cfg);
+        auto a = zactor_new(*actorfuncptr, (void*)bucket.back().c_str());
         if (!a) {
             std::cerr << "Failed to make actor for \"" << funcname << "\"\n";
             return -1;
         }
+        zsys_info("start actor: %s", bucket.back().c_str());
+        zsys_info("%p", a);
         actors.push_back(a);
     }
 
@@ -95,10 +99,11 @@ int main(int argc, char* argv[])
     zpoller_t* poller = zpoller_new(NULL);
     for (auto actor : actors) {
         int rc = zpoller_add(poller, zactor_sock(actor));
-        if (!rc) {
+        if (rc) {
             std::cerr << "Failed to poll on actor\n";
             return -1;
         }
+        std::cerr << "added actor\n";
     }
 
     // main loop
@@ -106,17 +111,20 @@ int main(int argc, char* argv[])
         void* which = zpoller_wait(poller, timeout);
         if (!which) {
             if (zpoller_terminated(poller)) {
-                std::cerr << "terminated\n";
+                zsys_error("terminated");
                 return -1;
             }
             if (zpoller_expired(poller)) {
                 zsys_info("no data for %d msec", timeout);
                 continue;
             }
-            std::cerr << "unknown error\n";
+            zsys_error("unknown error");
             return -1;
         }
-        //zsock_recv((zsock_t*)which, ....);
+        zsys_info("ptmp got message from %p", which);
+        zmsg_t* msg = zmsg_recv((zsock_t*)which);
+        zmsg_destroy(&msg);
+        zsys_info("continuing");
 
         // Big Fat FIXME: it's right here that any inter-actor
         // protocol would be enacted.  There are two major categories

@@ -87,20 +87,63 @@ them without command line arguments will give a usage message.
 Application programmers (and possibly their users) should also read
 the section [[Configuration]] below.
 
+* Actor Development 
+
+*note: support for actors is a work in progress*
+
+The low level API described above may be all that an developer chooses to use.  However, PTMP supports a more flexible and simpler programming interface which is based on CZMQ's /actor/ pattern.  The programmer provides functionality through a single function (a [[http://czmq.zeromq.org/manual:zactor][CZMQ ~zactor~ function]]).  This pattern provides two main benefits:
+
+1) as actors operate in a well defined context the developer can focus on core functionality.
+2) the resulting functionality can then later be composed with other actors through configuration to build a rich application. 
+
+The actor function is called by PTMP inside its own thread and passed two arguments: a PAIR socket called the "pipe" and a ~void*~ which is used to pass initial configuration in the form of a ~const char*~ in JSON format are passed into the actor function.  Once called, the actor function must participate in the /PTMP actor protocol/ but otherwise is free to do whatever the developer requires.  Likewise, a portion of the JSON schema is standardized but the developer may extend it to suit the needs of the actor program.
+
+Participating in the PTMP actor protocol entails expecting and providing certain message types on the pipe.  The protocol is largely asynchronous (ie, not query/response aka client/server patterns).  The protocol begins with the actor sending an empty "signal" message:
+
+#+BEGIN_SRC c++
+    zsock_signal(pipe, 0);      // ready
+#+END_SRC
+
+All subsequent messages are /multipart/ (have multiple frames).  The
+first frame carries an integer (an enum in ~ptmp::actor::~ namespace)
+marking the message /type/.  Subsequent frames may be provided on a
+type-specific basis.  The types are enumerated as:
+
+- ~ptmp::actor::stop~ :: no additional frames.  An actor
+       shall send this prior to existing the function.  PTMP shall
+       send this requesting the actor terminate and prior to
+       destroying the actor.
+
+- ~ptmp::actor::config~ :: the second frame shall contain a
+       character string in JSON format.  A ~config~ message may be sent
+       to the actor which may then reconfigure itself based on the
+       contents.  A ~config~ message may be sent from the actor with the
+       intention that it reports its current configuration state.  The
+       schema of this message is partly standardized, as described
+       below, but may be extended to suit the needs of the actor.
+
+- ~ptmp::actor::create~ :: the second frame shall contain an actor
+     configuration string.  Received by PTMP, it will attempt to
+     create an actor as described by the configuration string.
+
+- ~ptmp::actor::destroy~ ::  the second frame shall contain an actor
+     configuration string.  Received by PTMP, it will attempt to
+     destroy a previously created actor as described by the
+     configuration string.
+
+
+
 * Configuration
 
-The PTMP API classes require a string which will be used to configure
-the connection to the PTMP network.  This string *must* be provided by
-the application.  The application may of course hard-wire it or allow
-the application user to provide it.
+The PTMP API classes and PTMP actors are configured through JSON.  In
+both cases, the top level schema is that of a JSON object.  The
+details of this schema are described.
 
-This string is in JSON format and expressing a object (dictionary)
-with the following attributes (currently just one).
+** API Schema
 
-- socket :: a socket configuration object.
-
-Additional attributes may be added in the future.  The ~socket~ object
-has the following attributes:
+To configure an API class (~TPSender~ or ~TPReceiver~) the JSON object
+must contain a ~socket~ attribute which is itself an object with the
+following attributes:
 
 - type :: a ZeroMQ socket type name ("PAIR", "PUB", "SUB", etc)
 - bind :: an array of addresses in canonical ZeroMQ form that the socket should bind
@@ -109,6 +152,39 @@ has the following attributes:
 The usual ZeroMQ restrictions apply.  For example a PAIR socket may
 only bind or connect to one address.  Others can bind or connect to
 multiple addresses.
+
+** Actor schema
+
+*note: support for actors is a work in progress*
+
+The actor schema governs JSON objects which are used for creating an
+actor, providing its initial configuration string, providing
+subsequent configuration updates, reporting its current configuration
+by an actor and destroying the actor.  Which of the attributes
+described below are used depends on which action is being taken.
+
+- name :: a string which shall uniquely identify the actor instance.
+          The context of uniqueness shall be at least over all actors
+          of the PTMP application implemented with the given ~function~
+          (see next).
+
+- function :: the actor function name.
+
+- datatime :: a time value measured in the "data clock" at which the
+              configuration should be considered applied.  If absent
+              the configuration should be considered immediate.
+
+- sockets :: an array of objects of type ~socket~ as described above.
+             These are intended to describe sockets which the actor
+             produces but shall exclude the pipe.  An actor should
+             apply this attribute when creating and configuring
+             sockets and shall provide it to reflect the configuration
+             of any sockets that need be known by others.
+
+- etc :: other attributes may be included on a per function basis.
+         These may be ignored by PTMP but shall be forwarded to the
+         actor pipe where applicable.
+
 
 * Tuning and Exception Handling
 
