@@ -13,8 +13,8 @@ local socket(stype, bc, endpoint) = {
 local config(stypes, endpoint) =  {
     plugins: ["ptmp"],          // actually, redundant
     actors: [
-        actor('ptmp_testing_recver', socket(stypes[1], 'bind', endpoint)),
-        actor('ptmp_testing_sender', socket(stypes[0], 'connect', endpoint)),
+        actor('ptmp_testing_recver', socket(stypes[1], 'connect', endpoint)),
+        actor('ptmp_testing_sender', socket(stypes[0], 'bind', endpoint)),
    ],
 };
 
@@ -22,9 +22,9 @@ local configs = [
     {stypes:stypes, trans:ep[0], addr:ep[1]},
     for stypes in [['PAIR','PAIR'], ['PUB','SUB'], ['PUSH','PULL']]
     for ep in [
-        ['inproc','//test-agent'],
-        ['ipc','//test-agent.ipc'],
-        ['tcp','//127.0.0.1:23456']
+        ['inproc','://testagent'],
+        ['ipc','://testagent.ipc'],
+        ['tcp','://127.0.0.1:23456']
     ]];
 
 {

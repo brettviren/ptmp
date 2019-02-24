@@ -28,7 +28,9 @@ int ptmp::internals::socket_type(std::string name)
         {"xsub", 10},
         {"stream", 11}
     };
-    return zmqtypes[name];
+    int n = zmqtypes[name];
+    zsys_info("socket type \"%s\" %d", name.c_str(), n);
+    return n;
 }
 
 
@@ -39,6 +41,12 @@ zsock_t* ptmp::internals::endpoint(const std::string& config)
     std::string stype = jsock["type"];
     int socktype = socket_type(stype);
     zsock_t* sock = zsock_new(socktype);
+    if (!sock) {
+        zsys_error("failed to make socket of type %s #%d", stype.c_str(), socktype);
+        return sock;
+    }
+    zsys_info("endpoint of type %s #%d", stype.c_str(), socktype);
+    
     if (socktype == 2) {        // fixme: support topics?
         zsock_set_subscribe(sock, "");
         int old = zsock_rcvhwm(sock);
@@ -54,11 +62,19 @@ zsock_t* ptmp::internals::endpoint(const std::string& config)
     }
     for (auto jaddr : jsock["bind"]) {
         std::string addr = jaddr;
-        zsock_bind(sock, addr.c_str(), NULL);
+        zsys_info("binding \"%s\"", addr.c_str());
+        int rc = zsock_bind(sock, addr.c_str(), NULL);
+        if (rc) {
+            throw std::runtime_error("failed to bind");
+        }
     }
     for (auto jaddr : jsock["connect"]) {
         std::string addr = jaddr;
-        zsock_connect(sock, addr.c_str(), NULL);
+        zsys_info("connecting \"%s\"", addr.c_str());
+        int rc = zsock_connect(sock, addr.c_str(), NULL);
+        if (rc) {
+            throw std::runtime_error("failed to connect");
+        }
     }
     return sock;
 }
@@ -106,13 +122,29 @@ void ptmp::internals::send(zsock_t* sock, const ptmp::data::TPSet& tps)
     const int topic = 0;
 
     zmsg_t* msg = zmsg_new();
+    if (!msg) {
+        throw std::runtime_error("new msg failed");
+    }
     zframe_t* fid = zframe_new(&topic, sizeof(int));
-    zmsg_append(msg, &fid);
+    if (!fid) {
+        throw std::runtime_error("new frame failed");
+    }
+    int rc = zmsg_append(msg, &fid);
+    if (rc) {
+        throw std::runtime_error("msg append failed");
+    }
 
     size_t siz = tps.ByteSize();
     zframe_t* pay = zframe_new(NULL, siz);
     tps.SerializeToArray(zframe_data(pay), zframe_size(pay));
-    zmsg_append(msg, &pay);
-
-    zmsg_send(&msg, sock);
+    rc = zmsg_append(msg, &pay);
+    if (rc) {
+        throw std::runtime_error("msg append failed");
+    }
+        
+    rc = zmsg_send(&msg, sock);
+    if (rc) {
+        throw std::runtime_error("msg send failed");
+    }
+    
 }

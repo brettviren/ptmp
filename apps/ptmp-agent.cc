@@ -15,6 +15,8 @@ using json = nlohmann::json;
 
 int main(int argc, char* argv[])
 {
+    zsys_init();
+
     // Define command line interface
     CLI::App app{"PTMP agent manages PTMP actors"};
 
@@ -35,7 +37,7 @@ int main(int argc, char* argv[])
     // Slurp configuration file
     json jcfg;
     if (filename.empty()) {
-        std::cerr << "warning: no configuration file, try --help?\n";
+        zsys_error("warning: no configuration file, try --help?");
     }
     else {
         std::ifstream fp(filename);
@@ -54,7 +56,7 @@ int main(int argc, char* argv[])
     
 
     if (jcfg["actors"].empty()) {
-        std::cerr << "No actors configured.  Bye.\n";
+        zsys_info("No actors configured.  Bye.");
         return 0;
     }
 
@@ -67,6 +69,7 @@ int main(int argc, char* argv[])
     // fact, the ported graph nodes will be constructed and executed
     // from a bare actor function.
 
+    zpoller_t* poller = zpoller_new(NULL);
     typedef void (*zactor_fnp)(zsock_t* pipe, void* args);
     std::vector<zactor_t*> actors;
     std::vector<std::string> bucket;
@@ -75,19 +78,24 @@ int main(int argc, char* argv[])
         zactor_fnp actorfuncptr;
         bool ok = upif::symbol(funcname, actorfuncptr);
         if (!ok) {
-            std::cerr << "No such actor function: \"" << funcname << "\".  Load a plugin?\n";
+            zsys_error("No such actor function: \"%s\".  Load a plugin?", funcname.c_str());
             return -1;
         }
         const std::string cfg = jactor.dump();
         bucket.push_back(cfg);
         auto a = zactor_new(*actorfuncptr, (void*)bucket.back().c_str());
         if (!a) {
-            std::cerr << "Failed to make actor for \"" << funcname << "\"\n";
+            zsys_error("Failed to make actor for \"%s\"", funcname.c_str());
             return -1;
         }
-        zsys_info("start actor: %s", bucket.back().c_str());
-        zsys_info("%p", a);
+        zsys_info("start actor: %s at %p", bucket.back().c_str(), a);
         actors.push_back(a);
+
+        int rc = zpoller_add(poller, zactor_sock(a));
+        if (rc) {
+            zsys_error("Failed to poll on actor");
+            return -1;
+        }
     }
 
 
@@ -95,19 +103,9 @@ int main(int argc, char* argv[])
     // ...
 
 
-    // set up poller to read actor pipe messages
-    zpoller_t* poller = zpoller_new(NULL);
-    for (auto actor : actors) {
-        int rc = zpoller_add(poller, zactor_sock(actor));
-        if (rc) {
-            std::cerr << "Failed to poll on actor\n";
-            return -1;
-        }
-        std::cerr << "added actor\n";
-    }
-
     // main loop
     while (true) {
+        zsys_info("ptmp polling");
         void* which = zpoller_wait(poller, timeout);
         if (!which) {
             if (zpoller_terminated(poller)) {
@@ -124,7 +122,7 @@ int main(int argc, char* argv[])
         zsys_info("ptmp got message from %p", which);
         zmsg_t* msg = zmsg_recv((zsock_t*)which);
         zmsg_destroy(&msg);
-        zsys_info("continuing");
+        zsys_info("ptmp continuing");
 
         // Big Fat FIXME: it's right here that any inter-actor
         // protocol would be enacted.  There are two major categories
