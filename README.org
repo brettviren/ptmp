@@ -91,12 +91,14 @@ the section [[Configuration]] below.
 
 *note: support for actors is a work in progress*
 
-The low level API described above may be all that an developer chooses to use.  However, PTMP supports a more flexible and simpler programming interface which is based on CZMQ's /actor/ pattern.  The programmer provides functionality through a single function (a [[http://czmq.zeromq.org/manual:zactor][CZMQ ~zactor~ function]]).  This pattern provides two main benefits:
+The low level API described above may be all that an developer chooses to use.  However, its simplicity means that the application will be strongly limited in behavior.  PTMP also supports a programming interface which is based on CZMQ's /actor/ pattern.  The programmer provides functionality through a single function (a [[http://czmq.zeromq.org/manual:zactor][CZMQ ~zactor~ function]]).  This pattern provides some benefits over the simple API, actors may:
 
-1) as actors operate in a well defined context the developer can focus on core functionality.
-2) the resulting functionality can then later be composed with other actors through configuration to build a rich application. 
+1) handle more than one socket
+2) accept dynamic reconfiguration
+3) be composed through user configuration
+4) allow migration of functionality from threads to processes to computers.
 
-The actor function is called by PTMP inside its own thread and passed two arguments: a PAIR socket called the "pipe" and a ~void*~ which is used to pass initial configuration in the form of a ~const char*~ in JSON format are passed into the actor function.  Once called, the actor function must participate in the /PTMP actor protocol/ but otherwise is free to do whatever the developer requires.  Likewise, a portion of the JSON schema is standardized but the developer may extend it to suit the needs of the actor program.
+The actor function is called from inside its own thread and passed two arguments: a PAIR socket called the "pipe" and a ~void*~ which is used to pass initial configuration in the form of a ~const char*~ in JSON format are passed into the actor function.  Once called, the actor function must participate in the /PTMP actor protocol/ but otherwise is free to do whatever the developer requires.  Likewise, a portion of the JSON schema is standardized but the developer may extend it to suit the needs of the actor program.
 
 Participating in the PTMP actor protocol entails expecting and providing certain message types on the pipe.  The protocol is largely asynchronous (ie, not query/response aka client/server patterns).  The protocol begins with the actor sending an empty "signal" message:
 

@@ -135,11 +135,9 @@ void ptmp_testing_sender(zsock_t* pipe, void* args)
         }
         ptmp::testing::set_count_clock(tps);
 
-        zsys_info("0: sending");
-        // depending on socket pattern, this may block if HWM
+        ptmp::internals::send(sock, tps);
         
-
-        zsys_info("0: %d", count);
+        //zsys_info("0: %d", count);
         ++count;
         //usleep(1);
     }
