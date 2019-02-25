@@ -1,0 +1,29 @@
+{
+   "actors": [
+      {
+         "function": "ptmp_testing_recver",
+         "sockets": [
+            {
+               "connect": [
+                  "ipc://testagent.ipc"
+               ],
+               "type": "PAIR"
+            }
+         ]
+      },
+      {
+         "function": "ptmp_testing_sender",
+         "sockets": [
+            {
+               "bind": [
+                  "ipc://testagent.ipc"
+               ],
+               "type": "PAIR"
+            }
+         ]
+      }
+   ],
+   "plugins": [
+      "ptmp"
+   ]
+}

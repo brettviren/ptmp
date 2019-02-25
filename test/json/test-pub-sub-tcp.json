@@ -1,0 +1,29 @@
+{
+   "actors": [
+      {
+         "function": "ptmp_testing_recver",
+         "sockets": [
+            {
+               "connect": [
+                  "tcp://127.0.0.1:23456"
+               ],
+               "type": "SUB"
+            }
+         ]
+      },
+      {
+         "function": "ptmp_testing_sender",
+         "sockets": [
+            {
+               "bind": [
+                  "tcp://127.0.0.1:23456"
+               ],
+               "type": "PUB"
+            }
+         ]
+      }
+   ],
+   "plugins": [
+      "ptmp"
+   ]
+}
