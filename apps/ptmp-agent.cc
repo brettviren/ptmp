@@ -1,5 +1,7 @@
 // generic ptmp application to manage actors
 
+#include "ptmp/internals.h"
+
 #include "upif.h"
 
 #include "CLI11.hpp"
@@ -41,6 +43,10 @@ int main(int argc, char* argv[])
     }
     else {
         std::ifstream fp(filename);
+        if (!fp) {
+            zsys_error("no such file: %s", filename.c_str());
+            return -1;
+        }
         fp >> jcfg;
     }
 
@@ -72,7 +78,7 @@ int main(int argc, char* argv[])
     zpoller_t* poller = zpoller_new(NULL);
     typedef void (*zactor_fnp)(zsock_t* pipe, void* args);
     std::vector<zactor_t*> actors;
-    std::vector<std::string> bucket;
+    std::vector<std::string> actor_cfgs;
     for (auto jactor: jcfg["actors"]) {
         std::string funcname = jactor["function"];
         zactor_fnp actorfuncptr;
@@ -82,13 +88,13 @@ int main(int argc, char* argv[])
             return -1;
         }
         const std::string cfg = jactor.dump();
-        bucket.push_back(cfg);
-        auto a = zactor_new(*actorfuncptr, (void*)bucket.back().c_str());
+        actor_cfgs.push_back(cfg);
+        auto a = zactor_new(*actorfuncptr, (void*)cfg.c_str());
         if (!a) {
             zsys_error("Failed to make actor for \"%s\"", funcname.c_str());
             return -1;
         }
-        zsys_info("start actor: %s at %p", bucket.back().c_str(), a);
+        zsys_info("start actor: %s at %p", cfg.c_str(), a);
         actors.push_back(a);
 
         int rc = zpoller_add(poller, zactor_sock(a));
@@ -101,6 +107,13 @@ int main(int argc, char* argv[])
 
     // Send any initial notification messages to actors
     // ...
+    // for now we push config messages just to exercise the protocol
+    for (size_t ind=0; ind<actors.size(); ++ind) {
+        zactor_t* a = actors[ind];
+        std::string cfg = actor_cfgs[ind];
+        zsys_info("configure: %s", cfg.c_str());
+        ptmp::internals::send_cfg(zactor_sock(a), cfg.c_str());
+    }
 
 
     // main loop

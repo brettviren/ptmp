@@ -131,8 +131,21 @@ void ptmp_testing_sender(zsock_t* pipe, void* args)
 	//zsys_info("sender %d, check pipe", count);
         void* which = zpoller_wait(poller, 0);
         if (which) {
-            zsys_info("sender got stop at %d", count);
-            break;
+            zsys_info("sender got pipe message at %d", count);
+
+            // fixme: need to encapsulate this before going further. 
+            zmsg_t* msg = zmsg_recv(pipe);
+            zframe_t* fid = zmsg_first(msg);
+            if (!fid) {
+                throw std::runtime_error("null id frame");
+            }
+            int msgid = *(int*)zframe_data(fid);
+            if (msgid == 2) {
+                zsys_info("sender got config");
+            }
+            zmsg_destroy(&msg);
+
+            continue;
         }
         ptmp::testing::set_count_clock(tps);
         zsys_info("sender sending %d", tps.count());
@@ -171,9 +184,19 @@ void ptmp_testing_recver(zsock_t* pipe, void* args)
 	//zsys_info("recver %d, check pipe", count);
         void* which = zpoller_wait(poller, 0);
         if (which == pipe) {
-            zmsg_t* msg = zmsg_recv((zsock_t*)which);
-            zsys_info("recver got pipe msg at %d, last got: %d", count, got_count);
-            break;
+
+            // fixme: need to encapsulate this before going further. 
+            zmsg_t* msg = zmsg_recv(pipe);
+            zframe_t* fid = zmsg_first(msg);
+            if (!fid) {
+                throw std::runtime_error("null id frame");
+            }
+            int msgid = *(int*)zframe_data(fid);
+            if (msgid == 2) {
+                zsys_info("sender got config");
+            }
+            zmsg_destroy(&msg);
+
         }
         //zsys_info("recver receiving with timeout");
         bool ok = recver(tps, timeout);
