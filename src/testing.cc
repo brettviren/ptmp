@@ -153,7 +153,6 @@ void ptmp_testing_recver(zsock_t* pipe, void* args)
     json jcfg = json::parse((const char*)(args));
     json jsock;
     jsock["socket"] = jcfg["sockets"][0];
-    std::cerr << "ADDR:" << jsock << std::endl;
 
     ptmp::data::TPSet tps;
     ptmp::testing::init(tps);

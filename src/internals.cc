@@ -65,6 +65,7 @@ zsock_t* ptmp::internals::endpoint(const std::string& config)
         zsys_info("binding \"%s\"", addr.c_str());
         int rc = zsock_bind(sock, addr.c_str(), NULL);
         if (rc) {
+            zsys_error(zmq_strerror (errno));
             throw std::runtime_error("failed to bind");
         }
     }
@@ -73,6 +74,7 @@ zsock_t* ptmp::internals::endpoint(const std::string& config)
         zsys_info("connecting \"%s\"", addr.c_str());
         int rc = zsock_connect(sock, addr.c_str(), NULL);
         if (rc) {
+            zsys_error(zmq_strerror (errno));
             throw std::runtime_error("failed to connect");
         }
     }
