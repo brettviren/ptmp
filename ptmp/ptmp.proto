@@ -1,59 +1,65 @@
 // -*- c++ -*- // ish
 
-syntax = "proto2";
+
+syntax = "proto3";
 package ptmp.data;
+
+message Timestamp {
+    // Number of seconds from the start of the Unix epoch 
+    uint64 seconds = 1;
+
+    // Number of nanoseconds within the second
+    uint32 nanosecs = 2;
+}
 
 message TrigPrim {    
 
     // The channel of this TP
-    required uint32 channel = 1;
+    uint32 channel = 1;
 
-    // The start, measured in the same clock as and with respect to
-    // the datatime of the set.
-    required uint32 tstart = 2;
+    // The absolute start time of the trigger primitive measured in the data clock.
+    Timestamp tstart = 2;
 
-    // The duration, measured in the same clock as datatime, of the
-    // trigger primitive.
-    required uint32 tspan = 3;
+    // The duration of the primitive measured in the data clock and in units of nanoseconds.
+    uint32 tspan = 3;
 
     // The total ADC of the TP
-    optional uint32 adcsum = 4;
+    uint32 adcsum = 4;
 
     // The peak ADC of the TP above baseline
-    optional uint32 adcpeak = 5;
+    uint32 adcpeak = 5;
     
     // A bit mask error flag.  0 is no error
-    optional uint32 flags = 6;
+    uint32 flags = 6;
 
 }
 
 message TPSet {
     // A sequential count of how many TPsets were sent before this
     // one.  At 150Hz, this is enough for half a year
-    required uint32 count = 1;
+    uint32 count = 1;
 
     // Identify the detector portion that this TPSet derives.   
-    required uint32 detid = 2;
+    uint32 detid = 2;
 
-    // The reference time of the TPs in this set.  This is measured by
-    // a common clock and which stamps the electronics sampling.
-    required int64 datatime = 3;
+    // The system wall clock time stamp when this TPSet was created.
+    Timestamp created = 3;
 
-    // System clock in Unix seconds taken at the time of message
-    // formation.
-    required int64 unixseconds = 4;
+    // The smallest tstart of the TPs, ie the datatime of the earliest TP.
+    Timestamp tstart = 4;
 
-    // Number of system clock nanoseconds past the second.
-    required uint32 unixns = 5;
+    // The time span of the TPs in the set, measured in the datatime
+    // clock in units of ns.  
+    uint32 tspan = 5;
 
-    // Time span of the TPs in the set measured in the datatime clock.
-    optional uint32 timepan = 6;
+    // The channel providing the lower bound on the set, inclusive.
+    uint32 chanbeg = 6;
 
-    // Number of unique channels spanning the TPs in the set.
-    optional uint32 chanspan = 7;
+    // The channel providing the upper bound on the set, inclusive.
+    uint32 chanend = 7;
 
     // sum of ADC of all TPs in the set.
-    optional uint32 totaladc = 8;
+    uint32 totaladc = 8;
 
     // The TPs 
     repeated TrigPrim tps = 9;

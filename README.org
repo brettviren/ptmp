@@ -43,7 +43,7 @@ dependencies are:
 
 - libzmq
 - CZMQ
-- protobuf (v2 or v3)
+- protobuf (v3)
 
 See the [[./.travis.yml][Travis-CI file]] for an ~apt~ installation line.  There is also a
 [[./installdeps.sh][script]] to assist building the dependencies from source.  With
