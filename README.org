@@ -13,7 +13,8 @@ messages.  Driven by user configuration, an intervening network may be
 defined.  This can be a simple sink-to-source pipeline or may be
 structured into a rich data flow network which may include redundant
 flow paths and intervening filtering/processing with redundancy and
-load balancing.  The sink/source applications need not be complicated by this richness.
+load balancing.  The sink/source applications need not be complicated
+by this richness.
 
 Message transport is based on ZeroMQ which provides robustness and
 performance (see the section on throughput performance in the [[./docs/tuning.org][tuning]]
@@ -42,7 +43,7 @@ dependencies are:
 
 - libzmq
 - CZMQ
-- protobuf (v2)
+- protobuf (v2 or v3)
 
 See the [[./.travis.yml][Travis-CI file]] for an ~apt~ installation line.  There is also a
 [[./installdeps.sh][script]] to assist building the dependencies from source.  With
@@ -62,16 +63,19 @@ the [[./docs/tuning.org][tuning]] document for some details on these tests.
 
 * Application Development
 
-Application may be a "sender" or a "receiver" of trigger messages by
-instantiating a ~TPSender~ or ~TPReceiver~, respectively, with their
-configuration string.  These instances should be long-lived.  They are
-/callable/ objects.  The sender will take a ~const TPSet&~ to read and
-send to the network as a single message and the receiver takes a
-non-const ~TPSet&~ to be filled when a message arrives.  The receiver
-also takes an optional second argument which is a timeout in msec.  If
-no message arrives w/in that time the call will return the value
-~false~.  The receiver may ~throw std::runtime_error~ if a message is
-received which can not be deserialized into the ~TPSet~ object.
+PTMP provides a very specific and almost trivial API.  Application may
+be a "sender" or a "receiver" of trigger messages by instantiating a
+~TPSender~ or ~TPReceiver~, respectively, with their configuration string.
+These instances should be long-lived in the application and as they
+hold a ZeroMQ socket should be used from the thread in which they were
+constructed.  They provide /callable/ objects.  The sender will take a
+~const TPSet&~ to read and send to the network as a single message and
+the receiver takes a non-const ~TPSet&~ to be filled when a message
+arrives.  The receiver also takes an optional second argument which is
+a timeout in msec.  If no message arrives w/in that time the call will
+return the value ~false~.  The receiver may ~throw std::runtime_error~ if
+a message is received which can not be deserialized into the ~TPSet~
+object.
 
 The following applications provide reference applications.  Running
 them without command line arguments will give a usage message.
@@ -87,105 +91,99 @@ them without command line arguments will give a usage message.
 Application programmers (and possibly their users) should also read
 the section [[Configuration]] below.
 
-* Actor Development 
-
-*note: support for actors is a work in progress*
-
-The low level API described above may be all that an developer chooses to use.  However, its simplicity means that the application will be strongly limited in behavior.  PTMP also supports a programming interface which is based on CZMQ's /actor/ pattern.  The programmer provides functionality through a single function (a [[http://czmq.zeromq.org/manual:zactor][CZMQ ~zactor~ function]]).  This pattern provides some benefits over the simple API, actors may:
-
-1) handle more than one socket
-2) accept dynamic reconfiguration
-3) be composed through user configuration
-4) allow migration of functionality from threads to processes to computers.
-
-The actor function is called from inside its own thread and passed two arguments: a PAIR socket called the "pipe" and a ~void*~ which is used to pass initial configuration in the form of a ~const char*~ in JSON format are passed into the actor function.  Once called, the actor function must participate in the /PTMP actor protocol/ but otherwise is free to do whatever the developer requires.  Likewise, a portion of the JSON schema is standardized but the developer may extend it to suit the needs of the actor program.
-
-Participating in the PTMP actor protocol entails expecting and providing certain message types on the pipe.  The protocol is largely asynchronous (ie, not query/response aka client/server patterns).  The protocol begins with the actor sending an empty "signal" message:
-
-#+BEGIN_SRC c++
-    zsock_signal(pipe, 0);      // ready
-#+END_SRC
-
-All subsequent messages are /multipart/ (have multiple frames).  The
-first frame carries an integer (an enum in ~ptmp::actor::~ namespace)
-marking the message /type/.  Subsequent frames may be provided on a
-type-specific basis.  The types are enumerated as:
-
-- ~ptmp::actor::stop~ :: no additional frames.  An actor
-       shall send this prior to existing the function.  PTMP shall
-       send this requesting the actor terminate and prior to
-       destroying the actor.
-
-- ~ptmp::actor::config~ :: the second frame shall contain a
-       character string in JSON format.  A ~config~ message may be sent
-       to the actor which may then reconfigure itself based on the
-       contents.  A ~config~ message may be sent from the actor with the
-       intention that it reports its current configuration state.  The
-       schema of this message is partly standardized, as described
-       below, but may be extended to suit the needs of the actor.
-
-- ~ptmp::actor::create~ :: the second frame shall contain an actor
-     configuration string.  Received by PTMP, it will attempt to
-     create an actor as described by the configuration string.
-
-- ~ptmp::actor::destroy~ ::  the second frame shall contain an actor
-     configuration string.  Received by PTMP, it will attempt to
-     destroy a previously created actor as described by the
-     configuration string.
-
-
 
 * Configuration
 
-The PTMP API classes and PTMP actors are configured through JSON.  In
-both cases, the top level schema is that of a JSON object.  The
-details of this schema are described.
-
-** API Schema
-
-To configure an API class (~TPSender~ or ~TPReceiver~) the JSON object
-must contain a ~socket~ attribute which is itself an object with the
+The PTMP API classes are configured through a string in JSON format.
+The JSON object must contain an attribute named ~socket~ which has a
+value that is an object.  The ~socket~ object then may have the
 following attributes:
 
 - type :: a ZeroMQ socket type name ("PAIR", "PUB", "SUB", etc)
 - bind :: an array of addresses in canonical ZeroMQ form that the socket should bind
 - connect :: an array of addresses in canonical ZeroMQ form that the socket should connect
 
-The usual ZeroMQ restrictions apply.  For example a PAIR socket may
-only bind or connect to one address.  Others can bind or connect to
-multiple addresses.
+What follows is some discussion on how selecting a configuration for
+the PTMP API classes.  In short, the recommendation is:
 
-** Actor schema
+- ~TPSender~ :: use type PUB and bind
+- ~TPRecevier~ :: use type SUB and connect
 
-*note: support for actors is a work in progress*
+** Attachment mode
 
-The actor schema governs JSON objects which are used for creating an
-actor, providing its initial configuration string, providing
-subsequent configuration updates, reporting its current configuration
-by an actor and destroying the actor.  Which of the attributes
-described below are used depends on which action is being taken.
+In principle both ~bind~ and ~connect~ may be given to a single instance
+(ZeroMQ supports this) but in practice it's likely best to designate
+the *upstream* endpoint to ~bind~.  This makes upstream "server-like" and
+downstream "client-like" (although the actual message transmission is
+a linear flow, not request/reply).
 
-- name :: a string which shall uniquely identify the actor instance.
-          The context of uniqueness shall be at least over all actors
-          of the PTMP application implemented with the given ~function~
-          (see next).
+** Socket type
 
-- function :: the actor function name.
+Probably the two most important considerations in choosing the socket
+type are
 
-- datatime :: a time value measured in the "data clock" at which the
-              configuration should be considered applied.  If absent
-              the configuration should be considered immediate.
+1) multiplicity and routing pattern
+2) behavior when high water mark (HWM) is reached.
 
-- sockets :: an array of objects of type ~socket~ as described above.
-             These are intended to describe sockets which the actor
-             produces but shall exclude the pipe.  An actor should
-             apply this attribute when creating and configuring
-             sockets and shall provide it to reflect the configuration
-             of any sockets that need be known by others.
+*** Multiplicity and Routing Patterns
 
-- etc :: other attributes may be included on a per function basis.
-         These may be ignored by PTMP but shall be forwarded to the
-         actor pipe where applicable.
+PAIR sockets form only a 1-to-1 attachment (ZeroMQ 3 needs one
+endpoint to ~bind~ before the other ~connect~. ZeroMQ 4 seems to have
+removed this restriction).  As there is no multiplicity at either
+endpoint there is no routing pattern to consider.  The pair of PAIR
+sockets form a bidirectional pipe.
+
+PUSH follows a round-robin distribution of messages to its PULL
+endpoints.  Each subsequent message will be sent to the "next"
+endpoint in the PUSH's collection.  Only one PULL socket gets any
+particular message.
+
+PUB sends a message to all SUB endpoints which has subscribed to the
+"topic" of the message.  The topic is simply a prefix match against
+the initial bytes of the message.  To receive messages a SUB must
+subscribe to topics individually or to all (the empty topic).
+
+** High Water Mark Behavior
+
+In ZeroMQ like any system that transmits data asynchronously there are
+data buffers that smooth out the spikes in transmission rate.  ZeroMQ
+has both send and receive buffers managed by the sockets.  These
+buffers can become full if they reach their high water mark (HWM).
+
+When the HWM is reached one of only two things must happen:
+
+- block :: transmission must halt and the resume when possible
+- drop :: transmission must skip data until it can be accepted again
+
+This certainly is not specific to ZeroMQ.  When one hits a full queue,
+something's gotta give.  Either you abandon entering the queue or you
+must wait where you are until there is again room in the queue.
+
+Of course, one can make the queue larger or employ faster network or
+computers.  This will minimize the likelihood of hitting the HWM but
+it does not remove the need to design for the eventuality of hitting
+it.  Three is no magic and we can not rely on hope.
+
+Each ZeroMQ socket pattern chooses between *block* and *drop* policy.
+This policy is thus linked to the multiplicity routing policy
+described above.
+
+PUB/SUB will *drop* messages if the HWM is reached.  This is very useful
+if the transmission should avoid forcing back pressure onto the PUB
+side.  This (along with drop detection) makes most sense for trigger
+transmission in protoDUNE and DUNE.  If HWM is reached, we do not want
+to "back up" the data flow all the way to the hardware.  We have to
+deal with it at the source of the problem.
+
+PAIR, again 1-to-1, blocks.  The HWM is actually the sum of the HWM of
+both PAIRs.  Conceptually, it's a pipeline.  If the pipe is full, no
+new messages will be added until room is made.
+
+PUSH/PULL blocks.  Each PULL has its own HWM.  A send to PUSH will
+continue until all PULL sockets have reached HWM and then further
+until the PUSH HWM is reached.
+
+
 
 
 * Tuning and Exception Handling
