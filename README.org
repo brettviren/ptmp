@@ -88,6 +88,11 @@ them without command line arguments will give a usage message.
 - [[./test/check_sendrecv.cc][check_sendrecv]] :: a self contained sender+receiver that can use
      ~inproc~ as well as ~ipc~ or ~tcp~.
 
+Some of the unit tests run by CI are:
+
+- [[./test/test_sendrecv.sh]] :: run through all combinations of the supported transport and socket patterns for a 1-to-1 test.
+- [[./test/test_many_senders.sh]] :: run through all supported transports with a many-to-1 test of PUB/SUB.  Note, this pattern is what a "TC finder" will likely follow.
+
 Application programmers (and possibly their users) should also read
 the section [[Configuration]] below.
 
