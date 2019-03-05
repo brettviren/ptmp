@@ -58,6 +58,17 @@ Replace ~<path>~ with a into which you want the software to install.  If
 you want to just test it locally you may omit ~--prefix~ and the ~install~
 command.
 
+The default build will run the tests.  To avoid that, for example,
+while developing, you may do:
+
+#+BEGIN_EXAMPLE
+  $ ./waf --notests [install]
+#+END_EXAMPLE 
+
+
+See [[./docs/ups.org]] for special support for building in the UPS
+ecosystem.
+
 As part of the build, a number of tests will be built and run.  See
 the [[./docs/tuning.org][tuning]] document for some details on these tests.
 

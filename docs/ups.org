@@ -1,0 +1,55 @@
+#+title: Install in UPS Ecosystem
+
+PTMP installs in standard build environments meaning support for
+~PKG_CONFIG_PATH~ or explicitly locating dependencies with autoconf like
+~--with-*~ options to ~waf configure~.  See ~waf --help~ for details.
+
+The UPS ecosystem locates dependencies via package specific
+environment variables following a variety of patterns.  A script is
+provided to ease building and installing PTMP in this environment.
+
+* UPS setup
+
+Set up your UPS environment for ZeroMQ, CZMQ and Protobuf.  You might
+do something like:
+
+#+BEGIN_EXAMPLE
+  $ source /cvmfs/fermilab.opensciencegrid.org/products/artdaq/setup
+  $ PRODUCTS=$PRODUCTS:/cvmfs/fermilab.opensciencegrid.org/products/larsoft
+  $ setup czmq v4_2_0 -q e15
+  $ setup protobuf v3_3_1a -q e15
+#+END_EXAMPLE
+
+* Normal installation against UPS products
+
+To install PTMP as a "normal" (non UPS) source package but in a UPS
+environment, set up your environment as above and then:
+
+#+BEGIN_EXAMPLE
+  $ ./waftools/waf-configure-for-ups.sh [/path/to/ptmp/install]
+  $ ./waf install
+#+END_EXAMPLE
+
+If no installation directory is given to the script then the
+installation will go to the ~install/~ directory in the source.
+
+* Installation as UPS product
+
+This is not yet working and I'm not an expert but one would do
+something like:
+
+#+BEGIN_EXAMPLE
+  $ ups declare ptmp vX_Y_Z [magic arguments]
+  $ setup ptmp vX_Y_Z [-q maybe:some:qualifiers]
+  $ ./waftools/waf-configure-for-ups.sh $PTMP_FQ_DIR
+  $ ./waf install
+#+END_EXAMPLE
+
+Note, if this is the first time to install into ~$PTMP_FQ_DIR~ your
+various ~PATH~ variables will not yet be defined so before using the
+installation repeat:
+
+#+BEGIN_EXAMPLE
+  $ setup ptmp vX_Y_Z [-q maybe:some:qualifiers]
+#+END_EXAMPLE
+
