@@ -5,6 +5,8 @@
 from waflib.Task import Task
 from waflib.TaskGen import extension 
 
+import generic
+
 """
 A simple tool to integrate protocol buffers into your build system.
 
@@ -32,7 +34,11 @@ def process_protoc(self, node):
 
     self.use = self.to_list(getattr(self, 'use', '')) + ['PROTOBUF']
 
-def configure(conf):
-    conf.check_cfg(package="protobuf", uselib_store="PROTOBUF", 
-            args=['--cflags', '--libs'])
-    conf.find_program('protoc', var='PROTOC')
+def options(opt):
+    generic._options(opt, 'protobuf')
+
+def configure(cfg):
+    generic._configure(cfg, 'protobuf',
+                       incs=('google/protobuf/message.h',), libs=('protobuf',),
+                       mandatory=True)
+    cfg.find_program('protoc', var='PROTOC')
