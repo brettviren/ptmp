@@ -1,65 +1,65 @@
 // -*- c++ -*- // ish
 
 
-syntax = "proto3";
+syntax = "proto2";
 package ptmp.data;
 
 message Timestamp {
     // Number of seconds from the start of the Unix epoch 
-    uint64 seconds = 1;
+    required uint64 seconds = 1;
 
     // Number of nanoseconds within the second
-    uint32 nanosecs = 2;
+    required uint32 nanosecs = 2;
 }
 
 message TrigPrim {    
 
     // The channel of this TP
-    uint32 channel = 1;
+    required uint32 channel = 1;
 
     // The absolute start time of the trigger primitive measured in the data clock.
-    Timestamp tstart = 2;
+    required Timestamp tstart = 2;
 
     // The duration of the primitive measured in the data clock and in units of nanoseconds.
-    uint32 tspan = 3;
+    optional uint32 tspan = 3;
 
     // The total ADC of the TP
-    uint32 adcsum = 4;
+    optional uint32 adcsum = 4;
 
     // The peak ADC of the TP above baseline
-    uint32 adcpeak = 5;
+    optional uint32 adcpeak = 5;
     
     // A bit mask error flag.  0 is no error
-    uint32 flags = 6;
+    optional uint32 flags = 6;
 
 }
 
 message TPSet {
     // A sequential count of how many TPsets were sent before this
     // one.  At 150Hz, this is enough for half a year
-    uint32 count = 1;
+    required uint32 count = 1;
 
     // Identify the detector portion that this TPSet derives.   
-    uint32 detid = 2;
+    required uint32 detid = 2;
 
     // The system wall clock time stamp when this TPSet was created.
-    Timestamp created = 3;
+    required Timestamp created = 3;
 
     // The smallest tstart of the TPs, ie the datatime of the earliest TP.
-    Timestamp tstart = 4;
+    required Timestamp tstart = 4;
 
     // The time span of the TPs in the set, measured in the datatime
     // clock in units of ns.  
-    uint32 tspan = 5;
+    optional uint32 tspan = 5;
 
     // The channel providing the lower bound on the set, inclusive.
-    uint32 chanbeg = 6;
+    optional uint32 chanbeg = 6;
 
     // The channel providing the upper bound on the set, inclusive.
-    uint32 chanend = 7;
+    optional uint32 chanend = 7;
 
     // sum of ADC of all TPs in the set.
-    uint32 totaladc = 8;
+    optional uint32 totaladc = 8;
 
     // The TPs 
     repeated TrigPrim tps = 9;
