@@ -150,3 +150,36 @@ void ptmp::internals::send(zsock_t* sock, const ptmp::data::TPSet& tps)
     }
     
 }
+
+void ptmp::internals::send_cfg(zsock_t* sock, const char* cfgstr)
+{
+    const int msgid = 2;        // config
+
+    zmsg_t* msg = zmsg_new();
+    if (!msg) {
+        throw std::runtime_error("new msg failed");
+    }
+    zframe_t* fid = zframe_new(&msgid, sizeof(int));
+    if (!fid) {
+        throw std::runtime_error("new frame failed");
+    }
+    int rc = zmsg_append(msg, &fid);
+    if (rc) {
+        throw std::runtime_error("msg append failed");
+    }
+    
+    zframe_t* fcfg = zframe_from(cfgstr);
+    if (!fcfg) {
+        throw std::runtime_error("new frame failed");
+    }
+
+    rc = zmsg_append(msg, &fcfg);
+    if (rc) {
+        throw std::runtime_error("msg append failed");
+    }
+
+    rc = zmsg_send(&msg, sock);
+    if (rc) {
+        throw std::runtime_error("msg send failed");
+    }
+}

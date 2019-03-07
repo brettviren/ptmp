@@ -1,20 +1,27 @@
 // -*- c++ -*- // ish
 
+
 syntax = "proto2";
 package ptmp.data;
+
+message Timestamp {
+    // Number of seconds from the start of the Unix epoch 
+    required uint64 seconds = 1;
+
+    // Number of nanoseconds within the second
+    required uint32 nanosecs = 2;
+}
 
 message TrigPrim {    
 
     // The channel of this TP
     required uint32 channel = 1;
 
-    // The start, measured in the same clock as and with respect to
-    // the datatime of the set.
-    required uint32 tstart = 2;
+    // The absolute start time of the trigger primitive measured in the data clock.
+    required Timestamp tstart = 2;
 
-    // The duration, measured in the same clock as datatime, of the
-    // trigger primitive.
-    required uint32 tspan = 3;
+    // The duration of the primitive measured in the data clock and in units of nanoseconds.
+    optional uint32 tspan = 3;
 
     // The total ADC of the TP
     optional uint32 adcsum = 4;
@@ -35,22 +42,21 @@ message TPSet {
     // Identify the detector portion that this TPSet derives.   
     required uint32 detid = 2;
 
-    // The reference time of the TPs in this set.  This is measured by
-    // a common clock and which stamps the electronics sampling.
-    required int64 datatime = 3;
+    // The system wall clock time stamp when this TPSet was created.
+    required Timestamp created = 3;
 
-    // System clock in Unix seconds taken at the time of message
-    // formation.
-    required int64 unixseconds = 4;
+    // The smallest tstart of the TPs, ie the datatime of the earliest TP.
+    required Timestamp tstart = 4;
 
-    // Number of system clock nanoseconds past the second.
-    required uint32 unixns = 5;
+    // The time span of the TPs in the set, measured in the datatime
+    // clock in units of ns.  
+    optional uint32 tspan = 5;
 
-    // Time span of the TPs in the set measured in the datatime clock.
-    optional uint32 timepan = 6;
+    // The channel providing the lower bound on the set, inclusive.
+    optional uint32 chanbeg = 6;
 
-    // Number of unique channels spanning the TPs in the set.
-    optional uint32 chanspan = 7;
+    // The channel providing the upper bound on the set, inclusive.
+    optional uint32 chanend = 7;
 
     // sum of ADC of all TPs in the set.
     optional uint32 totaladc = 8;

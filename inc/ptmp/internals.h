@@ -1,6 +1,6 @@
 #ifndef PTMP_INTERNALS_H
 #define PTMP_INTERNALS_H
-
+#include "ptmp/data.h"
 #include <czmq.h>
 #include <string>
 
@@ -12,8 +12,10 @@ namespace ptmp {
 
         zsock_t* endpoint(const std::string& config);
 
-        void recv(zmsg_t* &msg, data::TPSet& tps);
+        void recv(zmsg_t* &msg, ptmp::data::TPSet& tps);
         void send(zsock_t* sock, const ptmp::data::TPSet& tps);
+
+        void send_cfg(zsock_t* sock, const char* cfgstr);
 
         class Socket {
             zsock_t* m_sock;
