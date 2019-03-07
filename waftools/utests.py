@@ -13,7 +13,7 @@ def utesting(bld, name, use=''):
     appsrc = bld.path.ant_glob('apps/*.cc')
     checksrc = bld.path.ant_glob('test/check_*.cc')
     testsrc = bld.path.ant_glob('test/test_*.cc')
-    test_scripts = bld.path.ant_glob('test/test_*.sh') + bld.path.ant_glob('test/test_*.py')
+    test_scripts = bld.path.ant_glob('test/test*.sh') + bld.path.ant_glob('test/test*.py')
 
     if getattr(bld.options, "notests", False):
         print ("no tests")
