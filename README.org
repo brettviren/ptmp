@@ -119,6 +119,25 @@ following attributes:
 - bind :: an array of addresses in canonical ZeroMQ form that the socket should bind
 - connect :: an array of addresses in canonical ZeroMQ form that the socket should connect
 
+An example configuration string for a sender might look like:
+
+#+BEGIN_SRC json
+{ 
+  "type": "PUB",
+  "bind": [ "tcp://127.0.0.1:12345" ]
+}
+#+END_SRC
+
+An example configuration string for a receiver connecting to two
+senders might look like:
+
+#+BEGIN_SRC json
+{
+  "type": "SUB",
+  "connect": [ "tcp://127.0.0.1:12345", "tcp://127.0.0.1:12346" ]
+}
+#+END_SRC
+
 What follows is some discussion on how selecting a configuration for
 the PTMP API classes.  In short, the recommendation is:
 
