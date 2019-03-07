@@ -4,23 +4,18 @@
 syntax = "proto2";
 package ptmp.data;
 
-message Timestamp {
-    // Number of seconds from the start of the Unix epoch 
-    required uint64 seconds = 1;
-
-    // Number of nanoseconds within the second
-    required uint32 nanosecs = 2;
-}
-
 message TrigPrim {    
 
     // The channel of this TP
     required uint32 channel = 1;
 
-    // The absolute start time of the trigger primitive measured in the data clock.
-    required Timestamp tstart = 2;
+    // The absolute start time of the trigger primitive measured in
+    // hardware data clock "ticks".  (For protoDUNE this is the 50MHz
+    // clock).
+    required uint64 tstart = 2;
 
-    // The duration of the primitive measured in the data clock and in units of nanoseconds.
+    // The duration of the primitive measured in hardware data clock
+    // ticks.
     optional uint32 tspan = 3;
 
     // The total ADC of the TP
@@ -43,13 +38,15 @@ message TPSet {
     required uint32 detid = 2;
 
     // The system wall clock time stamp when this TPSet was created.
-    required Timestamp created = 3;
+    // This is a Unix time_t value.
+    required int64 created = 3;
 
-    // The smallest tstart of the TPs, ie the datatime of the earliest TP.
-    required Timestamp tstart = 4;
+    // The smallest tstart of the TPs, ie the tstart of the earliest
+    // TP.  This is measured in hardware clock "ticks".
+    required uint64 tstart = 4;
 
     // The time span of the TPs in the set, measured in the datatime
-    // clock in units of ns.  
+    // clock in units of hardware clock ticks.
     optional uint32 tspan = 5;
 
     // The channel providing the lower bound on the set, inclusive.
