@@ -96,22 +96,22 @@ ptmp::testing::uniform_sleeps_t::uniform_sleeps_t(int t, int s)
 void ptmp::testing::uniform_sleeps_t::operator()()
 {
     ++count;
+    
     if (usleeptime == 0) { return; }
-    if (usleepskip == 0) { return; }
-    if (count % usleepskip != 1) { return; }
+    if (usleepskip>0 and count % usleepskip != 1) { return; }
     usleep(usleeptime);
 }
 
 ptmp::testing::exponential_sleeps_t::exponential_sleeps_t(int t, int s)
-    : usleeptime(t), usleepskip(s), count(0), expo_dist((double)t)
+    : usleeptime(t), usleepskip(s), count(0), expo_dist(1.0/t)
 {
 }
 
 void ptmp::testing::exponential_sleeps_t::operator()() {
     ++count;
-    if (usleepskip == 0) { return; }
-    if (count % usleepskip != 1) { return; }
-    int us = expo_dist(generator);
-    usleep(us);
+    if (usleeptime == 0) { return; }
+    if (usleepskip>0 and count % usleepskip != 1) { return; }
+    double us = expo_dist(generator);
+    usleep((int)us);
 }
 

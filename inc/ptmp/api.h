@@ -5,6 +5,7 @@
 #define PTMP_API_H
 
 #include <string>
+#include <vector>
 
 #include "ptmp/data.h"
 #include "ptmp/internals.h"
@@ -43,6 +44,26 @@ namespace ptmp {
         TPReceiver() =default;
         TPReceiver(const TPReceiver&) =delete;
         TPReceiver& operator=(const TPReceiver&) =delete;            
+    };
+
+    // A "device" that accepts TPSets from N TPSenders on input and
+    // produces an ordered output stream of their TPSets on output.
+    // Synchronizing is done on the "tstart" time of the TPSets.
+    class TPSorted {
+    public:
+        // Create a TPSorted with one config for input sockets and one
+        // for output.  Note, each output message is sent to all
+        // output sockets.  The config is two objects each like
+        // TPSender/TPReceiver held by a key "sender" and "receiver".
+        TPSorted(const std::string& config);
+
+        // The TPSorted will run a thread needs to be kept in scope
+        // but otherwise doesn't have a serviceable API.  Destroy it
+        // when done.
+        ~TPSorted();
+    private:
+        zactor_t* m_actor;
+        
     };
 
 }

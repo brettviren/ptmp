@@ -25,23 +25,33 @@ int main(int argc, char* argv[])
     CLI::App app{"Send TPSets given a model of their rates"};
     
     std::string socktype="PUB";
-    app.add_option("-p,--socket-pattern", socktype, "The ZeroMQ socket pattern for endpoint [PUB, PAIR, PUSH]");
+    app.add_option("-p,--socket-pattern", socktype,
+                   "The ZeroMQ socket pattern for endpoint [PUB, PAIR, PUSH]");
     std::string attach="bind";
-    app.add_option("-a,--socket-attachment", attach, "The socket attachement method [bind|connect] for this endpoint");
+    app.add_option("-a,--socket-attachment", attach,
+                   "The socket attachement method [bind|connect] for this endpoint");
     std::vector<std::string> endpoints;
-    app.add_option("-e,--socket-endpoints", endpoints, "The socket endpoint addresses in ZeroMQ format (tcp:// or ipc://)")->expected(-1);
+    app.add_option("-e,--socket-endpoints", endpoints,
+                   "The socket endpoint addresses in ZeroMQ format (tcp:// or ipc://)")->expected(-1);
 
     int begwait=0;
-    app.add_option("-B,--begin-wait-ms", begwait, "Number of ms to wait between creating socket and starting to send");
+    app.add_option("-B,--begin-wait-ms", begwait,
+                   "Number of ms to wait between creating socket and starting to send");
     int endwait=0;
-    app.add_option("-E,--end-wait-ms", endwait, "Number of ms to wait between completing --count messages and terminating");
+    app.add_option("-E,--end-wait-ms", endwait,
+                   "Number of ms to wait between completing --count messages and terminating");
 
     int ntpsets=0;
-    app.add_option("-n,--ntpsets", ntpsets, "Number of TPSet messages to send.  0 (default) runs for ever");
+    app.add_option("-n,--ntpsets", ntpsets,
+                   "Number of TPSet messages to send.  0 (default) runs for ever");
     int ntps = 1;
-    app.add_option("-N,--ntps", ntps, "Number of (mean or fixed) TPs per TPSet");
+    app.add_option("-N,--ntps", ntps,
+                   "Number of (mean or fixed) TPs per TPSet");
     int vartps = 0;
-    app.add_option("-V,--vartps", vartps, "Width of distribution of number of TPs per TPSet");
+    app.add_option("-V,--vartps", vartps,
+                   "Width of distribution of number of TPs per TPSet");
+    int detid = 0;
+    app.add_option("-d,--detid", detid, "Detector ID to pretend to be");
 
     app.require_subcommand();
 
@@ -61,12 +71,15 @@ int main(int argc, char* argv[])
 
     std::function<void()> sleepy_time;
     if (app.got_subcommand("exponential")) {
+        cerr << "exponential timing " << usleeptime << " " << usleepskip << "\n";
         sleepy_time = ptmp::testing::exponential_sleeps_t(usleeptime, usleepskip);
     }
-    if (app.got_subcommand("uniform")) {
+    else if (app.got_subcommand("uniform")) {
+        cerr << "uniform timing "  << usleeptime << " " << usleepskip << "\n";
         sleepy_time = ptmp::testing::uniform_sleeps_t(usleeptime, usleepskip);
     }
     else {
+        cerr << "fast as possible timing\n";
         sleepy_time = ptmp::testing::uniform_sleeps_t(0,0);
     }
 
@@ -80,6 +93,7 @@ int main(int argc, char* argv[])
 
     ptmp::data::TPSet tps;
     ptmp::testing::init(tps);
+    tps.set_detid(detid);
 
     // Avoid "late joiner" syndrom
     zclock_sleep (begwait);

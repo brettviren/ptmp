@@ -49,7 +49,6 @@ namespace ptmp {
             void operator()();
         };
         
-        
     }
 }
 

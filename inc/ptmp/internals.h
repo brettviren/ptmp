@@ -15,7 +15,7 @@ namespace ptmp {
         void recv(zmsg_t* &msg, ptmp::data::TPSet& tps);
         void send(zsock_t* sock, const ptmp::data::TPSet& tps);
 
-        void send_cfg(zsock_t* sock, const char* cfgstr);
+        //void send_cfg(zsock_t* sock, const char* cfgstr);
 
         class Socket {
             zsock_t* m_sock;
