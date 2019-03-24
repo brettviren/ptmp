@@ -63,7 +63,6 @@ namespace ptmp {
         ~TPSorted();
     private:
         zactor_t* m_actor;
-        
     };
 
 }
