@@ -42,7 +42,14 @@ above.
 The selected message is sent out all M output sockets in a fan-out
 fashion.
 
-Some comments:
+* Tests
+
+- [[../test/check_sorted.cc]] :: runs ~TPSorted~ as stand alone proxy application
+
+- [[../test/test_sorted.cc]] :: runs ~TPSorted~ with several ~TPSender~'s and ~TPReceiver~'s 
+
+
+* Comments
 
 - ZeroMQ input queues are used to hold all messages received by the
   input sockets.  They may be adjusted to cover variablility in input
@@ -51,7 +58,7 @@ Some comments:
 - Increasing the "tardy" time will reduce the number of discarded
   messages but will increase the maximum latency.
 
-Some caveats, fixme's and todo's:
+* Caveats, fixme's and todo's
 
 - [ ] When it must discarded message, the algorithm then moves on to
   the next input instead of continuing to drain that input until
@@ -72,7 +79,7 @@ Some caveats, fixme's and todo's:
 - [ ] This change would allow ~TPSorted~ to be made more generic and not
   dependent on ~TPSet~.
 
-- [ ] Current tests are not adequate to test the tardy condition.
+- [ ] Current tests do not directly exercise the tardy condition.
 
 
 
