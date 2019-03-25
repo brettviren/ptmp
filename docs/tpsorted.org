@@ -1,0 +1,79 @@
+#+title: ~TPSender~ Proxy Class
+
+The TPSender class provides a "proxy" which may sit between sources of
+messages and sinks.  In between it provides these functions:
+
+- stream aggregation
+- latency guarantee (wall clock)
+- time order guarantee (data clock)
+
+* Configuration
+
+A ~TPSender~ is constructed with three object items:
+
+- tardy :: a time in msec
+- input :: specification of the proxy's input sockets.  It holds a "socket" attribute which follows the same schema as ~TPReceiver~
+- output :: ibid for the specification of the proxy's output sockets.
+
+
+* Algorithm
+
+The algorithm maintains N input sockets and holds up to N current
+messages, one per input.  It will effectively sleep for a period of
+time equal to the "tardy" time.  On waking it will attempt to receive,
+without blocking, a new message from any input for which it lacks one.
+
+The algorithm will determine the data time of an input message from
+its ~TPSet.tstart~ value.  If this time is less than the current /output
+time/ (described below) the message will be discarded.
+
+The algorithm will also record the real time (wall clock) when an
+input last produced a message.  An input is considered "tardy" if this
+time is more than "tardy" msecs from the algorithms current real time
+(wall clock).
+
+If the algorithm lacks a message from all inputs but some inputs are
+not yet tardy, it will wait.  If all inputs have provided a message or
+those that have not are all tardy then the algorithm will select an
+output message.  The output message is the one with the smallest
+~TPSet.tstart~ time.  This time is recorded as the /output time/ used
+above.  
+
+The selected message is sent out all M output sockets in a fan-out
+fashion.
+
+Some comments:
+
+- ZeroMQ input queues are used to hold all messages received by the
+  input sockets.  They may be adjusted to cover variablility in input
+  rates.
+
+- Increasing the "tardy" time will reduce the number of discarded
+  messages but will increase the maximum latency.
+
+Some caveats, fixme's and todo's:
+
+- [ ] When it must discarded message, the algorithm then moves on to
+  the next input instead of continuing to drain that input until
+  getting to fresh data.  As-is, this can lead to an input never
+  catching up.  This must be fixed.
+
+- [ ] The "now" real time (wall clock) of the algorithm is set just
+  after waking and thus does not exactly represent the time a message
+  was received to the code.  This is probably okay.
+
+- [ ] To access ~TPSet.tstart~ each message is serialized via protobuf.
+  Changing the message schema a the ZeroMQ level (eg, by adding a
+  "header frame") to hold ~tstart~ and maybe also ~count~ and ~detid~, this
+  full serialization can be avoided.  This change can be made keeping
+  the other PTMP API classes in sync but would introduce
+  incompatibility between different versions of PTMP.
+
+- [ ] This change would allow ~TPSorted~ to be made more generic and not
+  dependent on ~TPSet~.
+
+- [ ] Current tests are not adequate to test the tardy condition.
+
+
+
+

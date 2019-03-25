@@ -139,6 +139,10 @@ void tpsorted_proxy(zsock_t* pipe, void* vargs)
                 if (header.tstart < last_msg_time) {
                     header_dump("tardy", header);
                     zmsg_destroy(&msg);
+                    // fixme: we should try more than just once.
+                    // Here, this should loop on this input socket
+                    // until we get a fresh message or the input is
+                    // drained.
                     continue;
                 }
                 si.msg = msg;

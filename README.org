@@ -74,19 +74,41 @@ the [[./docs/tuning.org][tuning]] document for some details on these tests.
 
 * Application Development
 
-PTMP provides a very specific and almost trivial API.  Application may
-be a "sender" or a "receiver" of trigger messages by instantiating a
-~TPSender~ or ~TPReceiver~, respectively, with their configuration string.
-These instances should be long-lived in the application and as they
-hold a ZeroMQ socket should be used from the thread in which they were
-constructed.  They provide /callable/ objects.  The sender will take a
-~const TPSet&~ to read and send to the network as a single message and
-the receiver takes a non-const ~TPSet&~ to be filled when a message
-arrives.  The receiver also takes an optional second argument which is
-a timeout in msec.  If no message arrives w/in that time the call will
-return the value ~false~.  The receiver may ~throw std::runtime_error~ if
-a message is received which can not be deserialized into the ~TPSet~
-object.
+PTMP provides a very specific and almost trivial API through a number
+of classes with *synchronous* methods:
+
+- ~TPSender~ :: a callable to send a ~TPSet~ object out its socket.
+
+- ~TPReceiver~ :: a callable to receive a ~TPSet~ object from its socket.
+                  Can block or be given a timeout to wait for one.
+
+- ~TPSorted~ :: (currently) provides no methods.  This is a proxy that
+                will take in N asynchronous streams of ~TPSet~ messages
+                and output sorted streams.  See [[./docs/tpsorted.org]].
+
+Each class is given a /configuration string/ in JSON format to provide
+information about the sockets to use and other info.  This allows
+applications to gain automatic flexibility in terms of socket patterns
+and transport.  
+
+Instances of these classes should be long-lived in the application and
+as they hold a ZeroMQ socket must be used from the thread in which
+they were constructed.  Some provide /callable/ objects.  Eg, a sender
+object will be called on a ~const TPSet&~ and send it out the object's
+socket(s) as a single message and the receiver takes a non-const
+~TPSet&~ to be filled when a message arrives.  The receiver also takes
+an optional second argument which is a timeout in msec.  If no message
+arrives w/in that time the call will return the value ~false~.  The
+receiver may ~throw std::runtime_error~ if a message is received which
+can not be deserialized into the ~TPSet~ object.  Finally, the ~TPsorted~
+acts as a proxy.  Once created, application code merely needs to keep
+it in scope and it will service its input and output sockets.  
+
+The application, via PTMP configuration, needs to assure these classes
+receive proper configuration to allow their sockets to properly bind
+and connect.  The socket type (PUB, SUB, PUSH, PULL, PAIR) and
+transport (~tcp://~, ~inproc://~, ~ipc://~) and endpoint addresses are all
+user configurable.  See ~zmq_socket(3)~ for a discussion of the options.
 
 ** Message Schema
 
