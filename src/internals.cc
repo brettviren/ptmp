@@ -98,6 +98,7 @@ zmsg_t* ptmp::internals::Socket::msg(int timeout_msec)
 {
     void* which = zpoller_wait(m_poller, timeout_msec);
     if (!which) return NULL;
+
     return zmsg_recv((zsock_t*)which);
 }
 
@@ -110,12 +111,14 @@ void ptmp::internals::recv(zmsg_t* &msg, ptmp::data::TPSet& tps)
 {
     zframe_t* fid = zmsg_first(msg);
     if (!fid) {
+        zsys_error(zmq_strerror (errno));
         throw std::runtime_error("null id frame");
     }
     int topic = *(int*)zframe_data(fid);
 
     zframe_t* pay = zmsg_next(msg);
     if (!pay) {
+        zsys_error(zmq_strerror (errno));
         throw std::runtime_error("null payload frame");
     }
     tps.ParseFromArray(zframe_data(pay), zframe_size(pay));
@@ -130,14 +133,17 @@ void ptmp::internals::send(zsock_t* sock, const ptmp::data::TPSet& tps)
     // the message ID:
     zmsg_t* msg = zmsg_new();
     if (!msg) {
+        zsys_error(zmq_strerror (errno));
         throw std::runtime_error("new msg failed");
     }
     zframe_t* fid = zframe_new(&topic, sizeof(int));
     if (!fid) {
+        zsys_error(zmq_strerror (errno));
         throw std::runtime_error("new frame failed");
     }
     int rc = zmsg_append(msg, &fid);
     if (rc) {
+        zsys_error(zmq_strerror (errno));
         throw std::runtime_error("msg append failed");
     }
 
@@ -146,45 +152,15 @@ void ptmp::internals::send(zsock_t* sock, const ptmp::data::TPSet& tps)
     tps.SerializeToArray(zframe_data(pay), zframe_size(pay));
     rc = zmsg_append(msg, &pay);
     if (rc) {
+        zsys_error(zmq_strerror (errno));
         throw std::runtime_error("msg append failed");
     }
         
     rc = zmsg_send(&msg, sock);
     if (rc) {
+        zsys_error(zmq_strerror (errno));
         throw std::runtime_error("msg send failed");
     }
     
 }
 
-// void ptmp::internals::send_cfg(zsock_t* sock, const char* cfgstr)
-// {
-//     const int msgid = 2;        // config
-
-//     zmsg_t* msg = zmsg_new();
-//     if (!msg) {
-//         throw std::runtime_error("new msg failed");
-//     }
-//     zframe_t* fid = zframe_new(&msgid, sizeof(int));
-//     if (!fid) {
-//         throw std::runtime_error("new frame failed");
-//     }
-//     int rc = zmsg_append(msg, &fid);
-//     if (rc) {
-//         throw std::runtime_error("msg append failed");
-//     }
-    
-//     zframe_t* fcfg = zframe_from(cfgstr);
-//     if (!fcfg) {
-//         throw std::runtime_error("new frame failed");
-//     }
-
-//     rc = zmsg_append(msg, &fcfg);
-//     if (rc) {
-//         throw std::runtime_error("msg append failed");
-//     }
-
-//     rc = zmsg_send(&msg, sock);
-//     if (rc) {
-//         throw std::runtime_error("msg send failed");
-//     }
-// }

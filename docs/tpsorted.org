@@ -9,7 +9,7 @@ messages and sinks.  In between it provides these functions:
 
 * Configuration
 
-A ~TPSender~ is constructed with three object items:
+A ~TPSorted~ is constructed with three object items:
 
 - tardy :: a time in msec
 - input :: specification of the proxy's input sockets.  It holds a "socket" attribute which follows the same schema as ~TPReceiver~
@@ -60,27 +60,26 @@ fashion.
 
 * Caveats, fixme's and todo's
 
-- [ ] When it must discarded message, the algorithm then moves on to
-  the next input instead of continuing to drain that input until
-  getting to fresh data.  As-is, this can lead to an input never
-  catching up.  This must be fixed.
+- [X] The "now" real time (wall clock) of the algorithm is set just
+  after waking and thus does not exactly represent the time each
+  message was received to the code.  This is probably okay.
 
-- [ ] The "now" real time (wall clock) of the algorithm is set just
-  after waking and thus does not exactly represent the time a message
-  was received to the code.  This is probably okay.
+- [X] The ~test_sorted~ tst will give warnings on out-of-order sequence
+  numbers.  These may occur when two threads send their messages at
+  the exact same microsecond.  If the ~tstart~ values differ then this
+  out-of-order will count as an error.
+
+- [ ] Tardy messages are simply dropped with a log message.  Something
+  different can be done but guidance from application developers is
+  needed.
 
 - [ ] To access ~TPSet.tstart~ each message is serialized via protobuf.
   Changing the message schema a the ZeroMQ level (eg, by adding a
   "header frame") to hold ~tstart~ and maybe also ~count~ and ~detid~, this
   full serialization can be avoided.  This change can be made keeping
   the other PTMP API classes in sync but would introduce
-  incompatibility between different versions of PTMP.
-
-- [ ] This change would allow ~TPSorted~ to be made more generic and not
-  dependent on ~TPSet~.
+  incompatibility between different versions of PTMP.  This change
+  would allow ~TPSorted~ to be made more generic and not dependent on
+  ~TPSet~.
 
 - [ ] Current tests do not directly exercise the tardy condition.
-
-
-
-

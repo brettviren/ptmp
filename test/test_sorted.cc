@@ -130,6 +130,7 @@ const uint64_t sec = 1000*msec;
 
 void dump_tpset(std::string ctx, ptmp::data::TPSet& tpset)
 {
+    return;
     zsys_info("%s: count:%-4d detid:%-2d tstart:%-8ld created:%ld",
               ctx.c_str(), tpset.count(), tpset.detid(), tpset.tstart(), tpset.created());
 }
@@ -157,8 +158,10 @@ void run_sequence1(json scfg, json pcfg, json rcfg, int nsends, double period)
 
     std::vector<ptmp::data::TPSet> send_records;
 
-    int64_t t0 = zclock_usecs();
+    zsys_info("sleeping 200ms to give time to connect");
+    zclock_sleep(200);
 
+    int64_t t0 = zclock_usecs();
     uint64_t tstart = 0;
     for (int seq=0; seq<nsends; ++seq) {
         int64_t dt = rtimer(gen);
@@ -176,6 +179,7 @@ void run_sequence1(json scfg, json pcfg, json rcfg, int nsends, double period)
     }
 
 
+    int nerrors=0;
     for (int seq=0; seq<nsends; ++seq) {
         ptmp::data::TPSet& want = send_records[seq];
         assert (want.count() == seq);
@@ -183,8 +187,22 @@ void run_sequence1(json scfg, json pcfg, json rcfg, int nsends, double period)
         bool ok = recver(got);
         dump_tpset("recv", got);
         assert(ok);
-        assert(got.count() == seq);
+        if (got.count() != seq) {
+            if (got.tstart() == want.tstart()) {
+                zsys_warning("order warning, got mesg seq %d, expect %d, but tstart identical", got.count(), seq);
+                dump_tpset("want:", want);
+                dump_tpset(" got:", got);
+            }
+            else {
+                zsys_error("order error, got mesg seq %d, expect %d", got.count(), seq);
+                dump_tpset("want:", want);
+                dump_tpset(" got:", got);
+                ++nerrors;
+            }
+        }
     }
+
+    assert(nerrors == 0);
 
     ptmp::data::TPSet nothing;
     bool ok = recver(nothing, 10); // should time out
@@ -201,14 +219,24 @@ void test1()
     // when a source is considered tardy, in usec
     int tardy_msec = 10;
 
-    auto jcfgs = make_configs({"connect", "PULL", "tcp",3},{"bind", "PUSH", "tcp", 1}, tardy_msec);
+    // Proxy's input sockets first, then output.  If you get
+    // "Operation not supported" then you've reversed them.
+    auto jcfgs = make_configs({"connect", "SUB", "tcp",3},
+                              {"bind", "PUB", "tcp", 1}, tardy_msec);
 
-    run_sequence1(jcfgs[0], jcfgs[1], jcfgs[2], 1000, period);
+    run_sequence1(jcfgs[0], jcfgs[1], jcfgs[2], 10000, period);
 }
 
 
+//#include <pthread.h>
+//#include <signal.h>
 int main()
 {
+    //sigset_t block_set;
+    ///sigfillset (&block_set);
+    //sigaddset (&block_set, SIGPROF);
+    //pthread_sigmask (SIG_SETMASK, &block_set, NULL);
+
     zsys_init();
     // eventually loop over various combos
     test1();

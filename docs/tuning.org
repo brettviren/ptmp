@@ -1,5 +1,51 @@
 #+title: Understanding and tuning
 
+* Memory Leaks
+
+Run ~valgrind~ to check for memory leaks.
+
+#+BEGIN_EXAMPLE
+  $ valgrind --leak-check=full build/test_sorted
+#+END_EXAMPLE
+
+Memory in use at exit is okay.  Any leaks are not.
+
+* CPU / Memory profiling
+
+** Valgrind
+
+Run:
+
+#+BEGIN_EXAMPLE
+  $ valgrind --tool=callgrind build/test_sorted
+  $ kcachegrind callgrind.out.<PID>
+#+END_EXAMPLE
+
+** Google Perftools
+
+The profiling such as used by Google PerfTools relies on sending a barrage of ~SIGPROF~ signals to the application.  As ZeroMQ does not perform signal handling, this will immediately interrupt any ~zmq_recv()~ function calls that are waiting for input.  They will raise error ~EINTR~.  
+
+In order perform such profiling, a loop around each ~zmq_recv()~ call is
+needed which re-calls it when interrupted by a signal.  In general,
+this is "bad" as it will block any attempts to kill or Ctrl-C the app.
+
+For more info see:
+
+ - the ~main()~ function of ~test_sorted.cc~ for the protective tooling
+ - This SO https://stackoverflow.com/a/17694612 and the referenced:
+ - https://git.lucina.net/zeromq-examples.git/tree/zmq-camera.c#n401
+
+Here's how one /would/ run the profiler
+
+#+BEGIN_EXAMPLE
+  $ CPUPROFILE=test_sorted.prof \
+    LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libprofiler.so.0 \
+    ./build/test_sorted  # <-- currently interrupts
+  $ google-pprof  --pdf build/test_sorted test_sorted.prof > test_sorted.prof.pdf
+#+END_EXAMPLE
+
+
+
 * Understanding the network
 
 In boring universe nothing exceptional ever happens.  Receivers start
