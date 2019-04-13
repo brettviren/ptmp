@@ -24,6 +24,9 @@ int main(int argc, char* argv[])
 {
     CLI::App app{"Send TPSets given a model of their rates"};
     
+    int hwm = 1000;
+    app.add_option("-m,--socket-hwm", hwm,
+                   "The ZeroMQ socket highwater mark");    
     std::string socktype="PUB";
     app.add_option("-p,--socket-pattern", socktype,
                    "The ZeroMQ socket pattern for endpoint [PUB, PAIR, PUSH]");
@@ -71,24 +74,25 @@ int main(int argc, char* argv[])
 
     std::function<void()> sleepy_time;
     if (app.got_subcommand("exponential")) {
-        cerr << "exponential timing " << usleeptime << " " << usleepskip << "\n";
+        //cerr << "exponential timing " << usleeptime << " " << usleepskip << "\n";
         sleepy_time = ptmp::testing::exponential_sleeps_t(usleeptime, usleepskip);
     }
     else if (app.got_subcommand("uniform")) {
-        cerr << "uniform timing "  << usleeptime << " " << usleepskip << "\n";
+        //cerr << "uniform timing "  << usleeptime << " " << usleepskip << "\n";
         sleepy_time = ptmp::testing::uniform_sleeps_t(usleeptime, usleepskip);
     }
     else {
-        cerr << "fast as possible timing\n";
+        //cerr << "fast as possible timing\n";
         sleepy_time = ptmp::testing::uniform_sleeps_t(0,0);
     }
 
     json jcfg;
+    jcfg["socket"]["hwm"] = hwm;
     jcfg["socket"]["type"] = socktype;
     for (const auto& endpoint : endpoints) {
         jcfg["socket"][attach].push_back(endpoint);
     }
-    cerr << jcfg << endl;
+    //cerr << jcfg << endl;
     ptmp::TPSender send(jcfg.dump());
 
     ptmp::data::TPSet tps;
@@ -104,6 +108,7 @@ int main(int argc, char* argv[])
     for (int ind=0; ind<ntpsets; ++ind) {
         sleepy_time();
         make_tps(tps);
+        zsys_debug("send %d/%d", ind, ntpsets);
         send(tps);
     }
     auto tend = zclock_usecs();
@@ -114,5 +119,8 @@ int main(int argc, char* argv[])
 
     zclock_sleep(endwait);
 
+    std::cerr << "check_send_rates exiting after "
+              << ntpsets << " in " << dt << "s = " << khz << " kHz"
+              << std::endl;
     return 0;
 }

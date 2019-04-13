@@ -22,6 +22,7 @@ std::vector<zsock_t*> make_sockets(json jcfg)
             json cfg = {
                 { "socket", {
                         { "type", jcfg["type"] },
+                        { "hwm", jcfg["hwm"] },
                         { bc, jaddr } } } };
             std::string cfgstr = cfg.dump();
             zsys_info("proxy socket: %s", cfgstr.c_str());
@@ -65,6 +66,9 @@ static void header_dump(std::string s, msg_header_t& h)
 
 }
 
+// keep EOT fitting in a signed int64
+static const uint64_t EOT = 0x7FFFFFFFFFFFFFFF;
+
 // keep track of state for each input
 struct SockInfo {
     size_t index;
@@ -73,11 +77,15 @@ struct SockInfo {
     int64_t seen_time; // wall clock time when last message arrived
     msg_header_t msg_header;
     zmsg_t* msg;       // most recent message popped from input queue or NULL
+    uint64_t nrecved;
+    uint64_t ntardy;
 };
 
-// Get the first prompt (not tardy) message.   Return true if successful.
-bool recv_prompt(SockInfo& si, uint64_t last_msg_time)
+// Get the next message.   Return true if successful.
+static
+bool recv_prompt(SockInfo& si, int64_t last_msg_time, bool drop_tardy)
 {
+    assert(!si.msg);            // we are not allowed to overwrite
     void* which = zpoller_wait(si.poller, 0);
     if (!which) {
         return false;
@@ -87,14 +95,21 @@ bool recv_prompt(SockInfo& si, uint64_t last_msg_time)
     if (!msg) {                 // interrupted
         return false;
     }
+    ++si.nrecved;
+
     auto header = msg_header(msg);
-    //header_dump("precv", header);
-    if (header.tstart < last_msg_time) {
-        // Message is tardy.
-        // fixme: may want to notify somehow besides dumping the header.
+    bool tardy = last_msg_time < EOT and header.tstart < EOT and header.tstart < last_msg_time;
+    if (tardy) {
+        ++si.ntardy;
+        zsys_debug("tardy: msg=%ld last=%ld %d/%d",
+                   header.tstart, last_msg_time, si.ntardy, si.nrecved); 
+    }
+    if (drop_tardy and tardy) {
+        // Message is tardy and policy is drop.
         header_dump("tardy", header);
         zmsg_destroy(&msg);
-        return recv_prompt(si, last_msg_time);
+        // next one might be on time
+        return recv_prompt(si, last_msg_time, drop_tardy);
     }
     si.msg = msg;
     si.msg_header = header;
@@ -104,12 +119,16 @@ bool recv_prompt(SockInfo& si, uint64_t last_msg_time)
 // The actor function
 void tpsorted_proxy(zsock_t* pipe, void* vargs)
 {
-    // keep EOT fitting in a signed int64
-    const uint64_t EOT = 0x7FFFFFFFFFFFFFFF;
 
     auto config = json::parse((const char*) vargs);
     auto input = make_sockets(config["input"]["socket"]);
     auto output = make_sockets(config["output"]["socket"]);
+
+    auto tardy_policy = config["tardy_policy"];
+    bool drop_tardy = true;
+    if (tardy_policy.is_string() and tardy_policy == "send") {
+        drop_tardy = false;
+    }
 
     const size_t ninputs = input.size();
 
@@ -117,77 +136,82 @@ void tpsorted_proxy(zsock_t* pipe, void* vargs)
     // input stream fails to provide any input w/in this time, it's
     // subsequent data is at risk of being dropped if other streams
     // are producing.
-    const int tardy = config["tardy"]; // msec
+    const int tardy_ms = config["tardy"]; // msec
 
     zsock_signal(pipe, 0);      // signal ready
 
+    zsys_info("starting tpsorted proxy with tardy policy: %s",
+              (drop_tardy?"drop":"pass"));
         
     // load up control info
     std::vector<SockInfo> sockinfo;
     for (size_t ind=0; ind<ninputs; ++ind) {
         zsock_t* s = input[ind];
-        sockinfo.push_back({ind, s, zpoller_new(s, NULL), 0, {0,0,EOT}, NULL});
+        sockinfo.push_back({ind, s, zpoller_new(s, NULL), 0,
+                            {0,0,EOT}, NULL, 0,0});
     }
     zpoller_t* pipe_poller = zpoller_new(pipe, NULL);
 
-    uint64_t last_msg_time = 0;
+    uint64_t last_msg_time = EOT;
 
-    int wait_time = tardy;
+    int wait_time_ms = 0;
 
     while (!zsys_interrupted) {
 
-        void* which = zpoller_wait(pipe_poller, wait_time);
+
+        void* which = zpoller_wait(pipe_poller, wait_time_ms);
         if (which) {
             zsys_info("TPSorted proxy got quit");
             break;
         }
 
-        const int now = zclock_usecs();
-        int nwait = 0;          // how many we lack but need to wait for
+        const int64_t now = zclock_usecs();
 
-        int64_t min_msg_time = EOT;
-        size_t min_msg_ind = ninputs;
+        int nwait = 0;          // how many we lack but need to wait for
 
         for (size_t ind=0; ind<ninputs; ++ind) {
             SockInfo& si = sockinfo[ind];
             if (!si.msg) {
-
                 void* which = zpoller_wait(si.poller, 0);
-                if (!which) {
-                    int wait_needed = now - si.seen_time;
-                    if (wait_needed <= tardy) {
-                        ++nwait;
-                    }
+                if (which) {
+                    si.seen_time = now;
+                    recv_prompt(si, last_msg_time, drop_tardy);
                     continue;
                 }
-                si.seen_time = now;
-                recv_prompt(si, last_msg_time);
-                
-                // zmsg_t* msg = zmsg_recv(si.sock);
-                // auto header = msg_header(msg);
-                // header_dump("precv", header);
-                // if (header.tstart < last_msg_time) {
-                //     header_dump("tardy", header);
-                //     zmsg_destroy(&msg);
-                //     // fixme: we should try more than just once.
-                //     // Here, this should loop on this input socket
-                //     // until we get a fresh message or the input is
-                //     // drained.
-                //     continue;
-                // }
-                // si.msg = msg;
-                // si.msg_header = header;
+                if (si.seen_time == 0) {
+                    continue; // never yet seen
+                }
+
+                const int since_ms = (now - si.seen_time)/1000;
+                const int wait_needed_ms = tardy_ms - since_ms;
+                if (wait_needed_ms >= 0 ) {
+                    zsys_debug("wait for #%d %d ms (now=%ld us, seen=%ld us)",
+                               ind, wait_needed_ms, now, si.seen_time);
+                    if (wait_needed_ms <= tardy_ms) {
+                        wait_time_ms = std::max(wait_needed_ms, wait_time_ms);
+                        ++nwait;
+                    }
+                }
             }
 
         } // get inputs
         
-
+        if (nwait == ninputs) {
+            wait_time_ms = tardy_ms;
+            zsys_debug("all input waiting, wait for %d ms", wait_time_ms);
+            continue;
+        }
         if (nwait) {
-            //zsys_info("waiting on %d", nwait);
+            wait_time_ms = std::min(wait_time_ms, tardy_ms);
+            // don't spin
+            if (wait_time_ms == 0) wait_time_ms = 1;
+            zsys_debug("waiting on %d input for at most %d ms", nwait, wait_time_ms);
             continue;
         }
 
         // find min time message
+        int64_t min_msg_time = EOT;
+        size_t min_msg_ind = ninputs;
         for (size_t ind=0; ind<ninputs; ++ind) {
             SockInfo& si = sockinfo[ind];
             if (si.msg) {
@@ -197,15 +221,32 @@ void tpsorted_proxy(zsock_t* pipe, void* vargs)
                 }
             }
         }
-
         if (min_msg_ind == ninputs) {
-            //zsys_info("got none");
+            wait_time_ms = tardy_ms;
+            zsys_debug("no input, waiting %d ms", wait_time_ms);
+
+            for (size_t ind=0; ind<ninputs; ++ind) {
+                SockInfo& si = sockinfo[ind];
+                if (si.msg) {
+                    zsys_debug("\t%d %ld %ld",
+                               ind, si.msg_header.tstart, min_msg_time);
+                }
+            }
+
             continue;
         }
 
-        // vacate min time message and set to poll corresponding queue for next time
+        // zsys_debug("got input on %d at %ld", min_msg_ind, min_msg_time);
+
+        // got something, assume there is more so next time around,
+        // don't wait at all.
+        wait_time_ms = 0;
+
+        // vacate min time message and set to poll corresponding queue
+        // for next time
         SockInfo& si = sockinfo[min_msg_ind];
         // header_dump("psend", si.msg_header);
+        // zsys_info("\ttardy:%d/%d", si.ntardy, si.nrecved);
 
         zmsg_t* msg = si.msg;
         si.msg = NULL;
@@ -225,10 +266,13 @@ void tpsorted_proxy(zsock_t* pipe, void* vargs)
         msg = NULL;
     } // main loop
 
+
     // clean up
     zpoller_destroy(&pipe_poller);
     for (size_t ind=0; ind < ninputs; ++ind) {
         SockInfo& si = sockinfo[ind];
+        zsys_debug("%d: %d tardy out of %d recved",
+                   ind, si.ntardy, si.nrecved);
         if (si.msg) {
             zmsg_destroy(&si.msg);
         }

@@ -11,9 +11,13 @@ messages and sinks.  In between it provides these functions:
 
 A ~TPSorted~ is constructed with three object items:
 
-- tardy :: a time in msec
+- tardy :: a time in msec.  Any input later than this time relative to recenbt messages from other streams will be considered "tardy".
 - input :: specification of the proxy's input sockets.  It holds a "socket" attribute which follows the same schema as ~TPReceiver~
 - output :: ibid for the specification of the proxy's output sockets.
+
+Optional settings:
+
+- tardy_policy :: if set to ~"send"~ then tardy input will be sent to output.  *Warning* this means the strict time order of output is violated.  Default is to drop tardy input.
 
 
 * Algorithm

@@ -12,6 +12,7 @@ struct conn_desc_t {
     std::string socktype;       // "PUB", etc
     std::string scheme;         // "tcp"/"inproc"/"ipc"
     int number;
+    int hwm;
 };
 
 json swap_socktype(const json jsockcfg)
@@ -56,6 +57,7 @@ json make_sockconfig(conn_desc_t desc)
     static int count = 0;
     json jcfg;
     jcfg["type"] = desc.socktype;
+    jcfg["hwm"] = desc.hwm;
     for (int num=0; num<desc.number; ++num) {
         ++count;
 
@@ -97,6 +99,7 @@ std::vector<json> split_endpoints(json jcfg)
         for (auto jep : endpoints) {
             json one;
             one["socket"]["type"] = jcfg["socket"]["type"];
+            one["socket"]["hwm"] = jcfg["socket"]["hwm"];
             one["socket"][bc][0] = jep;
             zsys_info("ENDPOINT %d: %s", ret.size(), one.dump(4).c_str());
             ret.push_back(one);
@@ -130,9 +133,9 @@ const uint64_t sec = 1000*msec;
 
 void dump_tpset(std::string ctx, ptmp::data::TPSet& tpset)
 {
-    return;
-    zsys_info("%s: count:%-4d detid:%-2d tstart:%-8ld created:%ld",
-              ctx.c_str(), tpset.count(), tpset.detid(), tpset.tstart(), tpset.created());
+    zsys_debug("%s: count:%-4d detid:%-2d tstart:%-8ld created:%ld",
+               ctx.c_str(), tpset.count(), tpset.detid(),
+               tpset.tstart(), tpset.created());
 }
 
 void run_sequence1(json scfg, json pcfg, json rcfg, int nsends, double period)
@@ -173,7 +176,9 @@ void run_sequence1(json scfg, json pcfg, json rcfg, int nsends, double period)
         tpset.set_tstart(tstart);
         int64_t now = zclock_usecs() - t0;
         tpset.set_created(now);
-        dump_tpset("send", tpset);
+        if (seq%100 == 0) {
+            dump_tpset("send", tpset);
+        }
         send_records.push_back(tpset);
         (*senders[isender])(tpset);
     }
@@ -185,8 +190,8 @@ void run_sequence1(json scfg, json pcfg, json rcfg, int nsends, double period)
         assert (want.count() == seq);
         ptmp::data::TPSet got;
         bool ok = recver(got);
-        dump_tpset("recv", got);
         assert(ok);
+        dump_tpset("recv", got);
         if (got.count() != seq) {
             if (got.tstart() == want.tstart()) {
                 zsys_warning("order warning, got mesg seq %d, expect %d, but tstart identical", got.count(), seq);
@@ -217,14 +222,27 @@ void test1()
     // The typical data period between messages from one source.
     const uint64_t period = 50*usec;
     // when a source is considered tardy, in usec
-    int tardy_msec = 10;
+    int tardy_msec = 100;
+    const int hwm = 1000;
+    // note, the test sends all before receiving so if using a
+    // blocking socket pattern (PUSH/PULL) and nsends is more than
+    // hmw*nsenders this test will DEADLOCK
+    const int nsends = 1000;
+    const int nsenders = 3;
+    const std::string trans = "tcp";
+
+    // Test initially with push/pull as it blocks instead of drops.
+    // any drops are thus due to TPSorted.
+    //std::vector<std::string> pattern{"PUSH","PULL"};
+    std::vector<std::string> pattern{"PUB","SUB"};
 
     // Proxy's input sockets first, then output.  If you get
     // "Operation not supported" then you've reversed them.
-    auto jcfgs = make_configs({"connect", "SUB", "tcp",3},
-                              {"bind", "PUB", "tcp", 1}, tardy_msec);
+    auto jcfgs = make_configs({"connect", pattern[1], trans,nsenders, hwm},
+                              {"bind", pattern[0], trans, 1, hwm},
+                              tardy_msec);
 
-    run_sequence1(jcfgs[0], jcfgs[1], jcfgs[2], 10000, period);
+    run_sequence1(jcfgs[0], jcfgs[1], jcfgs[2], nsends, period);
 }
 
 

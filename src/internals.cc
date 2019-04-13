@@ -39,27 +39,24 @@ zsock_t* ptmp::internals::endpoint(const std::string& config)
     auto jcfg = json::parse(config);
     auto jsock = jcfg["socket"];
     std::string stype = jsock["type"];
+    int hwm = 1000;
+    if (jsock["hwm"].is_number()) {
+        hwm = jsock["hwm"];
+    }
     int socktype = socket_type(stype);
     zsock_t* sock = zsock_new(socktype);
     if (!sock) {
         zsys_error("failed to make socket of type %s #%d", stype.c_str(), socktype);
         return sock;
     }
-    zsys_info("endpoint of type %s #%d", stype.c_str(), socktype);
-    
+    zsys_info("endpoint of type %s #%d, hwm:%d",
+              stype.c_str(), socktype, hwm);
+
+    zsock_set_rcvhwm(sock, hwm);
     if (socktype == 2) {        // fixme: support topics?
         zsock_set_subscribe(sock, "");
-        int old = zsock_rcvhwm(sock);
-        const int hwm = old * 1000;
-        zsys_info("increase sub hwm from %d to %d", old, hwm);
-        zsock_set_rcvhwm(sock, hwm);
     }
-    if (socktype == 1) {
-        const int old = zsock_sndhwm(sock);
-        const int hwm = old * 1000;
-        zsys_info("increase pub hwm from %d to %d", old, hwm);
-        zsock_set_sndhwm(sock, hwm);
-    }
+
     for (auto jaddr : jsock["bind"]) {
         std::string addr = jaddr;
         zsys_info("binding \"%s\"", addr.c_str());
@@ -89,7 +86,7 @@ ptmp::internals::Socket::Socket(const std::string& config)
 
 ptmp::internals::Socket::~Socket()
 {
-    std::cerr << "Socket destroy\n";
+    std::cerr << "Socket destroy " << zsock_endpoint(m_sock) << std::endl;
     zpoller_destroy(&m_poller);
     zsock_destroy(&m_sock);
 
