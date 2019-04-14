@@ -113,6 +113,7 @@ bool recv_prompt(SockInfo& si, int64_t last_msg_time, bool drop_tardy)
     }
     si.msg = msg;
     si.msg_header = header;
+    header_dump("precv", header);
     return true;
 }
 

@@ -13,7 +13,7 @@ tardy_ms=100
 outsock="PUSH"
 insock="PULL"
 
-
+endwait=10000
 nsend=10000
 senders="0 1 2 3 4 5 6 7 8 9"
 ntotal=0
@@ -61,7 +61,7 @@ cmd_sender () {
     local ep="$(endpoint $trans $num)"
     local logf="$(logfile sender $trans $num)"
     
-    cmd="$sender -d $num -m $hwm -p $outsock -a bind -e $ep -B 1000 -E 200 -n $nsend -N 1000 uniform -t 10"
+    cmd="$sender -E $endwait -d $num -m $hwm -p $outsock -a bind -e $ep -B 1000  -n $nsend -N 1000 uniform -t 10"
     echo $cmd
     $cmd 2>&1 > $logf
 }
@@ -75,9 +75,10 @@ cmd_sorter () {
     do
         ep="$ep -e $(endpoint $trans $n)"
     done
-    cmd="$sorter -t $tardy_ms -c $countdown output -m $hwm -p $outsock -a bind -e $outep input -m 10000 -p $insock -a connect  $ep"
+    cmd="$sorter -t $tardy_ms -c $countdown output -m $hwm -p $outsock -a bind -e $outep input -m 1000 -p $insock -a connect  $ep"
     echo $cmd
     $cmd 2>&1 > $logf
+    
 }
 
 cmd_recver () {
@@ -100,6 +101,7 @@ do
     done
     cmd_recver $trans $proxep || exit -1
     echo "success: $trans"
+
 done
 sleep 1
 
