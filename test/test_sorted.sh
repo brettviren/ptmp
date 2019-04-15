@@ -13,15 +13,16 @@ tardy_ms=100
 outsock="PUSH"
 insock="PULL"
 
+# 25 is long enough to handle 10k * 10 messages on my laptop
+countdown=25
 endwait=10000
 nsend=10000
-senders="0 1 2 3 4 5 6 7 8 9"
+#senders="0 1 2 3 4 5 6 7 8 9"
+senders="0 1"
 ntotal=0
 for n in $senders; do
     ntotal=$(( $ntotal + $nsend ))
 done
-# 25 is long enough to handle 10k * 10 messages on my laptop
-countdown=25
 
 
 set -e
