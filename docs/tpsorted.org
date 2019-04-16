@@ -9,7 +9,7 @@ messages and sinks.  In between it provides these functions:
 
 * Configuration
 
-A ~TPSorted~ is constructed with three object items:
+A ~TPSorted~ is constructed with a configuration object with these attributes:
 
 - tardy :: a time in msec.  Any input later than this time relative to recenbt messages from other streams will be considered "tardy".
 - input :: specification of the proxy's input sockets.  It holds a "socket" attribute which follows the same schema as ~TPReceiver~
@@ -52,6 +52,15 @@ fashion.
 
 - [[../test/test_sorted.cc]] :: runs ~TPSorted~ with several ~TPSender~'s and ~TPReceiver~'s 
 
+- [[../test/test_sorted.sh]] :: runs N ~check_send_rates~ (~TPSender~ apps), one ~check_sorted~ and one ~check_recv~ (~TPReceiver~ app).  
+
+Things named like ~test_*~ are run each full build.  They can be run manually like:
+
+#+BEGIN_EXAMPLE
+  $ ./build/test_sorted
+  $ ./test/test_sorted.sh
+#+END_EXAMPLE
+
 
 * Comments
 
@@ -61,6 +70,14 @@ fashion.
 
 - Increasing the "tardy" time will reduce the number of discarded
   messages but will increase the maximum latency.
+
+- The ~test_sorted.sh~ test defaults to N=2 senders to allow Travis-CI tests to complete (apparently they lack sufficient CPU to complete in time).  N=10 has been tested on a multi core host.  The ~check_sorted~ uses about 125% CPU, ~check_recv~ uses about 85% and the senders are all at about 5-10%.
+
+- Depending on the rate and its variance of the input ~TPSet~ messages,  ~TPSorted~ may require an increased HWM for its input queue.  This can be exercised with ~test_sorted.sh~ which will report something like: 
+
+#+BEGIN_EXAMPLE
+check_recv exiting after 100000 / 100000
+#+END_EXAMPLE
 
 * Caveats, fixme's and todo's
 
@@ -73,9 +90,8 @@ fashion.
   the exact same microsecond.  If the ~tstart~ values differ then this
   out-of-order will count as an error.
 
-- [ ] Tardy messages are simply dropped with a log message.  Something
-  different can be done but guidance from application developers is
-  needed.
+- [X] +Tardy messages are simply dropped with a log message.  Something different can be done but guidance from application developers is
+  needed.+ A ~tardy_policy~ may be given in configuration.  It is either ~drop~ (default) or ~send~.  The latter will send out any tardy message *in-band* and thus *out-of-order*.
 
 - [ ] To access ~TPSet.tstart~ each message is serialized via protobuf.
   Changing the message schema a the ZeroMQ level (eg, by adding a
