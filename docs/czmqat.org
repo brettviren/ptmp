@@ -1,0 +1,102 @@
+#+title Yet another ZeroMQ netcatish program
+
+* Introduction
+
+The program ~czmqat~ provides yet another program vaguely like ~netcat~
+using ZeroMQ sockets.  It requires CZMQ and the included ~CLI11.h~.  
+
+It may receive messages from an input socket and send on an output.
+Input or output may also be a file.  The command line options allow to
+set socket type, endpoint and other parameters and to set input or
+output filenames.
+
+* Documentation
+
+Besides this document, run
+
+#+BEGIN_EXAMPLE
+  $ czmqat -h
+  Yet another ZeroMQ netcat'ish program
+  Usage: czmqat [OPTIONS] [SUBCOMMAND]
+
+  Options:
+    -h,--help                   Print this help message and exit
+    -B,--begin-wait-ms INT      Number of ms to wait between creating socket and starting to send
+    -E,--end-wait-ms INT        Number of ms to wait between completing --count messages and terminating
+
+  Subcommands:
+    isock                       Input socket specification
+    osock                       Output socket specification
+    ifile                       Input file specification
+    ofile                       Output file specification
+
+#+END_EXAMPLE
+
+The "subcommands" are used to delimit options.  They also have a help
+flag.  Eg
+
+#+BEGIN_EXAMPLE
+  $ czmqat -h isock
+  Input socket specification
+  Usage: czmqat isock [OPTIONS]
+
+  Options:
+    -h,--help                   Print this help message and exit
+    -m,--socket-hwm INT         The ZeroMQ socket highwater mark
+    -p,--socket-pattern TEXT    The ZeroMQ socket pattern for endpoint [PUB, PAIR, PUSH]
+    -a,--socket-attachment TEXT The socket attachement method [bind|connect] for this endpoint
+    -s,--subscriptions TEXT ... Any subscriptions if SUB.
+    -e,--socket-endpoints TEXT ...
+                                The socket endpoint addresses in Zero MQ format (tcp:// or ipc://)
+#+END_EXAMPLE
+
+* Examples
+
+Receive messages over a PULL socket and dump them out to file.
+
+#+BEGIN_EXAMPLE
+  $ czmqat isock -p PULL -a connect -e tcp://127.0.0.1:5550 ofile -f junk.dump
+#+END_EXAMPLE
+
+The ~check_send_rates~ can be used to provide some messages.
+
+#+BEGIN_EXAMPLE
+  $ ./build/test/check_send_rates -E 10000 -d 0 -m 10 -p PUSH -a bind -e tcp://127.0.0.1:5550 -B 1000 -n 10000 -N 1000 uniform -t 10
+#+END_EXAMPLE
+
+The dumped file may be played back.
+
+#+BEGIN_EXAMPLE
+  $ czmqat -E 1000 osock -m 10000 -p PUSH -a bind -e tcp://127.0.0.1:5550 ifile -f junk-sub.dump 
+#+END_EXAMPLE
+
+The ~check_recv~ test can be used to sink the messages.
+
+#+BEGIN_EXAMPLE
+  $ ./build/test/check_recv  -n 10000 -p PULL -a connect -e tcp://127.0.0.1:5550
+#+END_EXAMPLE
+
+Note that the ~-E~ option is used to keep ~czmqat~ running after the file has been exhausted so as to give enough time to the receiver to finish.  Without this wait, ~czmqat~ will exit immediately leaving unsent messages in the ZeroMQ buffer. 
+
+* File format
+
+The file format is very simple, binary and not particularly portable.  Each message is serialized with a perfix giving the size. 
+
+|---------+----------|
+| bytes   | what     |
+|---------+----------|
+| 8       | size1    |
+|---------+----------|
+|         |          |
+| [size1] | message1 |
+|         |          |
+|---------+----------|
+| 8       | size2    |
+|---------+----------|
+|         |          |
+| [size2] | message2 |
+|         |          |
+|---------+----------|
+| ...     | ...      |
+|---------+----------|
+
