@@ -58,10 +58,12 @@ int make_sock(sock_opt_t& sopt)
     if (socktype == ZMQ_SUB) {
         if (sopt.subscriptions.empty()) {
             zsock_set_subscribe(sopt.sock, "");
+            //zsys_debug("subscribing to default");
         }
         else {
             for (auto sub : sopt.subscriptions) {
                 zsock_set_subscribe(sopt.sock, sub.c_str());
+                //zsys_debug("subscribing to \"%s\"", sub.c_str());
             }
         }
     }
@@ -115,6 +117,10 @@ int main(int argc, char* argv[])
 
     CLI::App app{"Yet another ZeroMQ netcat'ish program"};
 
+    int debug=0;
+    app.add_option("-d,--debug", debug,
+                   "Debug level. 0=errors, 1=summary, 2=verbose");
+
     int begwait=0;
     app.add_option("-B,--begin-wait-ms", begwait,
                    "Number of ms to wait between creating socket and starting to send");
@@ -165,6 +171,9 @@ int main(int argc, char* argv[])
         if (ifopt.fp) {
             msg = read_msg(ifopt.fp);
             if (!msg) {
+                if (debug>=1) {
+                    zsys_info("End of file reached");
+                }
                 break;
             }
         }
@@ -174,12 +183,16 @@ int main(int argc, char* argv[])
                 zsys_warning("interupted");
                 break;
             }
+            if (debug>=1) {
+                zsys_debug("got message");
+            }
         }
 
         if (ofopt.fp) {
             write_msg(ofopt.fp, msg);
         }
         if (osopt.sock) {
+            if (debug>=2) { zsys_debug("send message"); }
             zmsg_send(&msg, osopt.sock);
         }
 
@@ -188,6 +201,9 @@ int main(int argc, char* argv[])
         }
     }
 
+    if (debug>=1) {
+        zsys_info("sleeping at end");
+    }
     zclock_sleep(endwait);
 
     if (ofopt.fp) {
