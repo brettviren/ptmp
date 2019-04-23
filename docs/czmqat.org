@@ -89,7 +89,15 @@ Note that the ~-E~ option is used to keep ~czmqat~ running after the file has be
 
 ** Proxying
 
-As ~czmqat~ can both send and receive it may also be used as a proxy.
+As ~czmqat~ can both send and receive it may also be used as a proxy such as for translating between transports or socket types.  Here is an example using ~czmqat~ to join the two test programs above.  Each should be run from a different shell
+
+#+BEGIN_EXAMPLE
+  $ czmqat isock -p SUB -a connect -e tcp://127.0.0.1:5550 osock -p PUSH -a bind -e tcp://127.0.0.1:5551
+  $ ./build/test/check_recv -n 10000 -p PULL -a connect -e tcp://127.0.0.1:5551
+  $ ./build/test/check_send_rates -E 10000 -d 0 -m 10 -p PUB -a bind -e tcp://127.0.0.1:5550 -B 1000 -n 10000 -N 1000 uniform -t10
+#+END_EXAMPLE
+
+Note, as PUB/SUB follows "drop" policy, start the publisher last or it may otherwise immediately expend its messages.
 
 * File format
 
