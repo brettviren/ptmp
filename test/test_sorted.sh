@@ -17,13 +17,17 @@ insock="PULL"
 countdown=25
 endwait=10000
 nsend=10000
-#senders="0 1 2 3 4 5 6 7 8 9"
-senders="0 1"
-ntotal=0
-for n in $senders; do
-    ntotal=$(( $ntotal + $nsend ))
+maxsender=10
+ntotal=$(nproc)
+if [[ $ntotal > $maxsender ]] ; then
+    ntotal=$maxsender
+fi
+senders=""
+maxsender=0
+while [[ $maxsender -lt $ntotal ]] ; do
+    senders="$senders $maxsender"
+    maxsender=$(( $maxsender + 1 ))
 done
-
 
 set -e
 #set -x

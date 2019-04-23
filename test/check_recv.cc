@@ -56,6 +56,9 @@ int main(int argc, char* argv[])
     uint64_t last_time=0;
     int ind = -1;
     while (true) {
+        if (got >= count) {
+            break;
+        }
         ++ind;
         bool ok = recv(tps, timeout);
         if (!ok) {
