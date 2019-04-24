@@ -8,6 +8,9 @@ sender="$top/build/test/check_send_rates"
 sorter="$top/build/test/check_sorted"
 recver="$top/build/test/check_recv"
 
+# don't colide with other tests, they might run simultaneously!
+baseport=6660
+
 hwm=10
 tardy_ms=100
 outsock="PUSH"
@@ -28,6 +31,9 @@ while [[ $maxsender -lt $ntotal ]] ; do
     senders="$senders $maxsender"
     maxsender=$(( $maxsender + 1 ))
 done
+nexpect=$(( $ntotal * $nsend))
+echo $nexpect
+
 
 set -e
 #set -x
@@ -45,7 +51,7 @@ endpoint () {
 
     case $trans in
         ipc) echo "ipc://${myname}${num}.ipc" ;;
-        tcp) echo "tcp://127.0.0.1:$(( 5550 + $num ))" ;;
+        tcp) echo "tcp://127.0.0.1:$(( $baseport + $num ))" ;;
         inproc) echo "inproc://${myname}$num" ;;
         *) exit -1;;
     esac
@@ -90,7 +96,7 @@ cmd_recver () {
     local trans=$1 ; shift
     local ep="$1" ; shift
     local logf="$(logfile recver $trans 0)"
-    cmd="$recver -m $hwm -p $insock -a connect -e $ep -T 1000 -n $ntotal"
+    cmd="$recver -m $hwm -p $insock -a connect -e $ep -T 1000 -n $nexpect"
     echo $cmd
     $cmd 2>&1 > $logf
 }
