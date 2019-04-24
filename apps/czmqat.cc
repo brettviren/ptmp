@@ -117,6 +117,13 @@ int main(int argc, char* argv[])
 
     CLI::App app{"Yet another ZeroMQ netcat'ish program"};
 
+    int number=0;
+    app.add_option("-n,--number", number,
+                   "Send at most this number of messages before terminating");
+
+    int loop_delay=0;
+    app.add_option("-l,--loop-delay-ms", loop_delay, "Loop delay in msec");
+
     int debug=0;
     app.add_option("-d,--debug", debug,
                    "Debug level. 0=errors, 1=summary, 2=verbose");
@@ -165,6 +172,7 @@ int main(int argc, char* argv[])
 
     zclock_sleep (begwait);
 
+    int count=0;
     while (true) {
 
         zmsg_t* msg=NULL;
@@ -188,12 +196,23 @@ int main(int argc, char* argv[])
             }
         }
 
+        ++count;
+        if (number and count >= number) {
+            break;
+        }
+        if (loop_delay) {
+            zclock_sleep(loop_delay);
+        }
+
         if (ofopt.fp) {
             write_msg(ofopt.fp, msg);
         }
         if (osopt.sock) {
             if (debug>=2) { zsys_debug("send message"); }
-            zmsg_send(&msg, osopt.sock);
+            int rc = zmsg_send(&msg, osopt.sock);
+            if (rc != 0) {
+                break;
+            }
         }
 
         if (msg) {
