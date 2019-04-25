@@ -65,6 +65,38 @@ namespace ptmp {
         zactor_t* m_actor;
     };
 
+    // A "device" that accepts TPSets on an input socket and "replays"
+    // them to an output socket.  The replay is done in a
+    // pseudo-real-time manner by using the system clock and the
+    // message "tstart" value to pace their output.  The replayer
+    // attempts to keep the real time between messages matching the
+    // differences in subsequent "tstart" values.  If the input feed
+    // falls behind then a tardy message will be sent immediately on
+    // receipt which will not maintain the exact pacing.  Although the
+    // input socket is configurable it is best to use either PULL or
+    // PAIR unless message loss is preferable to blocking the upstream
+    // sender.  The replay may be governed by a multiplicative "speed"
+    // to cause a "fast forward" or a "slow motion" output.
+    class TPReplay {
+    public:
+        // Create a TPReplay with one config for input sockets and one
+        // for output.  Note, each output message is sent to all
+        // output sockets.  The config is two objects each like
+        // TPSender/TPReceiver held by a key "sender" and "receiver".
+        // An optional "speed" atribute may provide a multiplicative
+        // "dt/dt" speed up (speed>1) or slow down (speed<1) of output
+        // rate relative to that implied by the tstart values.
+        TPReplay(const std::string& config);
+
+        // The TPSorted will run a thread needs to be kept in scope
+        // but otherwise doesn't have a serviceable API.  Destroy it
+        // when done.
+        ~TPReplay();
+    private:
+        zactor_t* m_actor;
+        
+    };
+
 }
 
 #endif

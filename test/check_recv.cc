@@ -83,8 +83,8 @@ int main(int argc, char* argv[])
         }
         assert (dt >= 0);
 
-        zsys_debug("recv: dt=%ld %d, have %d/%d : %f s",
-                   dt, now, ind, count, (zclock_usecs()-tbeg)*1e-6);
+        zsys_debug("recv: dt=%ld #%d, have %d/%d : %f s",
+                   dt, now, got, count, (zclock_usecs()-tbeg)*1e-6);
         last_seen = now;
     }
     auto tend = zclock_usecs();

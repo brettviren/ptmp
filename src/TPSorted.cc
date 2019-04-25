@@ -1,5 +1,7 @@
 #include "ptmp/api.h"
-#include "json.hpp"
+
+#include <czmq.h>
+#include <json.hpp>
 
 #include <algorithm>
 #include <vector>
@@ -8,13 +10,12 @@
 
 using json = nlohmann::json;
 
-
-// For TPSender/TPReceiver, there's just one socket and it may have
-// multiple connects or binds.  TPSorted interprets the list of
-// endpoints as one socket per endpoint so do a little cfg gymnastics.
+// TPSorted interprets the list of endpoints as being for individual
+// sockets while normally, one socket may have many endpoints.  So, we
+// do a little private jostling of the config into many confgs.
+static
 std::vector<zsock_t*> make_sockets(json jcfg)
 {
-    zsys_info("make sockets: %s", jcfg.dump().c_str());
     const std::vector<std::string> bcs{"bind","connect"};
     std::vector<zsock_t*> ret;
     for (auto bc : bcs) {
@@ -25,7 +26,6 @@ std::vector<zsock_t*> make_sockets(json jcfg)
                         { "hwm", jcfg["hwm"] },
                         { bc, jaddr } } } };
             std::string cfgstr = cfg.dump();
-            zsys_info("proxy socket: %s", cfgstr.c_str());
             zsock_t* sock = ptmp::internals::endpoint(cfgstr);
             ret.push_back(sock);
         }
