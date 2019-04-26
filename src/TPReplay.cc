@@ -24,8 +24,8 @@ static msg_header_t msg_header(zmsg_t* msg)
 void tpreplay_proxy(zsock_t* pipe, void* vargs)
 {
     auto config = json::parse((const char*) vargs);
-    zsock_t* isock = ptmp::internals::endpoint(config["input"]);
-    zsock_t* osock = ptmp::internals::endpoint(config["output"]);
+    zsock_t* isock = ptmp::internals::endpoint(config["input"].dump());
+    zsock_t* osock = ptmp::internals::endpoint(config["output"].dump());
     double speed = 1.0;
     if (config["speed"].is_number()) {
         speed = config["speed"];
@@ -61,9 +61,45 @@ void tpreplay_proxy(zsock_t* pipe, void* vargs)
         }
         auto header = msg_header(msg);
         
-        
+        if (last_send_time == 0) { // first message
+            last_send_time = zclock_usecs();
+            last_mesg_time = header.tstart;
+            int rc = zmsg_send(&msg, osock);
+            if (rc  != 0) {
+                zsys_error("send failed");
+                break;
+            }
+            zsys_debug("replay: first");
+            continue;
+        }
 
+        zsys_debug("replay: send %d %d %ld", header.count, header.detid, header.tstart);
+
+        int64_t delta_tau = header.tstart - last_mesg_time;
+        int64_t t_now = zclock_usecs();
+        int64_t delta_t = last_send_time + delta_tau/speed - t_now;
+        if (delta_t < 0) {
+            // tardy!
+            delta_t = 0;
+        }
+        if (delta_t > 0 ) {
+            int zzz = delta_t / 1000;
+            zsys_debug("replay: sleep %ld after t=%ld/dt=%d, tau=%ld/dtau=%d",
+                       zzz, last_send_time, delta_t, last_mesg_time, delta_tau);
+            zclock_sleep(zzz);
+        }
+        last_send_time = zclock_usecs();
+        last_mesg_time = header.tstart;
+        int rc = zmsg_send(&msg, osock);
+        if (rc  != 0) {
+            zsys_error("send failed");
+            break;
+        }
     }
+
+    zsock_destroy(&isock);
+    zsock_destroy(&osock);
+    
 }
 
 
