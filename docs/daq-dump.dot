@@ -1,0 +1,34 @@
+digraph dump {
+        rankdir=LR
+        node[shape=box]
+        fbr1[label="FELIX BR\nTPSender (PUB)"]
+        fbr2[label="FELIX BR\nTPSender (PUB)"]
+        fbr3[label="FELIX BR\nTPSender (PUB)"]
+
+        pbr1[label="TP BR\nTPReceiver (SUB)"]
+        pbr2[label="TP BR\nTPReceiver (SUB)"]
+        pbr3[label="TP BR\nTPReceiver (SUB)"]
+        
+        znc1[label="czmqat\n(SUB)"]
+        znc2[label="czmqat\n(SUB)"]
+        znc3[label="czmqat\n(SUB)"]
+
+        file1[label="file1"]
+        file2[label="file2"]
+        file3[label="file3"]
+
+        edge[style=dotted]
+        fbr1->pbr1
+        fbr2->pbr2
+        fbr3->pbr3
+
+        fbr1->znc1
+        fbr2->znc2
+        fbr3->znc3
+
+        edge[style=solid]
+
+        znc1->file1
+        znc2->file2
+        znc3->file3
+}

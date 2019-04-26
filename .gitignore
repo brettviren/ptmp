@@ -13,3 +13,7 @@ tmp*
 venv
 *.dump
 cut.*
+auto
+ltximg
+*.tex
+*.pdf

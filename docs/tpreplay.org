@@ -1,17 +1,108 @@
 #+title: ~TPReplay~ Proxy Class
 
 The ~TPReplay~ class provides a "proxy" which may sit between sources of
-messages and sinks.  It reads ~TPSet~ messages from its input socket and
-"replays" them to its output socket.  The replay attempts to keep the
-original "pace" of the messages as determined by their ~tstart~ time
-stamp.   
+messages and a sink.  It reads ~TPSet~ messages from its input socket
+and "replays" them to its output socket.  The replay attempts to keep
+the original "pace" of the messages as determined by their ~tstart~ time
+stamp.
 
-** Replay
+* Usage
 
-The pacing is approximate and will deviate from the original in at
-least the following cases:
+The ~TPReplay~ class is a "device" meaning that it is started and does
+its work in a the background thread.  The application should simply
+construct it and keep it in scope for its desired lifetime.
 
-- the input stream of message do not keep up.
+The ~check_replay~ is a test application that gives a command line
+interface to the ~TPReplay~ class.  Use its online help:
+
+#+BEGIN_EXAMPLE
+  $ check_replay -h
+#+END_EXAMPLE
+
+* System configuration patterns
+
+The original intention of ~TPReplay~ was to facilitate offline
+development of consumers of ~TPSet~ messages by allowing these messages
+to be dumped to a file using an online data source and replayed
+offline with approximately the same pacing as if the consumer had been
+run "live".  Both the dumping and the replaying involves some
+configuration patterns at a scale of several applications and there
+are some trade-offs in how these patterns are constructed.  
+
+This section provides suggestions and some description of the options.
+For simplicity, it assumes the DAQ has $\mathcal{N}=3$ ~TPSet~ streams.
+In reality the PDSP DAQ likely has 10 streams per APA.  The dumping
+phase might be configured in this pattern:
+
+[[file:daq-dump.svg]]
+
+For each pipeline, the hit finder which is embedded in the FELIX BR
+sends ~TPSet~ messages via a ~TPSender~ to the TP BR's ~TPReceiver~ for
+eventual consumption by the artDAQ EB (not drawn) and to an instance
+of the ~czmqat~ PTMP application.  As PUB/SUB is used, these two totally
+different consumers do not interfere with each other as long as there
+are sufficient network and CPU resources.  The ~czmqat~ program dumps a
+file holding verbatim ZeroMQ messages.  See the [[./czmqat.org][czmqat documentation]]
+for more info on this application.  File write speed is likely faster
+than the input data rate but if it is not then ~czmqat~ may eventually
+drop packets due to the PUB/SUB pattern "drop" policy.
+
+The resulting files may then be transferred offline to a developer's
+workstation and used as fodder for developing and testing a TC finder
+or any other consumer of ~TPSet~ messages.  A likely setup is
+illustrated in the following figure:
+
+[[file:daq-replay.svg]]
+
+One ~czmqat~ instance per file is run.  Each will produce messages as
+fast as possible on its output PUSH socket.  Until its output buffer
+fills, the output rate will likely be limited by the disk read speed.
+While this is likely faster than the original pacing that existed
+during the dump if a very slow disk is used then the resulting pacing
+will be likewise artificially slowed.
+
+Given fast enough disk, a mechanism is needed to slow down the pacing
+to match the original and for that an instance of the ~check_replay~
+test application may be inserted after each ~czmqat~.  This app simply
+creates a ~TPRelay~ and then runs for ever or if so configured it will
+count down for some time before exiting.
+
+The ~check_replay~ is meant to mimic the original FELIX BR's ~TPSender~ so
+it also sends from a PUB socket.  The back end of the "dump"
+configuration could be grafted on at this point to emulate yet another
+dump but in an offline context.
+
+But the point is to provide an environment to develop a TC finder.
+The first step to finding TCs is to synchronize all streams of ~TPSet~
+messages.  This can either be done by the ~check_sorted~ test
+application or it can be done by an embedded ~TPSorted~ class running
+inside the "TC finder" code.
+
+In either case, the pattern between the ~TPSorted~ and the ~TPReceiver~ of
+the "TC finder" is best chosen as one with block instead of drop.  The
+connection should be 1-to-1.  For ~tcp://~ or ~ipc://~ transport,
+PUSH/PULL is best as it allows auto-reconnect.  If both ~TPSorted~ and
+~TPReceiver~ are in the same application then PAIR/PAIR over an
+~inproc://~ transport would require somewhat lower resources.
+
+During development of the "TC finder" the developer will likely want
+to start and restart this pattern many times.  The building of this
+pattern can be baked into a script such as seen in the many PTMP
+~test_*.sh~ scripts.  Alternatively, the ~check_replay~ and ~check_sorted~
+applications may be started and left running long term and the set of
+~czmqat~ applications can be restarted.  However, after any failure of
+the "TC finder" existing messages would need to be drained before a
+restart of the "TC finder".  This can be done with yet another ~czmqat~
+instance.
+
+* Pacing
+
+The pacing provided by ~TPReplay~ only approximates what is defined by
+the ~tstart~ attribute in the input ~TPSet~ messages.  It will deviate
+from the original in at least the following cases:
+
+- the input stream of messages are not provided slower than the
+  original pacing.
 
 - the input stream is too fast and a socket pattern with "drop" policy
   is chosen.
@@ -22,12 +113,8 @@ least the following cases:
 - jitter due to system activity and the msec precision available to
   the sleep function.
 
-The ~TPReplay~ class is a "device" meaning that it is started and does
-its work in a the background thread.  The application should simply
-construct it and keep it in scope for its desired lifetime.
 
-
-** Testing
+* Testing
 
 The ~check_replay~ test program is provided.  It has command line help.  The ~test_replay.sh~ script uses three programs: sender, replay and receiver.
 

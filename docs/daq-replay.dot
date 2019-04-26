@@ -1,0 +1,34 @@
+digraph replay {
+        rankdir=LR
+        node[shape=box]
+        
+        file1[label="file1"]
+        file2[label="file2"]
+        file3[label="file3"]
+
+        znc1[label="czmqat\n(PUSH)"]
+        znc2[label="czmqat\n(PUSH)"]
+        znc3[label="czmqat\n(PUSH)"]
+
+        rp1[label="check_replay\n(PULL -> PUB)"]
+        rp2[label="check_replay\n(PULL -> PUB)"]
+        rp3[label="check_replay\n(PULL -> PUB)"]
+
+        sorter[label="check_sorted\n(SUB -> PUSH)"]
+
+        tcf[label="TC finder\nTPReceiver(PULL)"]
+
+        edge[style=solid]
+
+        file1->znc1
+        file2->znc2
+        file3->znc3
+
+        edge[style=dotted]
+        znc1->rp1->sorter
+        znc2->rp2->sorter
+        znc3->rp3->sorter
+
+        sorter->tcf
+        
+}
