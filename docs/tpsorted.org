@@ -1,6 +1,6 @@
-#+title: ~TPSender~ Proxy Class
+#+title: ~TPSorted~ Proxy Class
 
-The TPSender class provides a "proxy" which may sit between sources of
+The TPSorted class provides a "proxy" which may sit between sources of
 messages and sinks.  In between it provides these functions:
 
 - stream aggregation

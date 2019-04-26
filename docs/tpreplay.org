@@ -1,0 +1,38 @@
+#+title: ~TPReplay~ Proxy Class
+
+The ~TPReplay~ class provides a "proxy" which may sit between sources of
+messages and sinks.  It reads ~TPSet~ messages from its input socket and
+"replays" them to its output socket.  The replay attempts to keep the
+original "pace" of the messages as determined by their ~tstart~ time
+stamp.   
+
+** Replay
+
+The pacing is approximate and will deviate from the original in at
+least the following cases:
+
+- the input stream of message do not keep up.
+
+- the input stream is too fast and a socket pattern with "drop" policy
+  is chosen.
+
+- the output stream pattern policy is "block" and output does not keep
+  up
+
+- jitter due to system activity and the msec precision available to
+  the sleep function.
+
+The ~TPReplay~ class is a "device" meaning that it is started and does
+its work in a the background thread.  The application should simply
+construct it and keep it in scope for its desired lifetime.
+
+
+** Testing
+
+The ~check_replay~ test program is provided.  It has command line help.  The ~test_replay.sh~ script uses three programs: sender, replay and receiver.
+
+The ~czmqat~ program can be useful to capture data to file, then later
+play it back to ~check_replay~ to emulate the pacing and content of an
+original data stream.
+
+
