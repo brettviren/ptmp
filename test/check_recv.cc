@@ -96,5 +96,5 @@ int main(int argc, char* argv[])
 
     std::cerr << "check_recv exiting after "
               << got << " / " << count << "\n";
-    return 0;
+    return (got != 0);
 }
