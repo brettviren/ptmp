@@ -60,6 +60,12 @@ void tpreplay_proxy(zsock_t* pipe, void* vargs)
             break;
         }
         auto header = msg_header(msg);
+
+        if (header.tstart == 0xffffffffffffffff) {
+            // zsys_debug("replay: kill %d %d %ld", header.count, header.detid, header.tstart);
+            zmsg_destroy(&msg);
+            continue;
+        }
         
         if (last_send_time == 0) { // first message
             last_send_time = zclock_usecs();
@@ -73,7 +79,7 @@ void tpreplay_proxy(zsock_t* pipe, void* vargs)
             continue;
         }
 
-        zsys_debug("replay: send %d %d %ld", header.count, header.detid, header.tstart);
+        //zsys_debug("replay: send %d %d %ld", header.count, header.detid, header.tstart);
 
         int64_t delta_tau = header.tstart - last_mesg_time;
         int64_t t_now = zclock_usecs();
@@ -84,12 +90,12 @@ void tpreplay_proxy(zsock_t* pipe, void* vargs)
         }
         if (delta_t > 0 ) {
             int zzz = delta_t / 1000;
-            zsys_debug("replay: sleep %ld after t=%ld/dt=%d, tau=%ld/dtau=%d",
-                       zzz, last_send_time, delta_t, last_mesg_time, delta_tau);
+            //zsys_debug("replay: sleep %ld after t=%ld/dt=%d, tau=%ld/dtau=%d",
+            //           zzz, last_send_time, delta_t, last_mesg_time, delta_tau);
             zclock_sleep(zzz);
+            last_mesg_time = header.tstart;
         }
         last_send_time = zclock_usecs();
-        last_mesg_time = header.tstart;
         int rc = zmsg_send(&msg, osock);
         if (rc  != 0) {
             zsys_error("send failed");
