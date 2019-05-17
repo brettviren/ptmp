@@ -113,7 +113,7 @@ bool recv_prompt(SockInfo& si, int64_t last_msg_time, bool drop_tardy)
     }
     si.msg = msg;
     si.msg_header = header;
-    header_dump("precv", header);
+    //header_dump("precv", header);
     return true;
 }
 
@@ -186,8 +186,8 @@ void tpsorted_proxy(zsock_t* pipe, void* vargs)
                 const int since_ms = (now - si.seen_time)/1000;
                 const int wait_needed_ms = tardy_ms - since_ms;
                 if (wait_needed_ms >= 0 ) {
-                    zsys_debug("wait for #%d %d ms (now=%ld us, seen=%ld us)",
-                               ind, wait_needed_ms, now, si.seen_time);
+                    // zsys_debug("wait for #%d %d ms (now=%ld us, seen=%ld us)",
+                    //            ind, wait_needed_ms, now, si.seen_time);
                     if (wait_needed_ms <= tardy_ms) {
                         wait_time_ms = std::max(wait_needed_ms, wait_time_ms);
                         ++nwait;
