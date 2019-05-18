@@ -95,20 +95,24 @@ int main(int argc, char* argv[])
     //cerr << jcfg << endl;
     ptmp::TPSender send(jcfg.dump());
 
-    ptmp::data::TPSet tps;
-    ptmp::testing::init(tps);
-    tps.set_detid(detid);
-
     // Avoid "late joiner" syndrom
     zclock_sleep (begwait);
 
     ptmp::testing::make_tps_t make_tps(ntps, vartps);
 
-    auto tbeg = zclock_usecs();
+    ptmp::data::TPSet tps;
+    ptmp::testing::init(tps);
+
+    int64_t tbeg = zclock_usecs();
     for (int ind=0; ind<ntpsets; ++ind) {
         sleepy_time();
         make_tps(tps);
-        zsys_debug("send %d/%d", ind, ntpsets);
+        tps.set_detid(detid);
+        tps.set_count(ind);
+        tps.set_created(zclock_usecs());
+        const int delta_ms = (tps.created()-tbeg)/1000;
+        zsys_debug("send %d/%d since start: %d ms",
+                   ind, ntpsets, delta_ms);
         send(tps);
     }
     auto tend = zclock_usecs();

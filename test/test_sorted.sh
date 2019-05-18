@@ -16,13 +16,16 @@ tardy_ms=100
 outsock="PUSH"
 insock="PULL"
 
+# delay between sender packets in microseconds
+delay=1
+
 # 25 is long enough to handle 10k * 10 messages on my laptop
 countdown=25
 endwait=10000
 nsend=10000
 maxsender=10
 ntotal=$(nproc)
-if [[ $ntotal > $maxsender ]] ; then
+if (( $ntotal > $maxsender )) ; then
     ntotal=$maxsender
 fi
 senders=""
@@ -32,8 +35,8 @@ while [[ $maxsender -lt $ntotal ]] ; do
     maxsender=$(( $maxsender + 1 ))
 done
 nexpect=$(( $ntotal * $nsend))
-echo $nexpect
-
+echo "ntotal=$ntotal nexpect=$nexpect"
+echo "senders: $senders"
 
 set -e
 #set -x
@@ -72,7 +75,7 @@ cmd_sender () {
     local ep="$(endpoint $trans $num)"
     local logf="$(logfile sender $trans $num)"
     
-    cmd="$sender -E $endwait -d $num -m $hwm -p $outsock -a bind -e $ep -B 1000  -n $nsend -N 1000 uniform -t 10"
+    cmd="$sender -E $endwait -d $num -m $hwm -p $outsock -a bind -e $ep -B 1000  -n $nsend -N 1000 uniform -t $delay"
     echo $cmd
     $cmd 2>&1 > $logf
 }

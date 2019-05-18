@@ -25,6 +25,7 @@ namespace units {
 void ptmp::testing::init(ptmp::data::TPSet& tps)
 {
     tps.set_count(0);
+    tps.set_created(zclock_usecs());
     tps.set_detid(4); // guaranteed random by roll of dice, but call only once
 }
 
@@ -86,6 +87,8 @@ void ptmp::testing::make_tps_t::operator()(ptmp::data::TPSet& tps) {
         tp->set_flags(0);
     }
     tps.set_tspan(tend - t0);
+    int64_t created = zclock_usecs();
+    tps.set_created(created);
 }
 
 ptmp::testing::uniform_sleeps_t::uniform_sleeps_t(int t, int s)

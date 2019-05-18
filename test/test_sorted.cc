@@ -133,9 +133,10 @@ const uint64_t sec = 1000*msec;
 
 void dump_tpset(std::string ctx, ptmp::data::TPSet& tpset)
 {
-    zsys_debug("%s: count:%-4d detid:%-2d tstart:%-8ld created:%ld",
+    int64_t now = zclock_usecs();
+    zsys_debug("%s: count:%-4d detid:%-2d tstart:%-8ld created:%ld latency:%ld ms",
                ctx.c_str(), tpset.count(), tpset.detid(),
-               tpset.tstart(), tpset.created());
+               tpset.tstart(), tpset.created(), (now-tpset.created())/1000);
 }
 
 void run_sequence1(json scfg, json pcfg, json rcfg, int nsends, double period)
@@ -164,7 +165,6 @@ void run_sequence1(json scfg, json pcfg, json rcfg, int nsends, double period)
     zsys_info("sleeping 200ms to give time to connect");
     zclock_sleep(200);
 
-    int64_t t0 = zclock_usecs();
     uint64_t tstart = 0;
     for (int seq=0; seq<nsends; ++seq) {
         int64_t dt = rtimer(gen);
@@ -174,7 +174,7 @@ void run_sequence1(json scfg, json pcfg, json rcfg, int nsends, double period)
         tpset.set_count(seq);
         tpset.set_detid(isender);
         tpset.set_tstart(tstart);
-        int64_t now = zclock_usecs() - t0;
+        int64_t now = zclock_usecs();
         tpset.set_created(now);
         if (seq%100 == 0) {
             dump_tpset("send", tpset);

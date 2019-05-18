@@ -88,7 +88,7 @@ int main(int argc, char* argv[])
         }
     }
 
-    const size_t nsends = 1000000;
+    const size_t nsends = 10000;
     const char* url = "tcp://127.0.0.1:12345";
     sender_args_t sargs{src_type, url, nsends, 1000, {"one","two","tre"}};
 

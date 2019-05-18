@@ -46,6 +46,7 @@ std::vector<zsock_t*> make_sockets(json jcfg)
 struct msg_header_t {
     uint32_t count, detid;
     uint64_t tstart;
+    int64_t created;
 };
 static msg_header_t msg_header(zmsg_t* msg)
 {
@@ -53,7 +54,7 @@ static msg_header_t msg_header(zmsg_t* msg)
     zframe_t* pay = zmsg_next(msg);
     ptmp::data::TPSet tps;
     tps.ParseFromArray(zframe_data(pay), zframe_size(pay));
-    return msg_header_t{tps.count(), tps.detid(), tps.tstart()};
+    return msg_header_t{tps.count(), tps.detid(), tps.tstart(), tps.created()};
 }
 
 static void header_dump(std::string s, msg_header_t& h)
@@ -61,8 +62,10 @@ static void header_dump(std::string s, msg_header_t& h)
     static uint64_t t0 = h.tstart;
     // zsys_warning("%s: #%d from %d t=%.1f",
     //              s.c_str(), h.count, h.detid, 1e-6*(h.tstart-t0));
-    zsys_info("%s: count:%-4d detid:%-2d tstart:%-8ld",
-              s.c_str(), h.count, h.detid, h.tstart);
+    int64_t now = zclock_usecs();
+    zsys_info("%s: count:%-4d detid:%-2d tstart:%-8ld lat:%d ms",
+              s.c_str(), h.count, h.detid, h.tstart,
+              (now - h.created)/1000);
 
 }
 
@@ -206,7 +209,7 @@ void tpsorted_proxy(zsock_t* pipe, void* vargs)
             wait_time_ms = std::min(wait_time_ms, tardy_ms);
             // don't spin
             if (wait_time_ms == 0) wait_time_ms = 1;
-            zsys_debug("waiting on %d input for at most %d ms", nwait, wait_time_ms);
+            // zsys_debug("waiting on %d input for at most %d ms", nwait, wait_time_ms);
             continue;
         }
 
@@ -224,7 +227,7 @@ void tpsorted_proxy(zsock_t* pipe, void* vargs)
         }
         if (min_msg_ind == ninputs) {
             wait_time_ms = tardy_ms;
-            zsys_debug("no input, waiting %d ms", wait_time_ms);
+            // zsys_debug("no input, waiting %d ms", wait_time_ms);
 
             for (size_t ind=0; ind<ninputs; ++ind) {
                 SockInfo& si = sockinfo[ind];

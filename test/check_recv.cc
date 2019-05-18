@@ -49,7 +49,7 @@ int main(int argc, char* argv[])
 
     ptmp::data::TPSet tps;
 
-    auto tbeg = zclock_usecs();
+    const int64_t tbeg = zclock_usecs();
     int last_seen = 0;
     int got = 0;
     int ntimeout = 3;
@@ -83,11 +83,15 @@ int main(int argc, char* argv[])
         }
         assert (dt >= 0);
 
-        zsys_debug("recv: dt=%ld #%d, have %d/%d : %f s",
-                   dt, now, got, count, (zclock_usecs()-tbeg)*1e-6);
+        const int latency = (zclock_usecs() - tps.created())/1000;
+        const int dt_ms = dt/1000;
+        zsys_debug("recv: det=%d dt=%d ms #%d, have %d/%d : %f s, latency=%d ms",
+                   tps.detid(), dt_ms, now, got, count, (zclock_usecs()-tbeg)*1e-6,
+                   latency);
+
         last_seen = now;
     }
-    auto tend = zclock_usecs();
+    const int64_t tend = zclock_usecs();
 
     const double dt = (tend-tbeg)*1e-6;
     const double khz = 0.001*count/dt;
