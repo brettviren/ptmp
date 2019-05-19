@@ -9,6 +9,7 @@ using json = nlohmann::json;
 struct msg_header_t {
     uint32_t count, detid;
     uint64_t tstart;
+    int ntps;
 };
 static msg_header_t msg_header(zmsg_t* msg)
 {
@@ -16,7 +17,14 @@ static msg_header_t msg_header(zmsg_t* msg)
     zframe_t* pay = zmsg_next(msg);
     ptmp::data::TPSet tps;
     tps.ParseFromArray(zframe_data(pay), zframe_size(pay));
-    return msg_header_t{tps.count(), tps.detid(), tps.tstart()};
+    return msg_header_t{tps.count(), tps.detid(), tps.tstart(), tps.tps_size()};
+}
+
+static
+void dump_header(const char* label, msg_header_t& head)
+{
+    zsys_debug("replay: %s %d %d %4d %ld",
+               label, head.detid, head.count, head.ntps, head.tstart);
 }
 
 
@@ -62,7 +70,7 @@ void tpreplay_proxy(zsock_t* pipe, void* vargs)
         auto header = msg_header(msg);
 
         if (header.tstart == 0xffffffffffffffff) {
-            // zsys_debug("replay: kill %d %d %ld", header.count, header.detid, header.tstart);
+            dump_header("kill", header);
             zmsg_destroy(&msg);
             continue;
         }
@@ -79,7 +87,7 @@ void tpreplay_proxy(zsock_t* pipe, void* vargs)
             continue;
         }
 
-        //zsys_debug("replay: send %d %d %ld", header.count, header.detid, header.tstart);
+        dump_header("send", header);
 
         int64_t delta_tau = header.tstart - last_mesg_time;
         int64_t t_now = zclock_usecs();
@@ -90,8 +98,8 @@ void tpreplay_proxy(zsock_t* pipe, void* vargs)
         }
         if (delta_t > 0 ) {
             int zzz = delta_t / 1000;
-            //zsys_debug("replay: sleep %ld after t=%ld/dt=%d, tau=%ld/dtau=%d",
-            //           zzz, last_send_time, delta_t, last_mesg_time, delta_tau);
+            zsys_debug("replay: sleep %ld after t=%ld/dt=%d, tau=%ld/dtau=%d",
+                      zzz, last_send_time, delta_t, last_mesg_time, delta_tau);
             zclock_sleep(zzz);
             last_mesg_time = header.tstart;
         }
