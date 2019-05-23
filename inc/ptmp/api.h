@@ -88,13 +88,51 @@ namespace ptmp {
         // rate relative to that implied by the tstart values.
         TPReplay(const std::string& config);
 
-        // The TPSorted will run a thread needs to be kept in scope
+        // The TPSorted will run a thread so needs to be kept in scope
         // but otherwise doesn't have a serviceable API.  Destroy it
-        // when done.
+        // when done and it will disconnect its sockets.
         ~TPReplay();
     private:
         zactor_t* m_actor;
         
+    };
+
+    class TPWindow {
+    public:
+        // Create a TPWindower with config covering input and output
+        // sockets as well as windowing parameters.  Windowing is
+        // applied to the tstart and tspan values of the TrigPrim in
+        // the TPSets.  Thus, output TPSets represent a rewriting.  No
+        // TrigPrims are rewritten.  A TrigPrim is added to a windowed
+        // TPSet based solely on its tstart.  This means that any
+        // activity spanning a window boundary will present a ragged
+        // edge.  A future "TPSlice" may be invented.
+        //
+        // The configuration parameters are:
+        //
+        // input.socket:: usual socket configuation for input
+        // output.socket:: usual socket configuation for output
+        //
+        // detid: if nonnegative, use this as output detid, -1 use detid from input
+        //
+        // tmod and trem: clock counts (in same clock as tstart/tspan)
+        // to determin window.  A window will be tmod wide and begin
+        // on a boundary such that t_HW%tmod == trem
+        //
+        // tspan : the span of the window in the HW clock.
+        TPWindow(const std::string& config);
+
+        // The TPWindow will run a thread so needs to be kept in scope
+        // but otherwise doesn't have a serviceable API.  Destroy it
+        // when done and it will disconnect its sockets.
+        ~TPWindow();
+
+        // a self-test
+        static void test();
+
+    private:
+        zactor_t* m_actor;
+
     };
 
 }
