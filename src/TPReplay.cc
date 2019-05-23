@@ -111,6 +111,7 @@ void tpreplay_proxy(zsock_t* pipe, void* vargs)
         }
     }
 
+    zpoller_destroy(&pipe_poller);
     zsock_destroy(&isock);
     zsock_destroy(&osock);
     
