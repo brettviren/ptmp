@@ -1,4 +1,5 @@
 #include "ptmp/api.h"
+#include "ptmp/internals.h"
 
 #include "json.hpp"
 
@@ -46,6 +47,12 @@ struct time_window_t {
     }
 };
 
+static void dump_window(time_window_t& window)
+{
+    zsys_debug("window #%d [%ld]+%ld @ %d",
+               window.wind, window.toff, window.tspan, window.tbegin());
+}
+
 static void test_time_window()
 {
     const hwclock_t tspan = 300, toff=53;
@@ -54,10 +61,11 @@ static void test_time_window()
     assert(tw.wind == 0);
     assert(toff == tw.tbegin());
     assert(tw.in(toff));
-    //zsys_debug("cmp: %d" , tw.cmp(tspan+toff-1));
+    zsys_debug("cmp: %d" , tw.cmp(tspan+toff-1));
     assert(tw.in(tspan+toff-1));
     assert(!tw.in(toff-1));
     assert(!tw.in(tspan+toff));
+    dump_window(tw);
 
     tw.set_bytime(tspan + toff + 1);
     //zsys_debug("wind: %ld", tw.wind);
@@ -65,6 +73,7 @@ static void test_time_window()
     assert(tw.tbegin() == tspan + toff);
     tw.wind = 1000;
     assert(tw.tbegin() == 1000*tspan + toff);
+    dump_window(tw);
 }
     
 struct TPWindower {
@@ -73,8 +82,9 @@ struct TPWindower {
     ptmp::data::TPSet tps;
     
     TPWindower(zsock_t* osock, hwclock_t tspan, hwclock_t toff, int detid)
-        : window(tspan, toff) {
+        : osock(osock), window(tspan, toff) {
         tps.set_count(0);
+        tps.set_tstart(toff);
         tps.set_tspan(tspan);
         tps.set_detid(detid);
         tps.set_created(zclock_usecs()); // maybe want to override this just before a send()
@@ -88,7 +98,11 @@ struct TPWindower {
             return false;
         }
         if (cmp > 0) {
-            ptmp::internals::send(osock, tps); // fixme: can throw
+            if (osock) {                           // allow NULL for testing
+                if (tps.tps().size() > 0) {
+                    ptmp::internals::send(osock, tps); // fixme: can throw
+                }
+            }
             reset(tstart, 1+tps.count());
         }
         ptmp::data::TrigPrim* newtp = tps.add_tps();
@@ -122,17 +136,52 @@ static void test_tpwindower()
 {
     hwclock_t tspan=300, toff=53;
     TPWindower tpw(nullptr, tspan, toff, 1234);
+    dump_window(tpw.window);
     const auto& tw = tpw.reset(tspan+toff, 1);
     assert(tw.wind == 1);
     assert(tw.in(tspan+toff));
     assert(tw.in(tspan+2*toff-1));
-}
 
-bool unpack(zmsg_t* msg, ptmp::data::TPSet& tps)
-{
-    zmsg_first(msg);            // msg id
-    zframe_t* pay = zmsg_next(msg);
-    tps.ParseFromArray(zframe_data(pay), zframe_size(pay));
+    ptmp::data::TrigPrim tp;
+
+    tp.set_tstart(tspan+toff);  // next window
+    tp.set_channel(42);
+    bool ok = tpw.maybe_add(tp);
+    assert(ok);
+    assert(tpw.tps.tps().size() == 1);
+    assert(tpw.tps.chanbeg() == tpw.tps.chanend());
+    assert(tpw.tps.chanbeg() == 42);
+    dump_window(tpw.window);
+
+    tp.set_tstart(tp.tstart() + 1);
+    tp.set_channel(43);    
+    ok = tpw.maybe_add(tp);
+    assert(ok);
+    assert(tpw.tps.tps().size() == 2);
+    assert(tpw.tps.chanbeg() == 42);
+    assert(tpw.tps.chanend() == 43);
+    dump_window(tpw.window);
+    
+    tp.set_tstart(toff);
+    ok = tpw.maybe_add(tp);
+    assert(!ok);
+    assert(tpw.tps.tps().size() == 2);
+    dump_window(tpw.window);
+
+    zsys_debug("advancing window");
+    tp.set_tstart(toff+2*tspan); // in next window
+    ok = tpw.maybe_add(tp);
+    assert(ok);
+    zsys_debug("have %d tps", (int)tpw.tps.tps().size());
+    assert(tpw.tps.tps().size() == 1);
+    dump_window(tpw.window);
+
+    tp.set_tstart(tp.tstart() + 1);
+    ok = tpw.maybe_add(tp);
+    assert(ok);
+    zsys_debug("have %d tps", (int)tpw.tps.tps().size());
+    assert(tpw.tps.tps().size() == 2);
+    dump_window(tpw.window);
 }
 
 
@@ -191,12 +240,7 @@ void tpwindow_proxy(zsock_t* pipe, void* vargs)
         }
 
         ptmp::data::TPSet tps;
-        bool ok = unpack(msg, tps);
-        if (!ok) {
-            zsys_notice("window: failed to unpack at window %ld", windower.window.wind);
-            zmsg_destroy(&msg);
-            continue;
-        }
+        ptmp::internals::recv(msg, tps); // throws
         int64_t latency = zclock_usecs() - tps.created();
 
         for (const auto& tp : tps.tps()) {
@@ -207,7 +251,6 @@ void tpwindow_proxy(zsock_t* pipe, void* vargs)
             }
         }
 
-        zmsg_destroy(&msg);
     } // message loop
 
 

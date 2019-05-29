@@ -118,7 +118,11 @@ void ptmp::internals::recv(zmsg_t* &msg, ptmp::data::TPSet& tps)
         zsys_error(zmq_strerror (errno));
         throw std::runtime_error("null payload frame");
     }
-    tps.ParseFromArray(zframe_data(pay), zframe_size(pay));
+    bool ok = tps.ParseFromArray(zframe_data(pay), zframe_size(pay));
+    if (!ok) {
+        zsys_error("failed to parse TPSet");
+        throw std::runtime_error("failed to parse TPSet");
+    }
 
     zmsg_destroy(&msg);
 }

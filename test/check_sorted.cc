@@ -1,51 +1,16 @@
 // run a TPSorted
 
 #include "ptmp/api.h"
+#include "ptmp/cmdline.h"
 
 #include <vector>
 #include <string>
 #include <iostream>
 
-#include "CLI11.hpp"
-#include "json.hpp"
-
 using namespace std;
 using json = nlohmann::json;
 
-
-struct sock_opt_t {
-    int hwm;
-    std::string socktype;
-    std::string attach;
-    std::vector<std::string> endpoints;
-};
-
-void make_opts(CLI::App* app, sock_opt_t& opt)
-{
-    app->add_option("-m,--socket-hwm", opt.hwm,
-                   "The ZeroMQ socket highwater mark");    
-    app->add_option("-p,--socket-pattern", opt.socktype,
-                    "The ZeroMQ socket pattern for endpoint [PUB, PAIR, PUSH]");
-    app->add_option("-a,--socket-attachment", opt.attach,
-                    "The socket attachement method [bind|connect] for this endpoint");
-    app->add_option("-e,--socket-endpoints", opt.endpoints,
-                    "The socket endpoint addresses in Zero MQ format (tcp:// or ipc://)")->expected(-1);
-}
-
-json make_cfg(sock_opt_t& opt)
-{
-    json jsock = json::object();
-    jsock["hwm"] = opt.hwm;
-    jsock["type"] = opt.socktype;
-    json eps = json::array();
-    for (auto ep : opt.endpoints) {
-        eps.push_back(ep);
-    }
-    jsock[opt.attach] = eps;
-    json jcfg;
-    jcfg["socket"] = jsock;
-    return jcfg;
-}
+using namespace ptmp::cmdline;
 
 int main(int argc, char* argv[])
 {
@@ -62,16 +27,16 @@ int main(int argc, char* argv[])
     CLI::App* osocks = app.add_subcommand("output", "Output socket specification");
     app.require_subcommand(2);
 
-    sock_opt_t iopt{1000,"SUB", "connect"}, oopt{1000,"PUB", "bind"};
-    make_opts(isocks, iopt);
-    make_opts(osocks, oopt);
+    sock_options_t iopt{1000,"SUB", "connect"}, oopt{1000,"PUB", "bind"};
+    add_socket_options(isocks, iopt);
+    add_socket_options(osocks, oopt);
 
     CLI11_PARSE(app, argc, argv);
     
     json jcfg;
     jcfg["tardy"] = tardy;
-    jcfg["input"] = make_cfg(iopt);
-    jcfg["output"] = make_cfg(oopt);
+    jcfg["input"] = to_json(iopt);
+    jcfg["output"] = to_json(oopt);
     
     //std::cerr << "Using config: " << jcfg << std::endl;
 

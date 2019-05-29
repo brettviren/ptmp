@@ -11,11 +11,14 @@ using namespace ptmp::cmdline;
 
 int main(int argc, char* argv[])
 {
-    CLI::App app{"A proxy to replay TPSet streams"};
+    CLI::App app{"A proxy to apply windowing on a stream of TPSets"};
 
-    double speed = 1.0;
-    app.add_option("-s,--speed", speed,
-                   "Relative speed of replay (>1 faster than normal, <1 slower)");
+    int toffset = 0;
+    app.add_option("-o,--offset", toffset, "HW time offset");
+
+    int tspan = 300;
+    app.add_option("-s,--span", tspan, "HW time span");
+
     int countdown = -1;         // forever
     app.add_option("-c,--count", countdown,
                    "Number of seconds to count down before exiting, simulating real app work");
@@ -33,14 +36,15 @@ int main(int argc, char* argv[])
     json jcfg;
     jcfg["input"] = to_json(iopt);
     jcfg["output"] = to_json(oopt);
-    jcfg["speed"] = speed;
+    jcfg["toffset"] = toffset;
+    jcfg["tspan"] = tspan;
     
     // std::cerr << "Using config: " << jcfg << std::endl;
 
     std::string cfgstr = jcfg.dump();
 
     {
-        ptmp::TPReplay proxy(cfgstr);
+        ptmp::TPWindow proxy(cfgstr);
 
         int snooze = 1000;
         while (countdown != 0) {
@@ -50,7 +54,7 @@ int main(int argc, char* argv[])
             int64_t t2 = zclock_usecs ();
             if (std::abs((t2-t1)/1000-snooze) > 10) {
                 std::stringstream ss;
-                ss << "check_replay: sleep interrupted, "
+                ss << "check_window: sleep interrupted, "
                    << " dt=" << (t2-t1)/1000-snooze
                    <<" t1="<<t1<<", t2="<<t2<<", snooze="<<snooze;
                 std::cerr << ss.str() << std::endl;
@@ -61,7 +65,7 @@ int main(int argc, char* argv[])
             zsys_debug("tick %d", countdown);
         }
 
-        std::cerr << "check_replay exiting\n";
+        std::cerr << "check_window exiting\n";
     }
 
     return 0;
