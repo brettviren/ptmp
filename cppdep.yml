@@ -1,0 +1,24 @@
+internal:
+  - name: ptmp
+    path: .
+    packages:
+      - name: include
+        include:
+          - .
+      - name: core
+        src:
+          - src
+          - inc
+
+          
+external:
+  - name: System
+    path: /usr/include
+    packages:
+      - name: SystemInclude
+        include:
+          - .
+      - name: STL
+        include:
+          - c++/8
+          
