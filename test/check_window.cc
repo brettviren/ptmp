@@ -11,6 +11,7 @@ using namespace ptmp::cmdline;
 
 int main(int argc, char* argv[])
 {
+    zsys_init();
     CLI::App app{"A proxy to apply windowing on a stream of TPSets"};
 
     int toffset = 0;
@@ -65,6 +66,7 @@ int main(int argc, char* argv[])
             zsys_debug("tick %d", countdown);
         }
 
+        zsys_debug("check_window exiting");
         std::cerr << "check_window exiting\n";
     }
 

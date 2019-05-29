@@ -14,7 +14,7 @@ do
         for at in pipe pubsub pushpull
         do
             log="build/log.sendrecv_${bc}_${at}_$(echo $tran | tr ':/.' '_')"
-            cmd="$top/build/test/check_sendrecv 100000 $bc $at $tran"
+            cmd="$top/build/test/check_sendrecv 10000 $bc $at $tran"
             echo $cmd
             echo $cmd > $log
             time $cmd >> $log 2>&1

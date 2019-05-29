@@ -175,6 +175,11 @@ int main(int argc, char* argv[])
     int count=0;
     while (true) {
 
+        if (number and count >= number) {
+            break;
+        }
+        ++count;
+
         zmsg_t* msg=NULL;
         if (ifopt.fp) {
             msg = read_msg(ifopt.fp);
@@ -196,10 +201,6 @@ int main(int argc, char* argv[])
             }
         }
 
-        ++count;
-        if (number and count >= number) {
-            break;
-        }
         if (loop_delay) {
             zclock_sleep(loop_delay);
         }

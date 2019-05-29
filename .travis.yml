@@ -18,7 +18,7 @@ before_install:
 # - pushd protobuf-3.6.1 && ./configure --prefix=/usr && make && sudo make install && popd
 
 script:
-  - ./waf distclean configure build --notests && ./test/test_sendrecv.sh && ./waf --alltests
+  - ./waf distclean configure build --notests && ./test/test_sendrecv.sh && ./waf --alltests -j1
 
 
 

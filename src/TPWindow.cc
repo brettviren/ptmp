@@ -227,9 +227,12 @@ void tpwindow_proxy(zsock_t* pipe, void* vargs)
         }
         if (which == pipe) {
             zsys_info("TPWindow proxy got quit");
+            zmsg_t* msg = zmsg_recv(isock);
+            zmsg_destroy(&msg);
             break;
         }
 
+        zsys_info("TPWindow got input");
         // got input
 
         zmsg_t* msg = zmsg_recv(isock);
@@ -243,13 +246,18 @@ void tpwindow_proxy(zsock_t* pipe, void* vargs)
         ptmp::internals::recv(msg, tps); // throws
         int64_t latency = zclock_usecs() - tps.created();
 
+        int ntps_failed = 0;
         for (const auto& tp : tps.tps()) {
             bool ok = windower.maybe_add(tp);
             if (!ok) {
-                zsys_debug("tpwindow: failed to add TP tstart=%ld lat:%ld", tp.tstart(), latency);
-                continue;
+                ++ntps_failed;
             }
         }
+        if (ntps_failed) {
+            zsys_debug("tpwindow: failed to add %d TPs, latency:%ld", ntps_failed, latency);
+            continue;
+        }        
+
 
     } // message loop
 
@@ -266,8 +274,11 @@ ptmp::TPWindow::TPWindow(const std::string& config)
 
 ptmp::TPWindow::~TPWindow()
 {
+    zsys_debug("tpwindow: signaling done");
     zsock_signal(zactor_sock(m_actor), 0); // signal quit
+    zclock_sleep(1000);
     zactor_destroy(&m_actor);
+    zsys_debug("tpwindow: destroying");
 }
 
 void ptmp::TPWindow::test()

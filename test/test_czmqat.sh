@@ -1,7 +1,7 @@
 #!/bin/bash
 
-port1=7771
-port2=7772
+port1=7761
+port2=7762
 
 tosend=10000
 
@@ -21,13 +21,6 @@ logfile () {
     echo "$top/build/test/log.${myname}.${name}.${trans}.${num}"
 }
 
-cmd_proxy() {
-    local logf="$(logfile proxy $trans 0)"
-    cmd="$proxy -E 10000 -n $tosend isock -p PULL -a connect -e ${url}:$port1 osock -p PUSH -a bind -e ${url}:$port2"
-    echo $cmd
-    $cmd 2>&1 > $logf
-}
-
 cmd_sender () {
     local trans="tcp"
     local logf="$(logfile sender $trans 0)"
@@ -36,10 +29,18 @@ cmd_sender () {
     $cmd 2>&1 > $logf
 }
 
+cmd_proxy() {
+    local logf="$(logfile proxy $trans 0)"
+    cmd="$proxy -E 10000 -n $tosend isock -p PULL -a connect -e ${url}:$port1 osock -p PUSH -a bind -e ${url}:$port2"
+    echo $cmd
+    $cmd 2>&1 > $logf
+}
+
+
 cmd_reciever () {
     local trans="tcp"
     local logf="$(logfile recver $trans 0)"
-    cmd="$recver -n $tosend -p PULL -a connect -e ${url}:$port2"
+    cmd="$recver -v5 -n $tosend -p PULL -a connect -e ${url}:$port2"
     echo $cmd
     $cmd 2>&1 > $logf
 }    
