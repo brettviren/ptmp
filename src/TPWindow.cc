@@ -47,10 +47,22 @@ struct time_window_t {
     }
 };
 
-static void dump_window(time_window_t& window)
+static void dump_window(const time_window_t& window, std::string msg="")
 {
-    zsys_debug("window #%d [%ld]+%ld @ %d",
-               window.wind, window.toff, window.tspan, window.tbegin());
+    zsys_debug("window %s #%ld [%ld]+%ld @ %ld",
+               msg.c_str(), window.wind, window.toff, window.tspan, window.tbegin());
+}
+static void dump_tpset(const ptmp::data::TPSet& tps, std::string msg="")
+{
+    hwclock_t tstart = tps.tstart();
+    zsys_debug("tpset: %s @ %ld + %d # %d detid: %d",
+               msg.c_str(), tstart, tps.tspan(), tps.count(), tps.detid());
+    for (const auto& tp : tps.tps()) {
+        hwclock_t tp_ts = tp.tstart();
+        hwclock_t tp_dt = tp_ts - tstart;
+        zsys_debug("\ttp: @ %ld (%8ld) + %d qpeak: %d qtot: %d chan: %d",
+                   tp_ts, tp_dt, tp.tspan(), tp.adcpeak(), tp.adcsum(), tp.channel());
+    }
 }
 
 static void test_time_window()
@@ -95,12 +107,20 @@ struct TPWindower {
         const hwclock_t tstart = tp.tstart();
         const int cmp = window.cmp(tstart);
         if (cmp < 0) {
+            zsys_debug("window: tardy TP @%ld", tstart);
+            dump_window(window);
             return false;
         }
         if (cmp > 0) {
             if (osock) {                           // allow NULL for testing
                 if (tps.tps().size() > 0) {
                     ptmp::internals::send(osock, tps); // fixme: can throw
+                    zsys_debug("window: send TPSet #%d with %d at Thw=%ld",
+                               tps.count(), tps.tps().size(), tps.tstart());
+                }
+                else {
+                    zsys_debug("window: drop empty TPSet #%d at Thw=%ld",
+                               tps.count(), tps.tstart());
                 }
             }
             reset(tstart, 1+tps.count());
@@ -226,14 +246,13 @@ void tpwindow_proxy(zsock_t* pipe, void* vargs)
             break;
         }
         if (which == pipe) {
-            zsys_info("TPWindow proxy got quit");
-            zmsg_t* msg = zmsg_recv(isock);
-            zmsg_destroy(&msg);
+            zsys_info("TPWindow proxy got quit with %d TPs", windower.tps.tps().size());
+            dump_window(windower.window, "quit");
             break;
         }
 
-        zsys_info("TPWindow got input");
-        // got input
+        // zsys_info("TPWindow got input");
+        // dump_window(windower.window, "recv");
 
         zmsg_t* msg = zmsg_recv(isock);
         if (!msg) {
@@ -245,13 +264,25 @@ void tpwindow_proxy(zsock_t* pipe, void* vargs)
         ptmp::data::TPSet tps;
         ptmp::internals::recv(msg, tps); // throws
         int64_t latency = zclock_usecs() - tps.created();
+        dump_window(windower.window, "recv");
+        dump_tpset(tps, "recv");
 
         int ntps_failed = 0;
+        // We do not know ordering of TrigPrim inside TPSet
+        std::sort(tps.mutable_tps()->begin(), tps.mutable_tps()->end(),
+                  [](const ptmp::data::TrigPrim& a, const ptmp::data::TrigPrim& b) {
+                      return a.tstart() < b.tstart();
+                  });
         for (const auto& tp : tps.tps()) {
             bool ok = windower.maybe_add(tp);
             if (!ok) {
                 ++ntps_failed;
+                zsys_debug("\tfail TP at %ld", tp.tstart());
             }
+            else {
+                zsys_debug("\tkeep TP at %ld", tp.tstart());
+            }
+
         }
         if (ntps_failed) {
             zsys_debug("tpwindow: failed to add %d TPs, latency:%ld", ntps_failed, latency);
@@ -262,9 +293,11 @@ void tpwindow_proxy(zsock_t* pipe, void* vargs)
     } // message loop
 
 
+    // zsys_debug("tpwindow actor cleaning up");
     zpoller_destroy(&pipe_poller);
     zsock_destroy(&isock);
     zsock_destroy(&osock);
+    // zsys_debug("tpwindow done");
 }
 
 ptmp::TPWindow::TPWindow(const std::string& config)
@@ -274,11 +307,11 @@ ptmp::TPWindow::TPWindow(const std::string& config)
 
 ptmp::TPWindow::~TPWindow()
 {
-    zsys_debug("tpwindow: signaling done");
+    // zsys_debug("tpwindow: signaling done");
     zsock_signal(zactor_sock(m_actor), 0); // signal quit
     zclock_sleep(1000);
     zactor_destroy(&m_actor);
-    zsys_debug("tpwindow: destroying");
+    // zsys_debug("tpwindow: destroying");
 }
 
 void ptmp::TPWindow::test()
