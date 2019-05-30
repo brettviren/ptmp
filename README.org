@@ -132,6 +132,24 @@ A note on times in the message schema.  There are three types of times:
 - an absolute *wall clock* time (~created~) which is a ~time_t~ value
   expressing the number of seconds since the start of the Unix epoch.
 
+** Message content requirements
+
+Messages shall be constructed and emitted adhering to these
+requirements ([[https://www.ietf.org/rfc/rfc2119.txt][rfc 2119]] langauge):
+
+- All TPSets emitted by a source shall be sent in strict time-order
+  based on their ~tstart~ time.
+
+- The time span of a TPSet (~tsart~, ~tstart~ + ~tspan~) shall cover the
+  union of time spans of all its constituent TrigPrims.
+
+- TPSets from the same source must not mutually overlap in their time
+  spans.
+
+- Emission of TPSets with no TrigPrims should be avoided.
+
+
+
 ** Reference applications and tests
 
 The following applications provide reference applications.  Running
