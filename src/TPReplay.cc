@@ -34,7 +34,11 @@ void tpreplay_proxy(zsock_t* pipe, void* vargs)
     auto config = json::parse((const char*) vargs);
     zsock_t* isock = ptmp::internals::endpoint(config["input"].dump());
     zsock_t* osock = ptmp::internals::endpoint(config["output"].dump());
-    double speed = 1.0;
+
+    // Note, speed MUST scale HW clock to real time microseconds.  Eg,
+    // PDSP's tstart should be counted in 50MHz ticks so speed should
+    // be 50.0.
+    double speed = 50.0;
     if (config["speed"].is_number()) {
         speed = config["speed"];
     }
@@ -97,10 +101,10 @@ void tpreplay_proxy(zsock_t* pipe, void* vargs)
             delta_t = 0;
         }
         if (delta_t > 0 ) {
-            int zzz = delta_t / 1000;
-            zsys_debug("replay: sleep %ld after t=%ld/dt=%d, tau=%ld/dtau=%d",
-                      zzz, last_send_time, delta_t, last_mesg_time, delta_tau);
-            zclock_sleep(zzz);
+            int zzz_ms = delta_t / 1000;
+            zsys_debug("replay: sleep %d ms after t=%ld/dt=%d, tau=%ld/dtau=%d",
+                      zzz_ms, last_send_time, delta_t, last_mesg_time, delta_tau);
+            zclock_sleep(zzz_ms);
             last_mesg_time = header.tstart;
         }
         last_send_time = zclock_usecs();

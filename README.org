@@ -75,16 +75,25 @@ the [[./docs/tuning.org][tuning]] document for some details on these tests.
 * Application Development
 
 PTMP provides a very specific and almost trivial API through a number
-of classes with *synchronous* methods:
+of classes which provide *synchronous* methods:
 
 - ~TPSender~ :: a callable to send a ~TPSet~ object out its socket.
 
 - ~TPReceiver~ :: a callable to receive a ~TPSet~ object from its socket.
                   Can block or be given a timeout to wait for one.
 
-- ~TPSorted~ :: (currently) provides no methods.  This is a proxy that
-                will take in N asynchronous streams of ~TPSet~ messages
-                and output sorted streams.  See [[./docs/tpsorted.org]].
+- ~TPReplay~ :: a free-running agent which accept an input ~TPSet~ stream
+                and attempt to produce an output stream at a pace
+                indicated by the original ~TPSet::tstart~ value.
+
+- ~TPSorted~ :: a free-running agent which takes in N asynchronous ~TPSet~
+                streams and emits one merged, ordered stream.  See
+                [[./docs/tpsorted.org]].
+
+- ~TPWindow~ :: a free-running agent which accepts one ~TPSet~ stream and
+                emits on ~TPSet~ stream.  Input is ordered and buffered
+                over a given minimum time span and then output in
+                ~TPSets~ spanning fixed windows.
 
 Each class is given a /configuration string/ in JSON format to provide
 information about the sockets to use and other info.  This allows
@@ -135,20 +144,30 @@ A note on times in the message schema.  There are three types of times:
 ** Message content requirements
 
 Messages shall be constructed and emitted adhering to these
-requirements ([[https://www.ietf.org/rfc/rfc2119.txt][rfc 2119]] langauge):
+requirements ([[https://www.ietf.org/rfc/rfc2119.txt][rfc 2119]] "may/shall/should" language):
 
-- All TPSets emitted by a source shall be sent in strict time-order
-  based on their ~tstart~ time.
+- All ~TPSets~ emitted by a source shall be sent in strict time-order
+  based either on their ~tstart~ time or their ~tstart+tspan~ time.
 
-- The time span of a TPSet (~tsart~, ~tstart~ + ~tspan~) shall cover the
-  union of time spans of all its constituent TrigPrims.
+- The time span of a TPSet (~tsart~, ~tstart~ + ~tspan~) shall cover (at
+  least) the union of time spans of all its constituent ~TrigPrims~.
 
-- TPSets from the same source must not mutually overlap in their time
-  spans.
+- A the time span of a ~TPSet~ emitted by a source must not overlap with
+  that of any other ~TPSet~ emitted from the source.
 
-- Emission of TPSets with no TrigPrims should be avoided.
+- Emission of a ~TPSet~ with no ~TrigPrims~ should be avoided.
 
+- The ~created~ value shall hold the number of microseconds since the
+  Unix epoch at which the ~TPSet~ was formed just prior to sending.  It
+  should be set with from the value returned by ~zclock_usecs()~.  Host
+  systems should synchronize system clocks with PTP or at least NTP.
+  The ~created~ value may be used for monitoring real time latency.
 
+- The ~count~ shall be incremented by one for each subsequently emitted
+  ~TPSet~.  It may be used for detection of lost ~TPSets~.
+
+- The ~detid~ should be set to a number uniquely identifying the portion
+  of detector from which the ~TPSet~ was derived.  
 
 ** Reference applications and tests
 
