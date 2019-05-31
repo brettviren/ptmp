@@ -37,8 +37,8 @@ message TPSet {
     // Identify the detector portion that this TPSet derives.   
     required uint32 detid = 2;
 
-    // The system wall clock time stamp when this TPSet was created.
-    // This is a Unix time_t value.
+    // The system wall clock time stamp when this TPSet was created in
+    // Unix microseconds eg as returned by zclock_usecs()
     required int64 created = 3;
 
     // The smallest tstart of the TPs, ie the tstart of the earliest
@@ -46,7 +46,7 @@ message TPSet {
     required uint64 tstart = 4;
 
     // The time span of the TPs in the set, measured in the datatime
-    // clock in units of hardware clock ticks.
+    // clock in units of hardware clock "ticks".
     optional uint32 tspan = 5;
 
     // The channel providing the lower bound on the set, inclusive.
