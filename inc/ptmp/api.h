@@ -46,9 +46,10 @@ namespace ptmp {
         TPReceiver& operator=(const TPReceiver&) =delete;            
     };
 
-    // A "device" that accepts TPSets from N TPSenders on input and
-    // produces an ordered output stream of their TPSets on output.
-    // Synchronizing is done on the "tstart" time of the TPSets.
+    // A "free agent" that accepts TPSets from N TPSenders on input
+    // and produces an ordered output stream of their TPSets on
+    // output.  Synchronizing is done on the "tstart" time of the
+    // TPSets.
     class TPSorted {
     public:
         // Create a TPSorted with one config for input sockets and one
@@ -65,8 +66,8 @@ namespace ptmp {
         zactor_t* m_actor;
     };
 
-    // A "device" that accepts TPSets on an input socket and "replays"
-    // them to an output socket.  The replay is done in a
+    // A "free agent" that accepts TPSets on an input socket and
+    // "replays" them to an output socket.  The replay is done in a
     // pseudo-real-time manner by using the system clock and the
     // message "tstart" value to pace their output.  The replayer
     // attempts to keep the real time between messages matching the
@@ -97,6 +98,8 @@ namespace ptmp {
         
     };
 
+    // A "free agent" that applies hw clock windowing to a stream of
+    // TPSets at the TP level.
     class TPWindow {
     public:
         // Create a TPWindower with config covering input and output
@@ -115,11 +118,14 @@ namespace ptmp {
         //
         // detid: if nonnegative, use this as output detid, -1 use detid from input
         //
-        // tmod and trem: clock counts (in same clock as tstart/tspan)
-        // to determin window.  A window will be tmod wide and begin
-        // on a boundary such that t_HW%tmod == trem
+        // toffset: start window this many HW clock ticks from 0.
         //
         // tspan : the span of the window in the HW clock.
+        //
+        // tbuffer : the minimum time span of a buffer defined on
+        // TrigPrim::tstart values which is maintained before taking
+        // wasy "tspan" worth of time to build output TPSet.
+        //
         TPWindow(const std::string& config);
 
         // The TPWindow will run a thread so needs to be kept in scope

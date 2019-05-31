@@ -20,6 +20,9 @@ int main(int argc, char* argv[])
     int tspan = 300;
     app.add_option("-s,--span", tspan, "HW time span");
 
+    int tbuf = 3000;
+    app.add_option("-b,--buff", tspan, "HW time buffer");
+
     int countdown = -1;         // forever
     app.add_option("-c,--count", countdown,
                    "Number of seconds to count down before exiting, simulating real app work");
