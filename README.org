@@ -141,18 +141,57 @@ A note on times in the message schema.  There are three types of times:
 - an absolute *wall clock* time (~created~) which is a ~time_t~ value
   expressing the number of seconds since the start of the Unix epoch.
 
+*** Planned extension
+
+- ~type~ :: (~int~?) identify the source of a ~TPSet~.  This may be needed
+            for ~TPSet~ consumers which subscribe to multiple sources
+            and require source-dependent behavior to be applied to a
+            ~TPSet~.
+            
+- ~tag~ :: (~int~? ~string~?) semantically categorize a ~TPSet~.  This may be
+           required to convey summary information about a ~TPSet~ that
+           is not otherwise derivable from current attributes.
+
+*** Unplanned extension
+
+Some suggestions are rejected
+
+- config ID :: such values are constant by construction throughout a
+               DAQ "run" and thus may be specified through DAQ
+               configuration
+
+- APA ID :: this is redundant with channel and not undefined if a
+            ~TPSet~ spans an APA.  It is also detector module specific.
+
+- APA plane ID :: ibid.
+
+- TP count :: implicitly held in the "~TPSet.tps~" attribute.
+
+- first/last channels :: already supported and redundant with info in the collection of ~TrigPrims~.
+
+- first/last channel time :: may be derived from collection of ~TrigPrims~.
+
+- first/last time :: may be derived from collection of ~TrigPrims~.
+
 ** Message content requirements
 
 Messages shall be constructed and emitted adhering to these
 requirements ([[https://www.ietf.org/rfc/rfc2119.txt][rfc 2119]] "may/shall/should" language):
 
-- All ~TPSets~ emitted by a source shall be sent in strict time-order
-  based either on their ~tstart~ time or their ~tstart+tspan~ time.
+- The ~tstart~ and ~tspan~ attributes of ~TPSet~ and ~TrigPrim~ shall be set
+  from values derived from a clock common to data sources from which
+  all PTMP messages are derived.  These values shall not rollover
+  during the lifetime of PTMP endpoints.
 
-- The time span of a TPSet (~tsart~, ~tstart~ + ~tspan~) shall cover (at
-  least) the union of time spans of all its constituent ~TrigPrims~.
+- All ~TPSets~ shall be sent by their source strict ascending order as
+  determined by their ~tstart~ attribute.
 
-- A the time span of a ~TPSet~ emitted by a source must not overlap with
+- The *time span* of a ~TPSet~ (~tsart~, ~tstart~ + ~tspan~) shall represent a
+  contiguous time range of data that was consumed by the source in the
+  production of the constituent ~TrigPrims~.  It may differ from the
+  union of time spans of the constituent ~TrigPrims~.
+
+- The time span of a ~TPSet~ emitted by a source shall not overlap with
   that of any other ~TPSet~ emitted from the source.
 
 - Emission of a ~TPSet~ with no ~TrigPrims~ should be avoided.
@@ -164,7 +203,7 @@ requirements ([[https://www.ietf.org/rfc/rfc2119.txt][rfc 2119]] "may/shall/shou
   The ~created~ value may be used for monitoring real time latency.
 
 - The ~count~ shall be incremented by one for each subsequently emitted
-  ~TPSet~.  It may be used for detection of lost ~TPSets~.
+  ~TPSet~ from a source.  It may be used for detection of lost ~TPSets~.
 
 - The ~detid~ should be set to a number uniquely identifying the portion
   of detector from which the ~TPSet~ was derived.  
