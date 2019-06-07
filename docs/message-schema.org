@@ -101,7 +101,17 @@ holding the full ~TPSet~.
 
 *** ~TPSet~ 
 
-These suggestions are under consideration.
+A ~TPSet~ represents a set of trigger primitives (~TrigPrim~) collected
+together to avoid transmitting many individual ~TrigPrim~ and to retain
+some context of their production.  For example, the Hit Finder emits
+all TPs found in some time period together as a ~TPSet~.  A trigger
+candidate (TC) finder produces a result that is also well suited to
+being represented as a ~TPSet~.  As understanding of the information
+that a TC must contain, the ~TPSet~ may evolve to accommodate that.  If
+indeed the evolution is too great, then a new object type may be
+crated.  
+
+These suggestions are under consideration for extension to ~TPSet~.
 
 - ~type~ :: (~int~?) identify the source of a ~TPSet~.  This may be needed
             for ~TPSet~ consumers which subscribe to multiple sources
@@ -112,7 +122,7 @@ These suggestions are under consideration.
            required to convey summary information about a ~TPSet~ that
            is not otherwise derivable from current attributes.
 
-These suggestions have been rejected for the given reasons.
+These suggestions have been considered and rejected for the given reasons.
 
 - config ID :: such values are constant by construction throughout a
                DAQ "run" and thus may be specified through DAQ
@@ -130,3 +140,83 @@ These suggestions have been rejected for the given reasons.
 - first/last channel time :: may be derived from collection of ~TrigPrims~.
 
 - first/last time :: may be derived from collection of ~TrigPrims~.
+
+** New messages
+
+Possibly a TC may require representation different than ~TPSet~.
+Certainly a trigger decision (TD) will.  As new object types are added
+some care in factoring is needed in both the message schema and the
+PTMP message handling code if existing functionality is to be
+leveraged.
+
+As an example, the ~TPSorted~ proxy strictly operates on ~TPSet~ but it
+only requires its ~tstart~ value.  If a TC uses a novel object then
+another ~TPSorted~ must be developed to handle this new type.  
+
+A better approach would be to factor ~tstart~ and possibly other values
+in ~TPSet~ into its own object, serialize that to frame 1, and put the
+remainder as frame 2.  Likewise, the TC would split into a generic
+header in frame 1 and its payload in frame 2.  This would allow
+~TPSorted~ to be refactored to be generic to both types of messages.
+
+** Trigger Decision
+
+The pinnacle object in the trigger system is a Trigger Decision (TD).
+It is meant to describe a command which is executed by reading out a
+portion of buffered data from one FD module.  The TD may be consumed
+by entities external to the detector module.
+
+The TD schema substantially differ from that of ~TPSet~ for at least
+these reasons:
+
+1. it may lack any constituent ~TrigPrim~ as a TD may not even derive from TPs thus the bulk of ~TPSet~ would in general be vestigial.
+2. it must address portions of the upstream DAQ buffers in order to readout some subset of the detector for a particular range of time.  ~TPSet~ has no attributes that may represent this information.
+
+What follow are proposed attributes of a TD with explanation.  
+
+- count :: (~uint32~) monotonically increasing count of the TDs from a given source.
+
+- partid :: (~uint32~) identify from which DAQ partition the TD derives
+
+- sources :: (~uint32~ enough?) a bitfield marking what "sources"
+             ("types"?) of TC were used to form this TD.  Eg, bits
+             indiciating contribution from "tpc self trigger", "beam",
+             "random", ...
+
+- tstart :: (~uint64~) the start of the commanded readout of the
+            detector measured in the hardware clock "data time".
+
+- tspan :: (~uint64~) the duration of the commanded readout of the
+           detector measured in the hardware clock "data time".  Note,
+           unlike ~TPSet~ or ~TrigPrim~ ~tspan~ this is 64 bits in order
+           span 100s anticipated for describing a SNB dump.
+
+- modid :: (~int32~) identify the FD module from which the TD *applies*.
+           The value of *zero* is reserved.
+
+- submodids :: (repeated ~int32~) a sequence of submodule IDs from which
+               data over the time span shall be readout.  The
+               submodids shall be interpreted in a manner depending on
+               the value of modid.  Additional interpretation rules
+               may include: empty sequence implies the readout of all
+               possible submodules.
+
+- flag :: a bitfield representing anomalous conditions.  Depending on
+          the bits set the other attributes may be interpreted
+          differently.
+
+
+These are proposed but rejected
+
+- trig ID :: instead of explicitly giving the ~tspan~ to readout, have
+             predefined IDs which imply the readout time span
+             ("nominal" 5ms vs "snb" 100s).  This needlessly reduces
+             flexibility without providing benefit.  One example: an
+             accidental coincidence of cosmic muons require a longer
+             than normal readout or two shorter than normal readouts
+             in either case to avoid commanding overlapping readout.
+
+- trig ID config :: see arguments above for changes to TPSet involving
+                    config
+
+
