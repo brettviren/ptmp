@@ -1,7 +1,0 @@
-kind: pipeline
-name: default
-
-steps:
-  - name: configure
-    image: ubuntu
-    commands: ./waf configure

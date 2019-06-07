@@ -1,0 +1,66 @@
+#+title: Aggregation
+
+PTMP is designed to not dictate how its components may be used in a
+larger context.  Instead, the application developer or even end user
+may aggregate them in ways that solve whatever external needs they may
+have.  Here some guidance is provided.
+
+* Aggregation contexts
+
+PTMP components (by nature of ZeroMQ) may be aggregated in three broad
+contexts using (at least) the listed ZeroMQ transports:
+
+- the same executable :: ~inproc://~, ~ipc://~, ~tcp://~
+- the same computer ::  ~ipc://~, ~tcp://~
+- the same network ::  ~tcp://~
+
+In principle, ~inproc://~ is more performant than ~ipc://~,which is more
+performant ~tcp://~.  It is expected that the performance differences
+are not very relevant to a choice.
+
+Besides aggregating the code itself, connections between components
+specified by configuration.  That is, one need not modify code in
+order to use different transports.
+
+* Aggregation strategies
+
+Some considerations for deciding how to aggregate
+
+** Same executable
+
+- Aggregation is done by writing code.   A [[https://github.com/brettviren/digrex/blob/master/dexnet/inc/upif.h][plugin/factory]] method may be used to allow for dynamic executable aggregation.
+
+- Can simplify end user configuration by not exposing details of how internal connections between components are formed.
+
+- Can use all transport methods.
+
+- Load is limited by available CPU cores on the physical host
+
+** Same computer
+
+- Aggregation is done by starting individual programs.  
+
+- Programs may be developed independently and in different languages.
+
+- Functionality is spread over more executables (than "same executable") so managing program lifetime requires more effort. 
+
+- Can not use ~inproc://~ transport
+
+- Load is limited by available CPU cores on the physical host
+
+** Same network
+
+- Aggregation is done by starting individual programs on multiple host computers.  
+
+- Programs may be developed independently and in different languages.
+
+- Functionality is spread over more executables and host computers so managing program lifetime requires yet more effort. 
+
+- Can only use ~tcp://~ transport
+
+- Load is limited by available CPU cores across multiple physical hosts
+
+- Network congestion may pose issues
+
+- Network security may need consideration (ZeroMQ CURVE could be used).
+

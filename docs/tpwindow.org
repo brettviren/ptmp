@@ -1,0 +1,35 @@
+#+title: TPWindow
+
+TPWindow is a PTMP "proxy" or "actor" class that applies time windows on a stream of ~TrigPrim~ objects provided by an input stream of ~TPSet~ message and produced on an output stream of the same.
+
+* TPWindow times
+
+TPWindow has two configurable *time durations* over which ~TrigPrim~ objects are:
+
+ - window :: chunked on output
+ - buffer :: held before chunked
+
+Both *window* and *buffer* time durations are measured in units of the 64
+bit hardware clock (50 MHz clock at PDSP).  These durations are
+compared against the ~tstart~ value of the ~TrigPrim~ objects.
+
+* Pipeline
+
+~TPWindow~ implements the following ~TrigPrim~ pipeline:
+
+1. An input ~TPSet~ has its ~TrigPrim~ objects placed in a *priority queue*.
+2. The queue is sorted by ~TrigPrim.tstart~ value.
+3. The "front" element in the queue exits only when its ~tstart~ is less than the "back" element's ~tstart~ by at least the *buffer time duration*.
+4. Once out of the queue, a ~TrigPrim~ is placed in an output ~TPSet~.
+5. Once the output ~TPSet~ contains all available ~TrigPrim~ objects with their ~tstart~ in a fixed *window time duration* it is sent to the output socket.
+6. Any input ~TrigPrim~ with a ~tstart~ falling in a window that has already been sent is dropped.
+
+* Windowing
+
+The windowing is performed on the ~TrigPrim.tstart~ value, which again
+holds the hardware clock "data time".  Windowing is applied in an
+*absolute* manner such that the same windowing may be asserted to many
+independent streams and the results will be synchronous.  This is done
+simply by having window boundaries occur on hardware clock times that
+satisify: ~tstart % twindow == toffset~.
+
