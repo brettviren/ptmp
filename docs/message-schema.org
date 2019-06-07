@@ -1,4 +1,4 @@
-#+title PTMP Message Schema
+#+title: PTMP Message Schema
 
 * Schema description
 
@@ -6,9 +6,9 @@ PTMP messages are ZeroMQ messages.
 
 Currently a message consists of two ZeroMQ frames:
 
-1. an "ID" frame, currently unused except that it holds a ~0~ value and
-   serves as a PUB/SUB "topic".  Its existence is currently not
-   exposed to PTMP client code.
+1. an "ID" frame, essentially unused currently except that it holds a
+   ~0~ value and serves as a PUB/SUB "topic".  Its existence is
+   currently not exposed to PTMP client code.
 2. a serialized representation of a ~TPSet~ object.  Serialization is
    performed by protobuf according to the schema held [[../ptmp/ptmp.proto][here]].
 
@@ -74,23 +74,22 @@ requirements (using [[https://www.ietf.org/rfc/rfc2119.txt][rfc 2119]] "may/shal
 - The ~detid~ should be set to a number uniquely identifying the portion
   of detector from which the ~TPSet~ was derived.  
 
-** Schema evolution
+* Schema evolution
 
 It is of course critical for all PTMP endpoints to know what schema is
 followed by the messages they consume.  This can be accomplished by
 assuring consisted software versions of all active endpoints.  In a
-mixed environment, it can be accomplished by asserting version strings
+mixed software environment, it can be accomplished by asserting version strings
 in the messages themselves and having version-specific message
 handling code.  This handling may simply be to reject any messages
 with unexpected versions.
 
 Currently, PTMP messages are not explicitly versioned.  The first
-schema evolution must contend with this.  The initial frame (holding ~0~
-now) of a message may be used to indicate a new schema.
+evolution of schema must contend with this.  The initial frame
+(holding a ~0~ now) of a message may modified to indicate new and
+subsequent schema.
 
-** Schema Changes
-
-*** Frame level
+*** Frame level 
 
 Although protobuf serialization is rather fast, there are some
 operations that need only partial serialization (eg, ~TPSorted~ only
@@ -100,8 +99,7 @@ serialized in a new, small protobuf object or directly into a ~zframe~.
 In either case, they would reside in a frame prior to the frame
 holding the full ~TPSet~.
 
-
-*** Considered ~TPSet~ extensions
+*** ~TPSet~ 
 
 These suggestions are under consideration.
 
@@ -113,8 +111,6 @@ These suggestions are under consideration.
 - ~tag~ :: (~int~? ~string~?) semantically categorize a ~TPSet~.  This may be
            required to convey summary information about a ~TPSet~ that
            is not otherwise derivable from current attributes.
-
-*** Rejected ~TPSet~ extensions
 
 These suggestions have been rejected for the given reasons.
 
