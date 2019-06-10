@@ -61,6 +61,12 @@ The script:
 
 Some TODO items for this script:
 
+ - [ ] version is taken from git tag, but sometimes UPS product
+   builders need to advance their own version, eg to handle build
+   level fixes, apply patches, etc.  This is sometimes done by
+   appending a letter.  Currently, there is nothing in the script to
+   allow that.
+
  - [ ] is the ~product_deps~ file needed?  I thought that was an MRB thing
 
  - [ ] it would be nice to parameterize dependencies outside of the
