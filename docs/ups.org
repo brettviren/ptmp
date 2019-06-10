@@ -38,8 +38,40 @@ installation will go to the ~install/~ directory in the source.
 Set up the environment as above and then:
 
 #+BEGIN_EXAMPLE
-  $ ./waftools/create_ups_product.sh /path/to/products/dir
+  $ ./upstools/create_ups_product.sh /path/to/products/dir [quals]
 #+END_EXAMPLE
 
-If the ptmp version or any of its dependencies change, edit ~ups/product_deps~ to match.
+The script:
+
+ - must reside in a sub-dir of the source
+
+ - will build to a UPS product version based on the current git tag in
+   ~X.Y.Z~ format.
+
+ - requires a minimal UPS environment with a ~PRODUCTS~ variable defined and
+   pointing to UPS products areas that provide the external
+   dependencies.
+
+ - will "prime" the target UPS products dir 
+
+ - will not overwrite existing installation, manually remove old
+   installation to redo
+
+ - needs modification if dependencies change
+
+Some TODO items for this script:
+
+ - [ ] is the ~product_deps~ file needed?  I thought that was an MRB thing
+
+ - [ ] it would be nice to parameterize dependencies outside of the
+   script so that ~upstools/~ can become a stand-alone repo to be
+   included in others (eg, [[https://github.com/brettviren/ptmp-tcs][ptmp-tcs]] like ~waftools/~ is becoming)
+
+ - [ ] The ZeroMQ related UPS products have a minor break with
+   community naming conventions.  If fixed, the script needs updating
+
+   - ~libzmq~ :: name of base package and not ~zeromq~ ("ZeroMQ" is the community name).
+
+   - ~libczmq~ :: name of high level C API and not ~czmq~
+
 
