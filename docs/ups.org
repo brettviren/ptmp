@@ -35,21 +35,11 @@ installation will go to the ~install/~ directory in the source.
 
 * Installation as UPS product
 
-This is not yet working and I'm not an expert but one would do
-something like:
+Set up the environment as above and then:
 
 #+BEGIN_EXAMPLE
-  $ ups declare ptmp vX_Y_Z [magic arguments]
-  $ setup ptmp vX_Y_Z [-q maybe:some:qualifiers]
-  $ ./waftools/waf-configure-for-ups.sh $PTMP_FQ_DIR
-  $ ./waf install
+  $ ./waftools/create_ups_product.sh /path/to/products/dir
 #+END_EXAMPLE
 
-Note, if this is the first time to install into ~$PTMP_FQ_DIR~ your
-various ~PATH~ variables will not yet be defined so before using the
-installation repeat:
-
-#+BEGIN_EXAMPLE
-  $ setup ptmp vX_Y_Z [-q maybe:some:qualifiers]
-#+END_EXAMPLE
+If the ptmp version or any of its dependencies change, edit ~ups/product_deps~ to match.
 
