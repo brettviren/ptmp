@@ -1,0 +1,4 @@
+pyzmq
+protobuf
+matplotlib
+click
