@@ -3,37 +3,93 @@
 usage()
 {
     echo "Usage:" >&2
-    echo "$(basename $0) installdir" >&2
+    echo "$(basename $0) <ups-products-dir>" >&2
 }
 
-mydir="$(dirname $BASH_SOURCE)"
+
+mydir="$(dirname $(realpath $BASH_SOURCE))"
 topdir="$(dirname $mydir)"
-if [ ! -f "$topdir/waf" ] ; then
-    echo "This script assumes it is in the PTMP source directory under waftools/"
-    exit 1
-fi
 
-echo mydir is $mydir
-echo topdir is $topdir
-
-MYPRODDIR="$1"
-
-if [ -z "${MYPRODDIR}" ]; then
+# assure UPS context
+DEV_PRODUCTS="$(realpath $1)" ; shift
+if [ -z "${DEV_PRODUCTS}" ]; then
     usage
     exit 1
 fi
-
-PRODNAME=ptmp
-VERSION=v0_0_1
-QUALS=e15
-
-PRODUCT_DEPS="${topdir}/ups/product_deps"
-
-# Make sure UPS is set up, since we'll be using it later
-if [ -z "$UPS_DIR" ]; then
-    echo "It appears that ups is not set up (\$UPS_DIR is not set). Bailing"
+if [ -z "$UPS_DIR" -o -z "$PRODUCTS" ]; then
+    echo "It appears that ups is not set up (\$UPS_DIR and/or \$PRODUCTS are not set). Bailing"
     exit 1
 fi
+QUALS=${1:-e15}
+PRODNAME="$(basename $topdir)"
+VERSION="v$(git describe --exact-match --tags $(git log -n1 --pretty='%h') | tr '.' '_')"
+VERSIONDIR="${DEV_PRODUCTS}/${PRODNAME}/${VERSION}"
+echo "Building into to: $VERSIONDIR"
+# attempt to create what is not there
+if [ ! -d "${DEV_PRODUCTS}" ] ; then
+    found=""
+    mkdir -p "${DEV_PRODUCTS}" || exit 1
+    for maybe in $(echo ${PRODUCTS//:/' '})
+    do
+        echo $maybe
+        if [ -d "$maybe/.upsfiles" ] ; then
+            echo "Bootstrapping dev UPS products dir from $maybe"
+            cp -a ${maybe}/.ups* ${DEV_PRODUCTS}
+            found="$maybe"
+            break
+        fi
+    done
+    if [ -z "$found" ] ; then
+        echo "Failed to bootstrap $DEV_PRODUCTS"
+        exit 1
+    fi
+fi
+# Get PRODUCTS right
+PRODUCTS=$(echo -n $PRODUCTS| tr ':' '\n' | grep -v "^${DEV_PRODUCTS}\$"|tr '\n' ':'| sed 's/:$//')
+PRODUCTS=$DEV_PRODUCTS:$PRODUCTS
+
+
+gen_product_deps () {
+    # fixme: let dependencies be not hard coded somehow
+    cat <<EOF
+parent $PRODNAME $VERSION
+
+defaultqual $QUALS
+
+fcldir -
+bindir fq_dir
+incdir fq_dir
+libdir fq_dir lib64
+
+product	    version
+zeromq	    v4_3_1
+czmq	    v4_2_0
+protobuf    v3_5_2
+end_product_list
+
+qualifier	zeromq  czmq    protobuf
+e15             e15	e15     e15     
+end_qualifier_list
+
+EOF
+}
+
+
+# assure WAF context for building
+WAF=""
+for maybe in "$topdir/waf" "$topdir/waftools/waf"
+do
+    if [ -x $maybe ] ; then
+        WAF=$maybe
+        break
+    fi
+done
+if [ -z "$WAF" ] ; then
+    echo "Failed to find waf, script must be in subdir of source, not in $mydir"
+    exit 1
+fi
+
+
 
 # Unfortunately, ups's 'setup' is a function, and it's not exported to
 # subshells, so we can't use it in this script (we *could* manually
@@ -79,10 +135,15 @@ SUBDIR=`get-directory-name subdir` || exit 1
 QUALS=$(sort_quals ${QUALS})
 QUALSDIR=$(echo ${QUALS} | tr ':' '.')
 
-# Is my installation dir already in the places where UPS will look? If not, add it
-if ! echo $PRODUCTS | grep -q ${MYPRODDIR}; then 
-    export PRODUCTS=$PRODUCTS:${MYPRODDIR}
+
+
+if [ -d "${VERSIONDIR}/${SUBDIR}.${QUALSDIR}" ] ; then
+    echo "This product already exists, not overwritting."
+    echo "Remove remove and rerun if desired."
+    echo "${VERSIONDIR}/${SUBDIR}.${QUALSDIR}"
+    exit 1
 fi
+   
 
 # Make the directories that UPS wants, and do the minimum necessary to
 # be able to setup the product (ie, copy across the table file). Then
@@ -90,15 +151,13 @@ fi
 # directories where UPS thinks they should be. This is really a bit of
 # extra paranoia, since we basically form those directories ourselves,
 # but it allows us to check that everything is working
-VERSIONDIR="${MYPRODDIR}/${PRODNAME}/${VERSION}"
 mkdir -p "${VERSIONDIR}/ups"                           || exit 1
 mkdir -p "${VERSIONDIR}/include"                       || exit 1
-mkdir -p "${VERSIONDIR}/${SUBDIR}.${QUALSDIR}"         || exit 1
 mkdir -p "${VERSIONDIR}/${SUBDIR}.${QUALSDIR}/lib64"   || exit 1
 mkdir -p "${VERSIONDIR}/${SUBDIR}.${QUALSDIR}/bin"     || exit 1
 mkdir -p "${VERSIONDIR}/${SUBDIR}.${QUALSDIR}/include" || exit 1
 
-cp ${PRODUCT_DEPS} "${VERSIONDIR}/ups/product_deps" || exit 1
+gen_product_deps > "${VERSIONDIR}/ups/product_deps" || exit 1
 
 # Make the table file from the product_deps file
 build_table ${VERSIONDIR}/ups ${VERSIONDIR}/ups || exit 1
@@ -114,20 +173,20 @@ if ups exist ${PRODNAME} ${VERSION} -q ${QUALS}; then
     echo You may want to manually remove ${VERSIONDIR}'/*' or even
     echo ${VERSIONDIR} and rerun 'make ups'
     echo 
-    ups undeclare -z ${MYPRODDIR} -r ${VERSIONDIR} -5 -m ${TABLE} -q ${QUALS} ${PRODNAME} ${VERSION}
+    ups undeclare -z ${DEV_PRODUCTS} -r ${VERSIONDIR} -5 -m ${TABLE} -q ${QUALS} ${PRODNAME} ${VERSION}
 fi
 
 
 echo Declaring with:
-echo ups declare -z ${MYPRODDIR} -r ${VERSIONDIR} -5 -m ${TABLE} -q ${QUALS} ${PRODNAME} ${VERSION}
-     ups declare -z ${MYPRODDIR} -r ${VERSIONDIR} -5 -m ${TABLE} -q ${QUALS} ${PRODNAME} ${VERSION}
+echo ups declare -z ${DEV_PRODUCTS} -r ${VERSIONDIR} -5 -m ${TABLE} -q ${QUALS} ${PRODNAME} ${VERSION}
+     ups declare -z ${DEV_PRODUCTS} -r ${VERSIONDIR} -5 -m ${TABLE} -q ${QUALS} ${PRODNAME} ${VERSION}
 
 if [ "$?" != "0" ]; then
     echo ups declare failed. Bailing
     exit 1
 fi
 
-echo Now ups list says the available builds are:
+echo "Now ups list says the available builds are:"
 ups list -aK+ ${PRODNAME}
 
 setup ${PRODNAME} ${VERSION} -q ${QUALS}
@@ -159,6 +218,12 @@ if [ ! -d "${!PRODNAME_UC_FQ_DIR}" ]; then
     exit 1
 fi
 
-${topdir}/waftools/waf-configure-for-ups.sh ${!PRODNAME_UC_FQ_DIR} || exit 1
 
-${topdir}/waf install
+
+${topdir}/upstools/waf-configure-for-ups.sh ${!PRODNAME_UC_FQ_DIR} || exit 1
+
+${topdir}/waf --notests clean install || exit 1
+
+#    ${topdir}/waf -j1 --alltests || exit 1
+
+

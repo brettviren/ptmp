@@ -17,3 +17,5 @@ auto
 ltximg
 *.tex
 *.pdf
+product_deps
+ups
