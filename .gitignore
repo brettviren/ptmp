@@ -19,3 +19,4 @@ ltximg
 *.pdf
 product_deps
 ups
+*.egg-info

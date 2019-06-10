@@ -180,6 +180,7 @@ struct TPWindower {
 
             // dump_window(window, "send");
             // dump_tpset(tps, "send");
+            ptmp::data::dump(tps, "send");
         }
         return true;
     }
@@ -317,6 +318,7 @@ void tpwindow_proxy(zsock_t* pipe, void* vargs)
         int64_t latency = zclock_usecs() - tps.created();
         // dump_window(windower.window, "recv");
         // dump_tpset(tps, "recv");
+        ptmp::data::dump(tps, "recv");
 
         if (detid < 0) {        // forward if user doesn't provide
             detid = tps.detid();

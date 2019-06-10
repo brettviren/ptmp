@@ -23,7 +23,7 @@ static msg_header_t msg_header(zmsg_t* msg)
 static
 void dump_header(const char* label, msg_header_t& head)
 {
-    zsys_debug("replay: %s %d %d %4d %ld",
+    zsys_debug("replay: %s 0x%x #%d %4d %ld",
                label, head.detid, head.count, head.ntps, head.tstart);
 }
 

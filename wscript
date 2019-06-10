@@ -41,10 +41,10 @@ def build(bld):
         if p: rpath += p
 
     src = bld.path.ant_glob("src/*.cc")
-    pbs = bld.path.ant_glob("ptmp/*.proto")
+    pbs = bld.path.ant_glob("src/*.proto")
     pb_headers = list()
     for pb in pbs:
-        bname = 'ptmp/' + pb.name.replace('.proto','.pb')
+        bname = 'src/' + pb.name.replace('.proto','.pb')
         pb_headers.append(bld.path.find_or_declare(bname+'.h'))
 
     bld.shlib(features='c cxx', includes='inc include',

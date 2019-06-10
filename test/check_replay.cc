@@ -13,9 +13,9 @@ int main(int argc, char* argv[])
 {
     CLI::App app{"A proxy to replay TPSet streams"};
 
-    double speed = 1.0;
+    double speed = 50.0;
     app.add_option("-s,--speed", speed,
-                   "Relative speed of replay (>1 faster than normal, <1 slower)");
+                   "Hardware clock ticks to replay per real time microsecond");
     int countdown = -1;         // forever
     app.add_option("-c,--count", countdown,
                    "Number of seconds to count down before exiting, simulating real app work");

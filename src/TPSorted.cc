@@ -63,7 +63,7 @@ static void header_dump(std::string s, msg_header_t& h)
     // zsys_warning("%s: #%d from %d t=%.1f",
     //              s.c_str(), h.count, h.detid, 1e-6*(h.tstart-t0));
     int64_t now = zclock_usecs();
-    zsys_info("%s: count:%-4d detid:%-2d tstart:%-8ld lat:%d ms",
+    zsys_info("%s: count:%-4d detid:0x%x tstart:%-8ld lat:%d ms",
               s.c_str(), h.count, h.detid, h.tstart,
               (now - h.created)/1000);
 
