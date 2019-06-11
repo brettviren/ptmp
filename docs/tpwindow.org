@@ -33,3 +33,41 @@ independent streams and the results will be synchronous.  This is done
 simply by having window boundaries occur on hardware clock times that
 satisify: ~tstart % twindow == toffset~.
 
+* Configuration
+
+Like all PTMP classes, configuration is performed by passing a
+~std::string~ in JSON format.  The ~check_window~ test program takes
+command line options and builds this JSON string and it will print the
+result.  This may help guide developers who will construct ~TPWindow~
+directly.  An example:
+
+#+BEGIN_EXAMPLE
+  $ ./build/test/check_window  -s 3000 -b 150000 input -p PULL -a connect -e tcp://127.0.0.1:9999  output -p PUSH -a bind -e tcp://127.0.0.1:8888 
+#+END_EXAMPLE
+
+Which displays:
+
+#+BEGIN_SRC json
+  {
+      "input": {
+          "socket": {
+              "connect": [
+                  "tcp://127.0.0.1:9999"
+              ],
+              "hwm": 1000,
+              "type": "PULL"
+          }
+      },
+      "output": {
+          "socket": {
+              "bind": [
+                  "tcp://127.0.0.1:8888"
+              ],
+              "hwm": 1000,
+              "type": "PUSH"
+          }
+      },
+      "toffset": 0,
+      "tspan": 150000
+  }
+#+END_SRC

@@ -43,7 +43,7 @@ int main(int argc, char* argv[])
     jcfg["toffset"] = toffset;
     jcfg["tspan"] = tspan;
     
-    // std::cerr << "Using config: " << jcfg << std::endl;
+    std::cerr << "Using config:\n" << jcfg.dump(4) << std::endl;
 
     std::string cfgstr = jcfg.dump();
 
