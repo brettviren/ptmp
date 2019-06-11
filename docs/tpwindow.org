@@ -67,6 +67,7 @@ Which displays:
               "type": "PUSH"
           }
       },
+      "tbuf": 3000,
       "toffset": 0,
       "tspan": 150000
   }

@@ -42,6 +42,7 @@ int main(int argc, char* argv[])
     jcfg["output"] = to_json(oopt);
     jcfg["toffset"] = toffset;
     jcfg["tspan"] = tspan;
+    jcfg["tbuf"] = tbuf;
     
     std::cerr << "Using config:\n" << jcfg.dump(4) << std::endl;
 
