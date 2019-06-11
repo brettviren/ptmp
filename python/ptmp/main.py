@@ -93,67 +93,12 @@ def dump_messages(ctx):
 @click.argument("outputfile")
 @click.pass_context
 def draw_tps(ctx, channel_range, time_range, time_bin, outputfile):
-    import numpy
-    import matplotlib.pyplot as plt
-    from matplotlib.colors import LogNorm
+    from .plotters import ChanVsTime
 
-    class Drawer(object):
-        def __init__(self, tr, cr, time_bin):
-            self.tr = list(tr)
-            self.cr = list(cr)
-            self.called = 0;
-            self.ntbins = int((self.tr[1] - self.tr[0])/time_bin)
-            self.nchans = self.cr[1] - self.cr[0]
-            self.arr = numpy.zeros((self.ntbins, self.nchans))
-
-        def tbin(self, t):
-            ibin = int(self.ntbins*(t-self.tr[0])/(self.tr[1]-self.tr[0]))
-            ibin = max(ibin, 0)
-            ibin = min(ibin, self.ntbins-1)
-            return ibin
-        def cbin(self, c):
-            ibin = c - self.cr[0]
-            ibin = max(ibin, 0)
-            ibin = min(ibin, self.nchans-1)
-            return ibin
-
-        def __call__(self, tpset):
-            if self.tr[0] == 0:
-                self.tr[0] += tpset.tstart
-                self.tr[1] += tpset.tstart
-            if tpset.tstart < self.tr[0]:
-                return True;
-            if tpset.tstart > self.tr[1]:
-                print ("reached end: %d" % tpset.tstart)
-                return False
-        
-            for tp in tpset.tps:
-                itbeg = self.tbin(tp.tstart)
-                itend = self.tbin(tp.tstart+tp.tspan)
-                nt = itend-itbeg
-                if nt <= 0:
-                    continue                
-                val = tp.adcsum/nt
-                ichan = self.cbin(tp.channel)
-                self.arr[itbeg:itend,ichan] += val
-            self.called += 1
-            return True
-        def plot(self, outputfile):
-            extent = self.cr + [0, self.tr[1]-self.tr[0]]
-            print (extent)
-            cmap = plt.get_cmap('gist_rainbow')
-            cmap.set_bad(color='white')
-            #arr = numpy.ma.masked_where(self.arr<=1, self.arr)
-            arr = self.arr
-            plt.imshow(arr, aspect='auto', interpolation='none', cmap=cmap,
-                       norm=LogNorm(),
-                       extent=extent)
-            plt.savefig(outputfile)
-            
-    drawer = Drawer(time_range, channel_range, time_bin)
+    drawer = ChanVsTime(time_range, channel_range, time_bin)
     spin(drawer, ctx.obj)
     print ("called %d" % drawer.called)
-    drawer.plot(outputfile)
+    drawer.output(outputfile)
 
 
 def main():
