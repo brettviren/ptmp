@@ -38,7 +38,7 @@ int main(int argc, char* argv[])
     jcfg["input"] = to_json(iopt);
     jcfg["output"] = to_json(oopt);
     
-    //std::cerr << "Using config: " << jcfg << std::endl;
+    std::cerr << "Using config: " << jcfg.dump(4) << std::endl;
 
     std::string cfgstr = jcfg.dump();
 
