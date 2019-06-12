@@ -29,7 +29,12 @@ void ptmp::data::dump(const ptmp::data::TPSet& tpset, const std::string& msg)
     const auto tstart = tpset.tstart();
     const auto tspan = tpset.tspan();
 
-    zsys_debug("TPSet #%-8d from 0x%x, %5ld TPs, window %-6ld (TP span [%ld,(%ld,%ld),%ld] = %ld) @ %ld %s",
+    const int64_t now = zclock_usecs();
+    const int64_t lat = now - tpset.created();
+    // hardware clock minus real time clock
+    const int64_t hmr = tpset.tstart() - now;
+
+    zsys_debug("TPSet #%-8d from 0x%x, %5ld TPs, window %-6ld (TP span [%ld,(%ld,%ld),%ld] = %ld) @ %ld lat:%ldus hmr:%ld now:%ld created:%ld %s",
                tpset.count(), tpset.detid(),
                ntps,
                tspan,
@@ -39,6 +44,7 @@ void ptmp::data::dump(const ptmp::data::TPSet& tpset, const std::string& msg)
                tmax-tstart,
                tmax-tmin,
                tstart,
+               lat, hmr, now, tpset.created(),
                msg.c_str());               
     
 }
