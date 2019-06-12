@@ -91,7 +91,7 @@ void tpreplay_proxy(zsock_t* pipe, void* vargs)
             continue;
         }
 
-        dump_header("send", header);
+        // dump_header("send", header);
 
         int64_t delta_tau = header.tstart - last_mesg_time;
         int64_t t_now = zclock_usecs();
@@ -102,8 +102,8 @@ void tpreplay_proxy(zsock_t* pipe, void* vargs)
         }
         if (delta_t > 0 ) {
             int zzz_ms = delta_t / 1000;
-            zsys_debug("replay: sleep %d ms after t=%ld/dt=%d, tau=%ld/dtau=%d",
-                      zzz_ms, last_send_time, delta_t, last_mesg_time, delta_tau);
+            // zsys_debug("replay: sleep %d ms after t=%ld/dt=%d, tau=%ld/dtau=%d",
+            //           zzz_ms, last_send_time, delta_t, last_mesg_time, delta_tau);
             zclock_sleep(zzz_ms);
             last_mesg_time = header.tstart;
         }

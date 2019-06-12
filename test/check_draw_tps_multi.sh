@@ -8,9 +8,9 @@ set -x
 # empty data compared to "totalspan"
 ntpsets=100000
 # Total time span of plot in hardware clock ticks (here, T in [us] times rate in [MHz])
-totalspan=$((100000 * 50))
+totalspan=$((1000000 * 50))
 # time bin, number of 50MHz ticks
-tbin=250
+tbin=2500
 # channel range
 # 602: channels in [10239, 10518]
 # 604: channels in [10467, 10468]
@@ -20,9 +20,9 @@ tbin=250
 # 605: channels in [9472, 9759]
 # 607: channels in [9424, 9711]
 # 609: channels in [9376, 9663]
-#chanrange="9280 9664"
+chanrange="9250 9800"
 #chanrange="9280 9325"
-chanrange="9280 10518"
+#chanrange="9280 10518"
 
 
 jobtime_s=100

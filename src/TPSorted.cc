@@ -241,12 +241,12 @@ void tpsorted_proxy(zsock_t* pipe, void* vargs)
             continue;
         }
 
-        {
-            for (const auto& si : sockinfo) {
-                std::cerr << "\t" << si.nrecved;
-            }
-            std::cerr << "\n";
-        }
+        // {
+        //     for (const auto& si : sockinfo) {
+        //         std::cerr << "\t" << si.nrecved;
+        //     }
+        //     std::cerr << "\n";
+        // }
 
         // zsys_debug("got input on %d at %ld", min_msg_ind, min_msg_time);
 
