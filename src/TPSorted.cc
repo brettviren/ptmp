@@ -154,6 +154,7 @@ void tpsorted_proxy(zsock_t* pipe, void* vargs)
         sockinfo.push_back({ind, s, zpoller_new(s, NULL), 0,
                             {0,0,EOT}, NULL, 0,0});
     }
+
     zpoller_t* pipe_poller = zpoller_new(pipe, NULL);
 
     uint64_t last_msg_time = EOT;
@@ -238,6 +239,13 @@ void tpsorted_proxy(zsock_t* pipe, void* vargs)
             }
 
             continue;
+        }
+
+        {
+            for (const auto& si : sockinfo) {
+                std::cerr << "\t" << si.nrecved;
+            }
+            std::cerr << "\n";
         }
 
         // zsys_debug("got input on %d at %ld", min_msg_ind, min_msg_time);

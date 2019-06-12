@@ -78,7 +78,7 @@ def dump_messages(ctx):
                 max(tspans),
                 min(chans), max(chans)
                ))
-        
+        return True
     spin(dumper, ctx.obj)
 
     pass
