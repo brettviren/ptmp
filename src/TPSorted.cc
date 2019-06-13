@@ -45,8 +45,8 @@ std::vector<zsock_t*> make_sockets(json jcfg)
 // this function static to contain the cancer.
 struct msg_header_t {
     uint32_t count, detid;
-    uint64_t tstart;
-    int64_t created;
+    ptmp::data::data_time_t tstart;
+    ptmp::data::real_time_t created;
 };
 static msg_header_t msg_header(zmsg_t* msg)
 {
@@ -59,10 +59,10 @@ static msg_header_t msg_header(zmsg_t* msg)
 
 static void header_dump(std::string s, msg_header_t& h)
 {
-    static uint64_t t0 = h.tstart;
+    // static ptmp::data::data_time_t t0 = h.tstart;
     // zsys_warning("%s: #%d from %d t=%.1f",
     //              s.c_str(), h.count, h.detid, 1e-6*(h.tstart-t0));
-    int64_t now = zclock_usecs();
+    ptmp::data::real_time_t now = ptmp::data::now();
     zsys_info("%s: count:%-4d detid:0x%x tstart:%-8ld lat:%d ms",
               s.c_str(), h.count, h.detid, h.tstart,
               (now - h.created)/1000);
@@ -70,14 +70,14 @@ static void header_dump(std::string s, msg_header_t& h)
 }
 
 // keep EOT fitting in a signed int64
-static const uint64_t EOT = 0x7FFFFFFFFFFFFFFF;
+static const ptmp::data::data_time_t EOT = 0x7FFFFFFFFFFFFFFF;
 
 // keep track of state for each input
 struct SockInfo {
     size_t index;
     zsock_t* sock;     // the socket
     zpoller_t* poller; 
-    int64_t seen_time; // wall clock time when last message arrived
+    ptmp::data::real_time_t seen_time; // wall clock time when last message arrived
     msg_header_t msg_header;
     zmsg_t* msg;       // most recent message popped from input queue or NULL
     uint64_t nrecved;
@@ -86,7 +86,7 @@ struct SockInfo {
 
 // Get the next message.   Return true if successful.
 static
-bool recv_prompt(SockInfo& si, int64_t last_msg_time, bool drop_tardy)
+bool recv_prompt(SockInfo& si, ptmp::data::data_time_t last_msg_time, bool drop_tardy)
 {
     assert(!si.msg);            // we are not allowed to overwrite
     void* which = zpoller_wait(si.poller, 0);
@@ -157,7 +157,7 @@ void tpsorted_proxy(zsock_t* pipe, void* vargs)
 
     zpoller_t* pipe_poller = zpoller_new(pipe, NULL);
 
-    uint64_t last_msg_time = EOT;
+    ptmp::data::data_time_t last_msg_time = EOT;
 
     int wait_time_ms = 0;
 
@@ -170,7 +170,7 @@ void tpsorted_proxy(zsock_t* pipe, void* vargs)
             break;
         }
 
-        const int64_t now = zclock_usecs();
+        const ptmp::data::real_time_t now = ptmp::data::now();
 
         int nwait = 0;          // how many we lack but need to wait for
 
@@ -215,7 +215,7 @@ void tpsorted_proxy(zsock_t* pipe, void* vargs)
         }
 
         // find min time message
-        int64_t min_msg_time = EOT;
+        ptmp::data::data_time_t min_msg_time = EOT;
         size_t min_msg_ind = ninputs;
         for (size_t ind=0; ind<ninputs; ++ind) {
             SockInfo& si = sockinfo[ind];

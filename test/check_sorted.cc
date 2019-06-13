@@ -48,9 +48,9 @@ int main(int argc, char* argv[])
         int snooze = 1000;
         while (countdown != 0) {
             -- countdown;
-            int64_t t1 = zclock_usecs ();
+            auto t1 = ptmp::data::now();
             zclock_sleep(snooze);
-            int64_t t2 = zclock_usecs ();
+            auto t2 = ptmp::data::now();
             if (std::abs((t2-t1)/1000-snooze) > 10) {
                 std::stringstream ss;
                 ss << "check_sorted: sleep interrupted, "

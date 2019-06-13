@@ -48,7 +48,7 @@ int main(int argc, char* argv[])
     // Avoid "late joiner" syndrom
     zclock_sleep (begwait);
 
-    auto tbeg = zclock_usecs();
+    auto tbeg = ptmp::data::now();
     for (int ind=0; ind<count; ++ind) {
         ptmp::testing::set_count_clock(tps);
         send(tps);
@@ -67,7 +67,7 @@ int main(int argc, char* argv[])
             }
         }
     }
-    auto tend = zclock_usecs();
+    auto tend = ptmp::data::now();
 
     const double dt = (tend-tbeg)*1e-6;
     const double khz = 0.001*count/dt;

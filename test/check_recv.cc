@@ -59,14 +59,14 @@ int main(int argc, char* argv[])
 
     ptmp::data::TPSet tps;
 
-    const int64_t tbeg = zclock_usecs();
+    const ptmp::data::real_time_t tbeg = ptmp::data::now();
     int ntardy=0, nbogus=0;
     int nn_sum=0, nn2_sum=0, nn_max=0, nn_zero=0;
-    int64_t dt_sum=0, dt2_sum=0;
+    ptmp::data::real_time_t dt_sum=0, dt2_sum=0;
     int last_seen = 0;
     int got = 0;
     int ntimeout = 3;
-    uint64_t last_time=0;
+    ptmp::data::data_time_t last_time=0;
     int ind = -1;
     while (true) {
         if (count > 0 and got >= count) {
@@ -113,7 +113,7 @@ int main(int argc, char* argv[])
         }
         last_time = tps.tstart();
 
-        const int latency = (zclock_usecs() - tps.created())/1000;
+        const int latency = (ptmp::data::now() - tps.created())/1000;
         const int dt_ms = dt/1000;
         const int ntps = tps.tps().size();
         if (ntps == 0) ++nn_zero;
@@ -123,14 +123,14 @@ int main(int argc, char* argv[])
         if (verbose >= lvl::debug or (verbose >= lvl::notice and ind==0)) {
             zsys_debug("recv: det=%d n=%d dt=%d ms #%d, have %d/%d : %f s, tstart=%ld, latency=%d ms",
                        tps.detid(), ntps,
-                       dt_ms, now, got, count, (zclock_usecs()-tbeg)*1e-6,
+                       dt_ms, now, got, count, (ptmp::data::now()-tbeg)*1e-6,
                        tps.tstart(),
                        latency);
         }
 
         last_seen = now;
     }
-    const int64_t tend = zclock_usecs();
+    const ptmp::data::real_time_t tend = ptmp::data::now();
 
     const double dt = (tend-tbeg)*1e-6;
     const double khz = 0.001*count/dt;

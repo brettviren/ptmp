@@ -6,10 +6,16 @@
 #include <iostream>             // debug
 #include <algorithm>
 #include <unordered_map>
+#include <unistd.h>
 
 using json = nlohmann::json;
 
 using namespace ptmp::internals;
+
+void ptmp::internals::microsleep(ptmp::data::real_time_t microseconds)
+{
+    usleep(microseconds);
+}
 
 int ptmp::internals::socket_type(std::string name)
 {

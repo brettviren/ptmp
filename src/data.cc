@@ -1,5 +1,5 @@
 #include "ptmp/data.h"
-
+#include <chrono>
 #include <czmq.h>
 
 using namespace ptmp::data;
@@ -8,13 +8,13 @@ void ptmp::data::dump(const ptmp::data::TPSet& tpset, const std::string& msg)
 {
     const auto& tps = tpset.tps();
     const size_t ntps = tps.size();
-    int64_t tmin=0, tmax=0, tbeg_max=0, tend_min=0;
+    data_time_t tmin=0, tmax=0, tbeg_max=0, tend_min=0;
 
 
     for (size_t ind=0; ind<ntps; ++ind) {
         const auto& tp = tps[ind];
-        const int64_t tstart = tp.tstart();
-        const int64_t tspan = tp.tspan();
+        const data_time_t tstart = tp.tstart();
+        const data_time_t tspan = tp.tspan();
         if (!ind) {
             tbeg_max = tmin = tstart;
             tend_min = tmax = tstart + tspan;
@@ -29,10 +29,10 @@ void ptmp::data::dump(const ptmp::data::TPSet& tpset, const std::string& msg)
     const auto tstart = tpset.tstart();
     const auto tspan = tpset.tspan();
 
-    const int64_t now = zclock_usecs();
-    const int64_t lat = now - tpset.created();
+    const real_time_t tnow = now();
+    const real_time_t lat = tnow - tpset.created();
     // hardware clock minus real time clock
-    const int64_t hmr = tpset.tstart() - now;
+    const real_time_t hmr = tpset.tstart() - tnow;
 
     zsys_debug("TPSet #%-8d from 0x%x, %5ld TPs, window %-6ld (TP span [%ld,(%ld,%ld),%ld] = %ld) @ %ld lat:%ldus hmr:%ld now:%ld created:%ld %s",
                tpset.count(), tpset.detid(),
@@ -49,3 +49,9 @@ void ptmp::data::dump(const ptmp::data::TPSet& tpset, const std::string& msg)
     
 }
 
+
+ptmp::data::real_time_t ptmp::data::now()
+{
+    // quite the mouthful
+    return std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+}

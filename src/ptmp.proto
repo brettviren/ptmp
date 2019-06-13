@@ -11,7 +11,8 @@ message TrigPrim {
 
     // The absolute start time of the trigger primitive measured in
     // hardware data clock "ticks".  (For protoDUNE this is the 50MHz
-    // clock).
+    // clock).  In C++, use ptmp::data::data_time_t to represent this
+    // value.
     required uint64 tstart = 2;
 
     // The duration of the primitive measured in hardware data clock
@@ -37,12 +38,16 @@ message TPSet {
     // Identify the detector portion that this TPSet derives.   
     required uint32 detid = 2;
 
-    // The system wall clock time stamp when this TPSet was created in
-    // Unix microseconds eg as returned by zclock_usecs()
+    // The system wall clock time stamp in units of microseconds from
+    // the Unix Epoch and marking when this TPSet was created just
+    // prior to sending.  In C++, use ptmp::data::real_time_t to
+    // represent this value and ptmp::data::now() to set it.  Do *not*
+    // use zclock_usecs().
     required int64 created = 3;
 
     // The smallest tstart of the TPs, ie the tstart of the earliest
-    // TP.  This is measured in hardware clock "ticks".
+    // TP.  This is measured in hardware clock "ticks".  In C++, use
+    // ptmp::data::data_time_t to represent this value.
     required uint64 tstart = 4;
 
     // The time span of the TPs in the set, measured in the datatime

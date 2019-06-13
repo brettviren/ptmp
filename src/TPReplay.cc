@@ -49,8 +49,8 @@ void tpreplay_proxy(zsock_t* pipe, void* vargs)
 
     int wait_time_ms = -1;
 
-    int64_t last_send_time = 0;
-    int64_t last_mesg_time = 0;
+    ptmp::data::real_time_t last_send_time = 0;
+    ptmp::data::data_time_t last_mesg_time = 0;
 
     while (!zsys_interrupted) {
 
@@ -80,7 +80,7 @@ void tpreplay_proxy(zsock_t* pipe, void* vargs)
         }
         
         if (last_send_time == 0) { // first message
-            last_send_time = zclock_usecs();
+            last_send_time = ptmp::data::now();
             last_mesg_time = header.tstart;
             int rc = zmsg_send(&msg, osock);
             if (rc  != 0) {
@@ -93,21 +93,18 @@ void tpreplay_proxy(zsock_t* pipe, void* vargs)
 
         // dump_header("send", header);
 
-        int64_t delta_tau = header.tstart - last_mesg_time;
-        int64_t t_now = zclock_usecs();
-        int64_t delta_t = last_send_time + delta_tau/speed - t_now;
+        const ptmp::data::real_time_t delta_tau = (header.tstart - last_mesg_time)/speed;
+        const ptmp::data::real_time_t t_now = ptmp::data::now();
+        ptmp::data::real_time_t delta_t = last_send_time + delta_tau - t_now;
         if (delta_t < 0) {
             // tardy!
             delta_t = 0;
         }
         if (delta_t > 0 ) {
-            int zzz_ms = delta_t / 1000;
-            // zsys_debug("replay: sleep %d ms after t=%ld/dt=%d, tau=%ld/dtau=%d",
-            //           zzz_ms, last_send_time, delta_t, last_mesg_time, delta_tau);
-            zclock_sleep(zzz_ms);
+            ptmp::internals::microsleep(delta_t);
             last_mesg_time = header.tstart;
         }
-        last_send_time = zclock_usecs();
+        last_send_time = ptmp::data::now();
         int rc = zmsg_send(&msg, osock);
         if (rc  != 0) {
             zsys_error("send failed");

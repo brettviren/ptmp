@@ -1,6 +1,8 @@
 #include <chrono>
 #include <czmq.h>
 #include <ctime>
+#include <iostream>
+#include <unistd.h>
 using namespace std::chrono;
 int main()
 {
@@ -11,13 +13,29 @@ int main()
     zsys_info("zclock_usecs:          %ld", zclock_usecs());
 
     
-    system_clock::time_point sys_tp = system_clock::now();
-    system_clock::duration sys_dtn = sys_tp.time_since_epoch();
-    zsys_info("chrono system periods: %ld", sys_dtn.count());
+    {
+        system_clock::time_point tp = system_clock::now();
+        system_clock::duration dtn = tp.time_since_epoch();
+        std::cout <<"chrono system periods: " << dtn.count() << "\n";
+    }
+    {
+        steady_clock::time_point tp = steady_clock::now();
+        steady_clock::duration dtn = tp.time_since_epoch();
+        std::cout <<"chrono steady periods: " << dtn.count() << "\n";
+    }
+    {
+        high_resolution_clock::time_point tp = high_resolution_clock::now();
+        system_clock::duration dtn = tp.time_since_epoch();    
+        std::cout <<"chrono hirez periods:  " << dtn.count() << "\n";
+    }
+    auto tp1 = system_clock::now();
+    usleep(1100000);
+    auto tp2 = system_clock::now();
+    auto dt = tp2-tp1;
+    assert (dt > seconds{1});
+    std::cout << "dt: " << dt.count() << "\n";
 
-    high_resolution_clock::time_point hrc_tp = high_resolution_clock::now();    
-    system_clock::duration hrc_dtn = hrc_tp.time_since_epoch();    
-    zsys_info("chrono hirez periods:  %ld", hrc_dtn.count());
-
+    int64_t us = duration_cast<microseconds>(tp1.time_since_epoch()).count();
+    zsys_info("%ld us", us);
     return 0;
 }

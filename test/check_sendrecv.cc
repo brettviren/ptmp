@@ -208,7 +208,7 @@ int main(int argc, char* argv[])
 
     zpoller_t* poller = zpoller_new(zactor_sock(sactor),
                                     zactor_sock(ractor), NULL);
-    auto tbeg = zclock_usecs();
+    auto tbeg = ptmp::data::now();
     int sn=0, num=0;
     const int timeout = 1000;
     while (true) {
@@ -245,7 +245,7 @@ int main(int argc, char* argv[])
     zpoller_destroy(&poller);
 
 
-    auto tend = zclock_usecs();
+    auto tend = ptmp::data::now();
     const double dt = (tend-tbeg)*1e-6;
     const double khz = 0.001*num/dt;
     zsys_info("main %d in %.3f s or %.1f kHz", num, dt, khz);

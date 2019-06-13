@@ -35,9 +35,11 @@ attributes:
   hardware clock.
 
 - an absolute *wall clock* time (~created~) which represents the number of
-  microseconds from the Unix epoch.  The function ~zclock_usecs()~
-  should be used in setting it.
+  microseconds from the Unix epoch.  The function ~ptmp::data::now()~
+  should be used to set it.  Note, ~zclock_usecs()~ is *not* appropriate.
 
+The check program ~test/check_clock.cc~ can be used to exercise some of
+the possible clocks.
 
 ** Message content requirements
 
@@ -64,9 +66,10 @@ requirements (using [[https://www.ietf.org/rfc/rfc2119.txt][rfc 2119]] "may/shal
 
 - The ~created~ value shall hold the number of microseconds since the
   Unix epoch at which the ~TPSet~ was formed just prior to sending.  It
-  should be set with from the value returned by ~zclock_usecs()~.  Host
-  systems should synchronize system clocks with PTP or at least NTP.
-  The ~created~ value may be used for monitoring real time latency.
+  should be set with from the value returned by ~ptmp::data::now()~
+  (note ~zclock_usecs()~ is *not* appropriate).  Host systems should
+  synchronize system clocks with PTP or at least NTP.  The ~created~
+  value may be used for monitoring real time latency.
 
 - The ~count~ shall be incremented by one for each subsequently emitted
   ~TPSet~ from a source.  It may be used for detection of lost ~TPSets~.

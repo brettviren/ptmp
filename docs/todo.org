@@ -16,8 +16,10 @@ Here's a check list of work needed (or done).
 - [X] tests which emulate expected TP finders in terms of specifying
   mean and variance of some rates.
 
-- [ ] move abs ~datatime~ into ~TrigPrim~
-- [ ] change ~chanspan~ to ~chanbeg~ and ~chanend~ in ~TPSet~
+- [X] move abs ~datatime~ into ~TrigPrim~
+- [X] change ~chanspan~ to ~chanbeg~ and ~chanend~ in ~TPSet~
+
+- [ ] clear up time stamps, use ~std::chrono::system_time()~ converted to microseconds for ~TPSet.created~.
 
 * Discussion and Decisions Needed
 

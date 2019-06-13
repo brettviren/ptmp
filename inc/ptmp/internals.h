@@ -15,6 +15,8 @@ namespace ptmp {
         void recv(zmsg_t* &msg, ptmp::data::TPSet& tps);
         void send(zsock_t* sock, const ptmp::data::TPSet& tps);
 
+        void microsleep(ptmp::data::real_time_t microseconds);
+
         //void send_cfg(zsock_t* sock, const char* cfgstr);
 
         class Socket {
