@@ -82,11 +82,10 @@ void tpreplay_proxy(zsock_t* pipe, void* vargs)
         if (last_send_time == 0) { // first message
             last_send_time = ptmp::data::now();
             last_mesg_time = header.tstart;
-            int rc = zmsg_send(&msg, osock);
-            if (rc  != 0) {
-                zsys_error("send failed");
-                break;
-            }
+            TPSet tpset;
+            ptmp::internals::recv(msg, tpset);
+            tpset.set_created(last_send_time);
+            ptmp::internals::send(osock, tpset);
             zsys_debug("replay: first");
             continue;
         }
@@ -105,10 +104,11 @@ void tpreplay_proxy(zsock_t* pipe, void* vargs)
             last_mesg_time = header.tstart;
         }
         last_send_time = ptmp::data::now();
-        int rc = zmsg_send(&msg, osock);
-        if (rc  != 0) {
-            zsys_error("send failed");
-            break;
+        {
+            TPSet tpset;
+            ptmp::internals::recv(msg, tpset);
+            tpset.set_created(last_send_time);
+            ptmp::internals::send(osock, tpset);
         }
     }
 

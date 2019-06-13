@@ -26,7 +26,6 @@ namespace ptmp {
         // Return the current "real time".  This is derived from
         // std::chrono::system_clock().
         real_time_t now();
-
     }
 }
 
