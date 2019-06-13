@@ -62,12 +62,12 @@ incdir fq_dir
 libdir fq_dir lib64
 
 product	    version
-zeromq	    v4_3_1
-czmq	    v4_2_0
+zmq	    v4_3_1
+czmq	    v4_2_0a
 protobuf    v3_5_2
 end_product_list
 
-qualifier	zeromq  czmq    protobuf
+qualifier	zmq    czmq    protobuf
 e15             e15	e15     e15     
 end_qualifier_list
 
@@ -102,9 +102,9 @@ setup ()
 }
 
 # We use get-directory-name from cetpkgsupport below
-setup -c cetpkgsupport
+[ -z "$CETPKGSUPPORT_DIR" ] && setup -c cetpkgsupport
 # We use build_table from cetbuildtools to make the table file from the product_deps file
-setup cetbuildtools v5_14_03
+[ -z "$CETBUILDTOOLS_DIR" ] && setup cetbuildtools v5_14_03
 
 # Sort the qualifiers in the same way as build_table does:
 # 'prof'/'debug' at the end, and the rest in alphabetical order
