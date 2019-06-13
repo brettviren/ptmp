@@ -82,7 +82,7 @@ void tpreplay_proxy(zsock_t* pipe, void* vargs)
         if (last_send_time == 0) { // first message
             last_send_time = ptmp::data::now();
             last_mesg_time = header.tstart;
-            TPSet tpset;
+            ptmp::data::TPSet tpset;
             ptmp::internals::recv(msg, tpset);
             tpset.set_created(last_send_time);
             ptmp::internals::send(osock, tpset);
@@ -105,7 +105,7 @@ void tpreplay_proxy(zsock_t* pipe, void* vargs)
         }
         last_send_time = ptmp::data::now();
         {
-            TPSet tpset;
+            ptmp::data::TPSet tpset;
             ptmp::internals::recv(msg, tpset);
             tpset.set_created(last_send_time);
             ptmp::internals::send(osock, tpset);
