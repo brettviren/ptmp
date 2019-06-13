@@ -1,0 +1,24 @@
+#+title: ~TPSender~ Class
+
+The ~TPSender~ class provides an application with a way to send a ~TPSet~
+object to the PTMP network.  An application should construct it, with
+a JSON config string and keep it alive until finished.  
+An example JSON configuration string is:
+
+#+BEGIN_SRC json
+  {
+    "socket": {
+        "connect": [
+            "tcp://127.0.0.1:9999"
+        ],
+        "hwm": 1000,
+        "type": "PUSH"
+    }
+  }
+#+END_SRC
+
+The instance is a /callable/ object and through its lifetime the
+application may call it on a ~TPSet~ to send that object to the network.
+This call may throw a ~std::runtime_error~.
+
+See [[../test/check_send.cc]] for a simple example of using a ~TPSender~.

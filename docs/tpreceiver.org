@@ -1,0 +1,28 @@
+#+title: ~TPReceiver~ Class
+
+The ~TPReceiver~ class provides an application with a way to receive a
+~TPSet~ object from the PTMP network.  An application should construct
+it with a JSON config string and keep it alive until finished.  An
+example JSON configuration string is:
+
+#+BEGIN_SRC json
+  {
+    "socket": {
+        "bind": [
+            "tcp://127.0.0.1:9999"
+        ],
+        "hwm": 1000,
+        "type": "PULL"
+    }
+  }
+#+END_SRC
+
+The instance is a /callable/ object and through its lifetime the
+application may call it on a ~TPSet~ and an optional timeout.  When data
+arrives from the PTMP network the call will complete and the ~TPSet~
+will be filled.  If a timeout is requested and occurs the return value
+of the call will be ~false~.
+
+See [[../test/check_recv.cc]] for a simple example of using a ~TPReceiver~.
+
+
