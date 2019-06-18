@@ -29,7 +29,7 @@ message IndexRange {
   // The first index in the range
   uint32 ibeg = 1;
   // One *past* the last index in the range.
-  uint32 iend = 1;
+  uint32 iend = 2;
 }
 
 
@@ -67,10 +67,10 @@ message TrigHead {
   required TimeSpan dataspan = 6;
 
   // Identify the algorithm providing the source for the message.
-  optional string source = 8;
+  optional string source = 7;
 
   // An arbitrary value with algorithm-dependent interpretation.
-  optional uint32 sflags = 9;
+  optional uint32 sflags = 8;
 }
 
 // A trigger primitive (TP) object represents activity on a given
@@ -150,11 +150,11 @@ message TD {
 message TrigInfo {
 
   // Zero or more trigger primitives.
-  repeated TP primitives = 2;
+  repeated TP primitives = 1;
 
   // Zero or more trigger candidates.
-  repeated TC candidates = 3;
+  repeated TC candidates = 2;
 
   // Zero or more trigger decisions.
-  repeated TD decisions = 4;
+  repeated TD decisions = 3;
 }
