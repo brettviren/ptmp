@@ -175,5 +175,5 @@ At the ZeroMQ message level, the *v1* PTMP message shall have three frames:
 |---------+--------------------------------------|
 
 The Version is a 4 byte integer and equal to ~1~ for v1 schema.
-The schema covering Header and Payload is in [[../src/ptmpng.proto]].
+The schema covering Header and Payload is in [[../src/ptmpv1.proto]].
 
