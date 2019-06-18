@@ -1,0 +1,160 @@
+// This is PTMP's next generation message schema.  
+
+// Note, not explicitly captured in this object schema is the ZeroMQ
+// message frame schema.  The PTMP v1 message has three frames:
+//
+// [1, TrigHead, TrigInfo]
+
+syntax = "proto3";
+package ptmp.data;
+
+
+// Represent a span of hardware clock time.
+message TimeSpan {
+  // An absolute reference time for an edge (leading or trailing) of
+  // some contiguous block of time.  It is measured in hardware data
+  // clock "ticks".  (For protoDUNE this is the 50MHz clock).  In
+  // C++, use ptmp::data::data_time_t to represent this value.
+  required uint64 tref = 1;
+
+  // The duration of the contiguous block of time also measured in
+  // hardware data clock ticks and relative to tref.  If tspan is
+  // positive then tref is a leading edge.  If tspan is negative
+  // then tref is a trailing edge.
+  required int64 span = 2;
+}
+    
+// Represent a *half-open* range of indices.
+message IndexRange {
+  // The first index in the range
+  uint32 ibeg = 1;
+  // One *past* the last index in the range.
+  uint32 iend = 1;
+}
+
+
+// Info common to any message.
+message TrigHead {
+  // A sequential count of how many messages from the source socket
+  // have been produced.
+  required uint32 count = 1;
+
+  // Identify the detector module. 0=reserved to mean
+  // undefined/illegal module, 1,2,3,4 for their respective Far
+  // Detector modules. 10 for protodune-SP, 20 for protodune-DP.
+  optional uint32 modid = 2;    
+
+  // Identify the portion of the detector module's data from which the
+  // payload was derived.  This may be some bit field or enumeration
+  // following a modid-specific convention.  0=reserved to mean
+  // undefined/illegal detid
+  repeated uint32 from_detids = 3;
+
+  // Partition ID.  Enumerate in which DAQ partition this message
+  // exists.  0=reserved to mean undefined/illegal partition ID.
+  optional uint32 partid = 4;
+
+  // The system wall clock time stamp in units of microseconds from
+  // the Unix Epoch and marking the time just prior to sending.  In
+  // C++, use ptmp::data::real_time_t to represent this value and
+  // ptmp::data::now() to set it.  Do *not* use zclock_usecs().
+  required int64 created = 5;
+
+  // The time span of the data stream fragment from which this message
+  // was derived.  This describes how much data was consumed to
+  // produce the message and NOT some measure of where activity is.
+  // It marks the time window examined.
+  required TimeSpan dataspan = 6;
+
+  // Identify the algorithm providing the source for the message.
+  optional string source = 8;
+
+  // An arbitrary value with algorithm-dependent interpretation.
+  optional uint32 sflags = 9;
+}
+
+// A trigger primitive (TP) object represents activity on a given
+// channel which is significant over some contiguous time span.
+message TP {    
+
+  // The time span of the trigger primitive
+  required TimeSpan tspan = 1;
+
+  // The channel of this TP.  This should be unique at least to the
+  // detector module.
+  required uint32 channel = 2;
+
+  // The total ADC of the TP
+  optional uint32 adcsum = 3;
+
+  // The peak ADC of the TP above baseline
+  optional uint32 adcpeak = 4;
+    
+  // The time measured in hardware clock counts and realtive to tref
+  // of the sample which contains the highest ADC value.
+  optional int32 tdcpeak = 5;
+    
+  // A bit mask error flag.  0 is no error
+  optional uint32 flags = 6;
+}
+
+// A trigger candidate (TC) object represents activity which is
+// significant over a set of channels and a contiguous time span.
+message TC {
+  
+  // The time span of the trigger candidate which exactly contains
+  // the activity represented by this TC.
+  required TimeSpan tspan_covered = 1;
+                          
+  // A list of detector identifier numbers describing the fragments of
+  // the detector which are considered to contain the activity
+  // represented by this TC.
+  repeated uint32 detids_covered = 2;
+
+  // The half-open index range on a collection of TP objects from
+  // which this TC was derived.  If this TC resides in a TrigInfo that
+  // provides primitives then this range refers to that collection.
+  // Even lacking a collection, the range may be used to determine the
+  // number of channels contributing to this TC.
+  optional IndexRange tp_indices = 3;
+
+}
+
+message TD {
+
+  // The time span of the trigger decision.  This determines the time
+  // range of data is to be read out from some portion of the
+  // detector.
+  required TimeSpan tspan_readout = 1;
+
+  // A list of detector identifier numbers describing the fragments of
+  // the detector which are to be read out.
+  repeated uint32 detids_readout = 2;
+
+  // The half-open index range on a collection of TC objects from
+  // which this TD was derived.  If this TD resides in a TrigInfo that
+  // provides candidates, this range refers to that collection.  Even
+  // lacking a collection, this range may be used to determin the
+  // number of candidates contributing to the TD.  If the TD was not
+  // derived from TCs this range is empty.
+  optional IndexRange tc_indices = 3;
+
+  // The priority of the TD follows the definition used in Unix
+  // processes.  Consumers shall interpret smaller (more negative)
+  // numbers as having more priority.
+  optional int32 priority = 4;
+
+  
+}
+
+message TrigInfo {
+
+  // Zero or more trigger primitives.
+  repeated TP primitives = 2;
+
+  // Zero or more trigger candidates.
+  repeated TC candidates = 3;
+
+  // Zero or more trigger decisions.
+  repeated TD decisions = 4;
+}
