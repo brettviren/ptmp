@@ -52,20 +52,19 @@ do
     iport=$oport
     oport=8$fn
     #oport=7777
-    $window -s 3000 -b 150000 \
+    $replay -c $jobtime_s -s 50.0 \
             input -p PULL -a connect -e tcp://127.0.0.1:$iport \
-            output -p PUSH -a connect -e tcp://127.0.0.1:$oport  > log.window.$fn 2>&1 &
+            output -p PUSH -a connect -e tcp://127.0.0.1:$oport > log.replay.$fn 2>&1 &
     tokill="$! $tokill"
 
     iport=$oport
     oport=7$fn
-    tpsorted_endpoints="-e tcp://127.0.0.1:$oport $tpsorted_endpoints"
-
-    $replay -c $jobtime_s -s 50.0 \
+    $window -s 3000 -b 150000 \
             input -p PULL -a bind -e tcp://127.0.0.1:$iport \
-            output -p PUSH -a connect -e tcp://127.0.0.1:$oport > log.replay.$fn 2>&1 &
+            output -p PUSH -a connect -e tcp://127.0.0.1:$oport  > log.window.$fn 2>&1 &
     tokill="$! $tokill"
 
+    tpsorted_endpoints="-e tcp://127.0.0.1:$oport $tpsorted_endpoints"
 done
 
 
