@@ -1,7 +1,13 @@
+#!/usr/bin/env python3
+'''
+ptmpy is a Python-based command line interface to PTMP
+'''
+
+import click
 
 socket_type_names = "PAIR PUB SUB REQ REP DEALER ROUTER PULL PUSH XPUB XSUB STREAM".split()
 
-import click
+
 
 @click.group()
 @click.option('-n','--number', default=0, type=int, required=False,
@@ -99,6 +105,9 @@ def draw_tps(ctx, channel_range, time_range, time_bin, outputfile):
     spin(drawer, ctx.obj)
     print ("called %d" % drawer.called)
     drawer.output(outputfile)
+
+
+            
 
 
 def main():

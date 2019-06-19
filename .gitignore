@@ -20,3 +20,5 @@ ltximg
 product_deps
 ups
 *.egg-info
+dist
+*.npz

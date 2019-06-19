@@ -24,12 +24,15 @@ message TimeSpan {
   required int64 span = 2;
 }
     
-// Represent a *half-open* range of indices.
+// Represent a *half-open* range of indices.  If both indices are set
+// to zero the range is considered "null".
 message IndexRange {
-  // The first index in the range
-  uint32 ibeg = 1;
-  // One *past* the last index in the range.
-  uint32 iend = 2;
+  // The first index in the range.  This is made optional to make
+  // default set to zero
+  optional uint32 ibeg = 1;
+  // One *past* the last index in the range.  This is made optional to
+  // make default set to zero
+  optional uint32 iend = 2;
 }
 
 
