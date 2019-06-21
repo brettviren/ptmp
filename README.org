@@ -42,6 +42,9 @@ See below for installing from source.
 See [[./docs/todo.org][To Do]] document for checklist and notes on future development and
 also any [[https://github.com/brettviren/ptmp/issues][issues]].
 
+[[https://travis-ci.org/brettviren/ptmp][https://travis-ci.org/brettviren/ptmp.svg?branch=master]]
+
+
 * Installation 
 
 The PTMP package should build with any reasonably up to date C++
