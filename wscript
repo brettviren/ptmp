@@ -41,7 +41,7 @@ def build(bld):
         if p: rpath += p
 
     src = bld.path.ant_glob("src/*.cc")
-    pbs = bld.path.ant_glob("src/*.proto")
+    pbs = bld.path.ant_glob("src/ptmp.proto")
     pb_headers = list()
     for pb in pbs:
         bname = 'src/' + pb.name.replace('.proto','.pb')
