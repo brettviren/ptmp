@@ -1,0 +1,12 @@
+language: cpp
+
+services:
+  - docker
+
+before_install:
+  - docker pull brettviren/ptmp-testing
+  - docker run brettviren/ptmp-testing
+
+# script:
+#   - ./waf distclean configure build --notests && ./test/test_sendrecv.sh && ./waf --alltests -j1
+
