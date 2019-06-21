@@ -13,6 +13,11 @@ int main(int argc, char* argv[])
 {
     CLI::App app{"A proxy to replay TPSet streams"};
 
+    int rewrite_count = 0;
+    app.add_option("-C,--rewrite-count", rewrite_count,
+                   "rewrite the TPSet.count values");
+
+
     double speed = 50.0;
     app.add_option("-s,--speed", speed,
                    "Hardware clock ticks to replay per real time microsecond");
@@ -34,8 +39,9 @@ int main(int argc, char* argv[])
     jcfg["input"] = to_json(iopt);
     jcfg["output"] = to_json(oopt);
     jcfg["speed"] = speed;
+    jcfg["rewrite_count"] = rewrite_count;
     
-    // std::cerr << "Using config: " << jcfg << std::endl;
+    std::cerr << "Using config: " << jcfg << std::endl;
 
     std::string cfgstr = jcfg.dump();
 

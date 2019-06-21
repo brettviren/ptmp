@@ -14,6 +14,21 @@ from .data import *
 def cli(ctx):
     pass
 
+@cli.command("tap")
+@click.option('-o', '--output', default="spy.npz",
+              help="output file holding plots")
+@click.argument("npzfile")
+def plot(output, npzfile):
+    import matplotlib.pyplot as plt
+
+    fp = np.load(npzfile)
+    for name in fp:
+        a = fp[name]
+        rel=(a-a[1])[1:]
+        delta=a[1:]-a[:-1]
+        plt.plot(b[1:,0]//25 - b[:-1,0]//25)                                                         
+
+
 # Context manager which does the spying for timing
 class spy_timing(object):
     def __init__(self, output):
@@ -107,14 +122,15 @@ def tap(output, spy_method, socket_spec_pairs):
             for sock, evt in poller.poll():
                 #print ("got event %s, %d" % (evt, count))
                 if evt != zmq.POLLIN:
-                    continue
+                    print ("got unexpected event: %s" % evt)
+                    break
                 tapnum = taps[sock]
                 frames = sock.recv_multipart()
                 if not frames:
                     print("null frames")
                     break
                 spier(intern_message(frames), tapnum)
-            
+
             
 
 def main():
