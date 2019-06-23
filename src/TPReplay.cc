@@ -42,6 +42,10 @@ void tpreplay_proxy(zsock_t* pipe, void* vargs)
     if (config["speed"].is_number()) {
         speed = config["speed"];
     }
+    int rewrite_count = 0;
+    if (config["rewrite_count"].is_number()) {
+        rewrite_count = config["rewrite_count"];
+    }
 
     zsock_signal(pipe, 0);      // signal ready
 
@@ -51,6 +55,8 @@ void tpreplay_proxy(zsock_t* pipe, void* vargs)
 
     ptmp::data::real_time_t last_send_time = 0;
     ptmp::data::data_time_t last_mesg_time = 0;
+
+    int count = 0;
 
     while (!zsys_interrupted) {
 
@@ -85,7 +91,11 @@ void tpreplay_proxy(zsock_t* pipe, void* vargs)
             ptmp::data::TPSet tpset;
             ptmp::internals::recv(msg, tpset);
             tpset.set_created(last_send_time);
+            if (rewrite_count) {
+                tpset.set_count(count);
+            }
             ptmp::internals::send(osock, tpset);
+            ++count;
             zsys_debug("replay: first");
             continue;
         }
@@ -108,7 +118,11 @@ void tpreplay_proxy(zsock_t* pipe, void* vargs)
             ptmp::data::TPSet tpset;
             ptmp::internals::recv(msg, tpset);
             tpset.set_created(last_send_time);
+            if (rewrite_count) {
+                tpset.set_count(count);
+            }
             ptmp::internals::send(osock, tpset);
+            ++count;
         }
     }
 
