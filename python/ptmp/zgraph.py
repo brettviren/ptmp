@@ -67,17 +67,25 @@ def cmdlines(nodes):
             ret.append(cmdline)
     return ret
 
-@cli.command('run')
+@cli.command('procfile')
+@click.option('-o','--output', default="/dev/stdout", help="Output file or stdout")
 @click.argument('infile')
-def run(infile):
-    dat = load(infile)
-    for cmdline in cmdlines(dat):
-        print (cmdline)
+def procfile(output, infile):
+    'Emit a procfile for the given graph'
+    nodes = load(infile)
+    lines = list()
+    for node in nodes:
+        data = node['data']
+        if data['app_type'] == 'subprocess':
+            cmdline = data['cmdline'].format(ports=node['ports'], **data)
+            lines.append("%s: %s" % (node['name'], cmdline))
+    open(output, "w").write("\n".join(lines))
 
 @cli.command('dotify')
 @click.option('-o','--output', default="/dev/stdout", help="Output file or stdout")
 @click.argument('infile')
 def dotify(output, infile):
+    'Emit a graphviz dot file for the given graph'
     dat = load(infile)
     open(output,"w").write(dot(dat))
 
