@@ -1,16 +1,19 @@
 #!/usr/bin/env python3
 
+import os
 import json
 import _jsonnet as jsonnet
 
 def load(fname):
     if fname.endswith(".jsonnet"):
-        text = jsonnet.evaluate_file(fname)
+        jpathdir = os.path.dirname(__file__)
+        text = jsonnet.evaluate_file(fname, jpathdir=jpathdir)
     elif fname.endswith(".json"):
         text = open(fname).read()
     else:
         return
     return json.loads(text)
+
 
 
 def dot(nodes):
@@ -45,11 +48,31 @@ def dot(nodes):
     dottext += '\n}\n'
     return dottext
 
+
 import click
 
 @click.group()
 def cli():
     pass
+
+
+
+def cmdlines(nodes):
+    ret = list()
+    for node in nodes:
+        data = node['data']
+        if data['app_type'] == 'subprocess':
+            cmdline = data['cmdline']
+            cmdline = cmdline.format(ports=node['ports'], **data)
+            ret.append(cmdline)
+    return ret
+
+@cli.command('run')
+@click.argument('infile')
+def run(infile):
+    dat = load(infile)
+    for cmdline in cmdlines(dat):
+        print (cmdline)
 
 @cli.command('dotify')
 @click.option('-o','--output', default="/dev/stdout", help="Output file or stdout")
@@ -57,6 +80,7 @@ def cli():
 def dotify(output, infile):
     dat = load(infile)
     open(output,"w").write(dot(dat))
+
 
 def main():
     cli()

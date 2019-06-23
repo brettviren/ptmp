@@ -35,8 +35,8 @@
         data = {
             app_type: "subprocess",
             cmdline: "czmqat ifile -f {filename} osock " +
-                "-m {hwm} -p {ports[0].type} " +
-                "-a {ports[0].atts[0][0]} -e {ports[0].atts[0][1]}",
+                "-m {hwm} -p {ports[0][type]} " +
+                "-a {ports[0][atts][0][0]} -e {ports[0][atts][0][1]}",
             hwm: 1000,
             filename: filename
         } + clidata),
