@@ -23,6 +23,7 @@ setup(name = 'ptmp',
           'console_scripts': [
               'ptmpy = ptmp.main:main',
               'ptmp-spy = ptmp.spy:main',
+              'zgraph = ptmp.zgraph:main',
           ]
       }
               

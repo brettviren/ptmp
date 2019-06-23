@@ -13,32 +13,57 @@ def load(fname):
     return json.loads(text)
 
 
-def dot(g):
-    lines = ['graph "%s" {' % g['name']]
+def dot(nodes):
+    lines = ['graph "zgra" {']
     lines += ['rankdir=LR']
-    node_lines = ['node[shape=box]']
-    for node in g['nodes']:
-        node_lines += ['%s' % node['name']]
-        
-    port_lines = ['node[shape=circle]']
-    edge_lines = ['edge[style=solid]']
-    for node in g['nodes']:
+
+    node_nodes = ['// node nodes', 'node[shape=box]']
+    port_nodes = ['// port nodes', 'node[shape=circle]']
+    atts_nodes = ['// atts nodes', 'node[shape=ellipse]']
+    np_edges = ['edge[style=solid]']
+    pa_edges = ['edge[style=dotted]']
+
+
+    for node in nodes:
+        nn = node['name']
+        node_nodes += ['"%s"' % nn]
         for port in node['ports']:
-            node_name = node['name']
-            port_name = '%s_%s' % (node_name, port['name'])
-            line = '"%s"[label="%s"]' % (port_name, port['type'])
-            port_lines.append(line)
-            edge_lines.append('"%s"--"%s"' % (node_name, port_name))
+            pn = port['name']
+            pt = port['type']
 
-    addr_lines = ['node[shape=ellipse]']
-    att_lines = ['edge[style=solid]']
-    for att in g['attachments']:
-        node_name = att['node']
-        port_name = '%s_%s' % (node_name, att['port']['name'])
-        addr_name = att['addr']
-        addr_lines.append('"%s"' % addr_name)
-        att_lines += ['"%s" -- "%s"[label="%s"]' % (port_name, addr_name, att['bc'])]
+            pnn = '%s_%s' % (nn, pn)
 
-    dottext = '\n\t'.join(lines + node_lines + port_lines + addr_lines + edge_lines + att_lines)
+            port_nodes.append('"%s"[label="%s"]' % (pnn, pt))
+            np_edges.append('"%s" -- "%s"[label="%s"]' % (nn, pnn, pn))
+
+            for bc, addr in port['atts']:
+                atts_nodes.append('"%s"' % addr)
+                pa_edges.append('"%s" -- "%s"[label="%s"]' %(pnn, addr, bc))
+
+    lines += node_nodes + port_nodes + atts_nodes + np_edges + pa_edges
+    dottext = '\n\t'.join(lines)
     dottext += '\n}\n'
     return dottext
+
+import click
+
+@click.group()
+def cli():
+    pass
+
+@cli.command('dotify')
+@click.option('-o','--output', default="/dev/stdout", help="Output file or stdout")
+@click.argument('infile')
+def dotify(output, infile):
+    dat = load(infile)
+    open(output,"w").write(dot(dat))
+
+def main():
+    cli()
+
+if '__main__' == __name__:
+    main()
+
+    
+    
+    
