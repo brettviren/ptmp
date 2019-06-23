@@ -16,7 +16,7 @@ setup(name = 'ptmp',
       url = 'http://github.com/brettviren/ptmp',
       package_dir = {'':'python'},
       #packages = ['ptmp', 'ptmp.data', 'ptmp.ptmp_pb2'],
-      py_modules = ['ptmp', 'ptmp.main', 'ptmp.spy', 'ptmp.data', 'ptmp.ptmp_pb2', 'ptmp.helpers'],
+      py_modules = ['ptmp', 'ptmp.main', 'ptmp.spy', 'ptmp.data', 'ptmp.ptmp_pb2', 'ptmp.helpers', 'ptmp.zgraph'],
       install_requires = [l for l in open("requirements.txt").readlines() if l.strip()],
       # # implicitly depends on ROOT
       entry_points = {
