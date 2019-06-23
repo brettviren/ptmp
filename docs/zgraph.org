@@ -1,0 +1,40 @@
+#+title zgraph
+
+PTMP's Python package provides a command line program ~zgraph~ which accepts and processes graphs described in JSON or Jsonnet format which represent PTMP networks.
+
+* Installation
+
+The PTMP Python package installs in the usual Python ways.  My favorite:
+
+#+begin_example
+  $ python3 -m venv venv
+  $ source venv/bin/activiate
+  $ python setup.py develop
+#+end_example
+
+* GraphViz
+
+The graph can be visualized
+
+#+begin_example
+  $ zgraph dotify -o foo.dot foo.jsonnet
+  $ dot -Tpdf -o foo.pdf foo.dot
+#+end_example
+
+* Foreman Procfile
+
+[[http://blog.daviddollar.org/2011/05/06/introducing-foreman.html][Foreman]] provides a mechanism to start multiple programs using a simple file in Procfile format.  The ~zgraph~ command will render the graph to a Procfile if it is properly formed.
+
+#+begin_example
+  $ zgraph procfile foo.jsonnet
+#+end_example
+
+In additional to the original there are many Foreman re-implementations that will operate on a Procfile.  For a Python-based implementation:
+
+#+begin_example
+  $ pip install honcho
+  $ honcho start
+#+end_example
+
+
+
