@@ -20,6 +20,11 @@
     },
 
 
+    cmdargstr(iport, iaddr=0) ::
+    "-m {hwm} -p {ports[%d][type]} -a {ports[%d][atts][%d][0]} -e {ports[%d][atts][%d][1]}" %
+        [ iport, iport, iaddr, iport, iaddr],
+    
+
     // Create a file source subgraph with a node.data suitable for
     // generating a command line.  A single socket is plugged and no
     // addresses attached.
@@ -29,16 +34,50 @@
     //
     // FIXME: this structure only supports a single endpoint (although
     // czmqat supports multiple).
-    fsource(name, filename, port, clidata={}) :: self.node(
+    fsource(name, filename, port, clidata={}, program="czmqat") :: self.node(
         name,
         ports=[port],
         data = {
             app_type: "subprocess",
-            cmdline: "czmqat ifile -f {filename} osock " +
-                "-m {hwm} -p {ports[0][type]} " +
-                "-a {ports[0][atts][0][0]} -e {ports[0][atts][0][1]}",
+            cmdline: "{program} ifile -f {filename} osock " + $.cmdargstr(0),
             hwm: 1000,
-            filename: filename
+            filename: filename,
+            program: program
         } + clidata),
     
+
+    csource(name, port, clidata={}, program="check_send_rates") :: self.node(
+        name,
+        ports=[port],
+        data = {
+            app_type: "subprocess",
+            cmdline: "{program} {timing} -t {time} -s {skip} " + $.cmdargstr(0),
+            timing: "uniform",
+            time: 10,
+            skip: 0,
+            hwm: 1000,
+            program: program
+        } + clidata),
+    
+    csink(name, port, clidata={}, program="check_recv") :: self.node(
+        name,
+        ports = [port],
+        data = {
+            app_type: "subprocess",
+            cmdline: "{program} " + $.cmdargstr(0),
+            hwm: 1000,
+            program: program,
+        } + clidata),
+
+    // Create a check_* type proxy
+    cproxy(name, ports, clidata={}, program='check_replay') :: self.node(
+        name,
+        ports=ports,
+        data = {
+            app_type: "subprocess",
+            cmdline: "{program} input " + $.cmdargstr(0) + " output " + $.cmdargstr(1),
+            hwm: 1000,
+            program: program,
+        } + clidata),
+
 }

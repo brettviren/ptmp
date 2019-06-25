@@ -75,6 +75,7 @@ def procfile(output, infile):
     nodes = load(infile)
     lines = list()
     for node in nodes:
+
         data = node['data']
         if data['app_type'] == 'subprocess':
             cmdline = data['cmdline'].format(ports=node['ports'], **data)
