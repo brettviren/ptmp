@@ -25,8 +25,9 @@
         [ iport, iport, iaddr, iport, iaddr],
     
 
-    cmdargstr_multi(iports, iaddr=0) ::
-    std.join(" ", [$.cmdargstr(iport, iaddr) for iport in iports]),
+    cmdargstr_sorted(ninput) ::
+    "-m {hwm} -p {ports[0][type]} -a {ports[0][atts][0][0]} -e " +
+        std.join(" ", ["{ports[%d][atts][0][1]}"%ind for ind in std.range(0,ninput-1)]),
 
     // Create a file source subgraph with a node.data suitable for
     // generating a command line.  A single socket is plugged and no
@@ -87,17 +88,16 @@
             cliargs: cliargs
         } + clidata),
 
-    // Create a check_sorted type proxy which has n input ports
-    csorted(name, ninput, ports, clidata={}, program='check_sorted', cliargs="") :: self.node(
+    // Create a check_sorted type proxy which has n input ports.  Output port must be last.
+    csorted(name, ports, clidata={}, program='check_sorted', cliargs="") :: self.node(
         name,
         ports=ports,
         data = {
             app_type: "subprocess",
-            cmdline: "{program} {cliargs} input " + $.cmdargstr_multi(std.range(0,ninput-1)) + " output " + $.cmdargstr_multi(std.range(ninput, std.length(ports) - 1)),
+            cmdline: "{program} {cliargs} input " + $.cmdargstr_sorted(std.length(ports)-1) + " output " + $.cmdargstr(std.length(ports)-1),
             hwm: 1000,
             program: program,
             cliargs: cliargs,
-            ninput: ninput
         } + clidata),
 
 }

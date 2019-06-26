@@ -141,15 +141,31 @@ def kitchen_sink(output, monlog):
     'Plot a bunch of stuff'
     pds = main_pid(load(monlog))
 
+    fig, axes = plt.subplots(1,3)
+
+    ax = axes[0]
     for pd in pds:
         x,y = cpu_usage(pd)
-        plt.plot(x,y, label=pd.name)
-    plt.ylabel("CPU%")
-    plt.xlabel("wall clock [s]")
-    plt.legend()
-    plt.savefig(output)
+        ax.plot(x,y)
+    ax.set_ylabel("CPU%")
+    ax.set_xlabel("wall clock [s]")
 
-    
+    ax = axes[1]
+    for pd in pds:
+        ax.plot(pd.sample_time-pd.sample_time[0], pd.rss, label=pd.name)
+    ax.set_ylabel("RSS [pages]")
+    ax.set_xlabel("wall clock [s]")
+    ax.legend(prop=dict(size=6))
+
+    ax = axes[2]
+    for pd in pds:
+        ax.plot(pd.sample_time-pd.sample_time[0], pd.processor)
+    ax.set_ylabel("proc num")
+    ax.set_xlabel("wall clock [s]")
+
+    fig.tight_layout()
+
+    fig.savefig(output)    
 
 def main():
     cli()

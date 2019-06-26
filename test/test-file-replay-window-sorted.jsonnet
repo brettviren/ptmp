@@ -37,11 +37,12 @@ local windows = [
                  g.port('in', 'PULL', [['connect', replay_addr(ind)]]),
                  g.port('out', 'PUSH', [['bind', window_addr(ind)]])
              ],
-             cliargs="-c 30")
+             program='check_window',
+             cliargs="-c 30 -s 3000 -b 150000")
     for ind in file_iota
     ];
 
-local sorted = g.csorted("sorted", nfiles,
+local sorted = g.csorted("sorted", 
                          [ g.port('in%02d'%ind,'PULL', [['connect', window_addr(ind)]]) for ind in file_iota ]
                          +
                          [ g.port('out', 'PUSH', [['bind', sorted_addr()]]) ],
