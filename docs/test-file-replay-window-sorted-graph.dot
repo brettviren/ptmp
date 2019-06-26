@@ -1,0 +1,156 @@
+graph "zgra" {
+	rankdir=LR
+	// node nodes
+	node[shape=box]
+	"file00"
+	"file01"
+	"file02"
+	"file03"
+	"file04"
+	"replay00"
+	"replay01"
+	"replay02"
+	"replay03"
+	"replay04"
+	"window00"
+	"window01"
+	"window02"
+	"window03"
+	"window04"
+	"sorted"
+	"sink"
+	// port nodes
+	node[shape=circle]
+	"file00_src"[label="PUSH"]
+	"file01_src"[label="PUSH"]
+	"file02_src"[label="PUSH"]
+	"file03_src"[label="PUSH"]
+	"file04_src"[label="PUSH"]
+	"replay00_in"[label="PULL"]
+	"replay00_out"[label="PUSH"]
+	"replay01_in"[label="PULL"]
+	"replay01_out"[label="PUSH"]
+	"replay02_in"[label="PULL"]
+	"replay02_out"[label="PUSH"]
+	"replay03_in"[label="PULL"]
+	"replay03_out"[label="PUSH"]
+	"replay04_in"[label="PULL"]
+	"replay04_out"[label="PUSH"]
+	"window00_in"[label="PULL"]
+	"window00_out"[label="PUSH"]
+	"window01_in"[label="PULL"]
+	"window01_out"[label="PUSH"]
+	"window02_in"[label="PULL"]
+	"window02_out"[label="PUSH"]
+	"window03_in"[label="PULL"]
+	"window03_out"[label="PUSH"]
+	"window04_in"[label="PULL"]
+	"window04_out"[label="PUSH"]
+	"sorted_in00"[label="PULL"]
+	"sorted_in01"[label="PULL"]
+	"sorted_in02"[label="PULL"]
+	"sorted_in03"[label="PULL"]
+	"sorted_in04"[label="PULL"]
+	"sorted_out"[label="PUSH"]
+	"sink_in"[label="PULL"]
+	// atts nodes
+	node[shape=ellipse]
+	"tcp://127.0.0.1:6000"
+	"tcp://127.0.0.1:6001"
+	"tcp://127.0.0.1:6002"
+	"tcp://127.0.0.1:6003"
+	"tcp://127.0.0.1:6004"
+	"tcp://127.0.0.1:6000"
+	"tcp://127.0.0.1:7000"
+	"tcp://127.0.0.1:6001"
+	"tcp://127.0.0.1:7001"
+	"tcp://127.0.0.1:6002"
+	"tcp://127.0.0.1:7002"
+	"tcp://127.0.0.1:6003"
+	"tcp://127.0.0.1:7003"
+	"tcp://127.0.0.1:6004"
+	"tcp://127.0.0.1:7004"
+	"tcp://127.0.0.1:7000"
+	"tcp://127.0.0.1:8000"
+	"tcp://127.0.0.1:7001"
+	"tcp://127.0.0.1:8001"
+	"tcp://127.0.0.1:7002"
+	"tcp://127.0.0.1:8002"
+	"tcp://127.0.0.1:7003"
+	"tcp://127.0.0.1:8003"
+	"tcp://127.0.0.1:7004"
+	"tcp://127.0.0.1:8004"
+	"tcp://127.0.0.1:8000"
+	"tcp://127.0.0.1:8001"
+	"tcp://127.0.0.1:8002"
+	"tcp://127.0.0.1:8003"
+	"tcp://127.0.0.1:8004"
+	"tcp://127.0.0.1:9000"
+	"tcp://127.0.0.1:9000"
+	edge[style=solid]
+	"file00" -- "file00_src"[label="src"]
+	"file01" -- "file01_src"[label="src"]
+	"file02" -- "file02_src"[label="src"]
+	"file03" -- "file03_src"[label="src"]
+	"file04" -- "file04_src"[label="src"]
+	"replay00" -- "replay00_in"[label="in"]
+	"replay00" -- "replay00_out"[label="out"]
+	"replay01" -- "replay01_in"[label="in"]
+	"replay01" -- "replay01_out"[label="out"]
+	"replay02" -- "replay02_in"[label="in"]
+	"replay02" -- "replay02_out"[label="out"]
+	"replay03" -- "replay03_in"[label="in"]
+	"replay03" -- "replay03_out"[label="out"]
+	"replay04" -- "replay04_in"[label="in"]
+	"replay04" -- "replay04_out"[label="out"]
+	"window00" -- "window00_in"[label="in"]
+	"window00" -- "window00_out"[label="out"]
+	"window01" -- "window01_in"[label="in"]
+	"window01" -- "window01_out"[label="out"]
+	"window02" -- "window02_in"[label="in"]
+	"window02" -- "window02_out"[label="out"]
+	"window03" -- "window03_in"[label="in"]
+	"window03" -- "window03_out"[label="out"]
+	"window04" -- "window04_in"[label="in"]
+	"window04" -- "window04_out"[label="out"]
+	"sorted" -- "sorted_in00"[label="in00"]
+	"sorted" -- "sorted_in01"[label="in01"]
+	"sorted" -- "sorted_in02"[label="in02"]
+	"sorted" -- "sorted_in03"[label="in03"]
+	"sorted" -- "sorted_in04"[label="in04"]
+	"sorted" -- "sorted_out"[label="out"]
+	"sink" -- "sink_in"[label="in"]
+	edge[style=dotted]
+	"file00_src" -- "tcp://127.0.0.1:6000"[label="bind"]
+	"file01_src" -- "tcp://127.0.0.1:6001"[label="bind"]
+	"file02_src" -- "tcp://127.0.0.1:6002"[label="bind"]
+	"file03_src" -- "tcp://127.0.0.1:6003"[label="bind"]
+	"file04_src" -- "tcp://127.0.0.1:6004"[label="bind"]
+	"replay00_in" -- "tcp://127.0.0.1:6000"[label="connect"]
+	"replay00_out" -- "tcp://127.0.0.1:7000"[label="bind"]
+	"replay01_in" -- "tcp://127.0.0.1:6001"[label="connect"]
+	"replay01_out" -- "tcp://127.0.0.1:7001"[label="bind"]
+	"replay02_in" -- "tcp://127.0.0.1:6002"[label="connect"]
+	"replay02_out" -- "tcp://127.0.0.1:7002"[label="bind"]
+	"replay03_in" -- "tcp://127.0.0.1:6003"[label="connect"]
+	"replay03_out" -- "tcp://127.0.0.1:7003"[label="bind"]
+	"replay04_in" -- "tcp://127.0.0.1:6004"[label="connect"]
+	"replay04_out" -- "tcp://127.0.0.1:7004"[label="bind"]
+	"window00_in" -- "tcp://127.0.0.1:7000"[label="connect"]
+	"window00_out" -- "tcp://127.0.0.1:8000"[label="bind"]
+	"window01_in" -- "tcp://127.0.0.1:7001"[label="connect"]
+	"window01_out" -- "tcp://127.0.0.1:8001"[label="bind"]
+	"window02_in" -- "tcp://127.0.0.1:7002"[label="connect"]
+	"window02_out" -- "tcp://127.0.0.1:8002"[label="bind"]
+	"window03_in" -- "tcp://127.0.0.1:7003"[label="connect"]
+	"window03_out" -- "tcp://127.0.0.1:8003"[label="bind"]
+	"window04_in" -- "tcp://127.0.0.1:7004"[label="connect"]
+	"window04_out" -- "tcp://127.0.0.1:8004"[label="bind"]
+	"sorted_in00" -- "tcp://127.0.0.1:8000"[label="connect"]
+	"sorted_in01" -- "tcp://127.0.0.1:8001"[label="connect"]
+	"sorted_in02" -- "tcp://127.0.0.1:8002"[label="connect"]
+	"sorted_in03" -- "tcp://127.0.0.1:8003"[label="connect"]
+	"sorted_in04" -- "tcp://127.0.0.1:8004"[label="connect"]
+	"sorted_out" -- "tcp://127.0.0.1:9000"[label="bind"]
+	"sink_in" -- "tcp://127.0.0.1:9000"[label="connect"]
+}
