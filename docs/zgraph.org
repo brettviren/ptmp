@@ -52,17 +52,17 @@ A [[https://github.com/brettviren/shoreman][modified version of shoreman]], the 
   $ ./shoreman.sh procfile envfile mon.log > top.log 2>&1
 #+END_EXAMPLE
 
-The produced ~mon.log~ may then be processed to analyze the behavior of the programs and their threads.  Note, this log prepends the process ID to each sampled line from ~/proc/<pid>/task/<taskid>/stat~.  That is, when column 0 matches column 1, the line corresponds to the "main" thread, when they differ the line corresponds to a "sub-thread".  The meaning of the columns starting from 1 are described in ~proc(5)~.
+The produced ~mon.log~ may then be processed to analyze the behavior of the programs and their threads.  Note, this log prepends the time and the process ID to each sampled line from ~/proc/<pid>/task/<taskid>/stat~.  That is, when column 1 matches column 2, the line corresponds to the "main" thread, when they differ the line corresponds to a "sub-thread".  The meaning of the columns starting from 2 are described in ~proc(5)~.  One must add one to ~proc(5)~ numbers to get file column numbers or better yet use ~ptmp.procplot~ Python module.
 
 The ~top.log~ contains all ~stdout/stderr~ from the individual processes with their Procfile name prepended to each line.
 
-Killing the ~shoreman.sh~ process should also kill any remaining processes.
+Killing the ~shoreman.sh~ process should also kill any processes that it started via the Procfile.
 
 ** Visualizing
 
 The PTMP Python package provides processing and visualizing of a monitoring file as created above.
 
-This is highly subject to change but here's an example:
+This is highly subject to change but here's an initial example:
 
 #+BEGIN_EXAMPLE
   $ procplot kitchen-sink -o test-replay-jobs.svg log.test-replay-jobs 
@@ -74,7 +74,7 @@ This is highly subject to change but here's an example:
 
 * Worked example
 
-We have some per-FELIX link dumps made:
+We have some per-FELIX-link dump files:
 
 #+BEGIN_EXAMPLE
 $ cd /data/fast/bviren/ptmp-dumps/2019-06-10/
@@ -91,7 +91,9 @@ $ ls -l FELIX_BR_6*.dump
 -rw-r--r-- 1 bviren bviren   3843427 Jun 10 06:45 FELIX_BR_610.dump
 #+END_EXAMPLE
 
-To replay these we need a network consisting of these layers:
+To replay these and form a stream which is the precursor to running a
+Candidate Level Trigger ("TC finder") a network consisting of these
+layers is needed:
 
 1. file source (~czmqat~)
 2. paced reply (~check_replay~)
@@ -99,24 +101,26 @@ To replay these we need a network consisting of these layers:
 4. synchronizing streams (~check_sorted~)
 5. a sink (~check_recv~)
 
-The first 3 layers are spanned by one pipeline per input file.  These
-N pipelines are synchronized by step 4 to one stream.  This is then
-simply terminated in the sink of 5.
+The first 3 layers are spanned by one pipeline per input file (ie,
+1->2->3 for each file).  These N pipelines are synchronized by step 4
+to one stream.  Its output stream is then simply terminated in the
+sink of 5.
 
-The network topology is partially generically described in
+The network topology is described in
 [[../test/test-file-replay-window-sorted.jsonnet]].  This description is
-parameterized on the number of files as well as the number of message
-to sink (so that ~check_recv~ will eventually terminate).  Where it
-lacks generalization is in:
+partially generic in that it is parameterized by a list of input files
+as well as the number of message to sink (so that ~check_recv~ will
+eventually terminate).  Where it lacks generalization is in:
 
- - the socket patterns used.  PUSH/PULL is use throughout.  This means
-   the network may block.
+ - the socket patterns used.  Use of PUSH/PULL is hard-wired.  This
+   means the network may block.
 
  - transport.  ~tcp://~ on the loopback device is used throughout.
 
-To get the external parameterization in to the Jsonnet is a bit tricky
-as we must form a JSON array which lists the file paths.  Here is how
-to generate a diagnostic graph visualization:
+The file list is input into the Jsonnet as a string representing a
+JSON array.  Some shell fiddling is done to generate that string.
+Otherwise, the command to operate on a PTMP network graph model is
+straight forward.  Here is an example to generate a GraphViz ~dot~ file:
 
 #+BEGIN_EXAMPLE
   $ zgraph dotify \
@@ -128,15 +132,14 @@ to generate a diagnostic graph visualization:
     docs/test-file-replay-window-sorted-graph.dot 
 #+END_EXAMPLE
 
-We only include the "odd" files to keep the graph relatively sane.  From the result below you can imagine it 2x "longer".
-Note, the "even" files which are used contain messages produced from the collection
-channels servicing wires that directly face the cryostat.  The
+We only include the "odd" files to keep the graph relatively small.
+Note, the "even" files hold data from channels lacking signal.  The
 resulting graph is:
 
 [[file:test-file-replay-window-sorted-graph.svg]]
 
-As the ~.jsonnet~ file was developed, several bugs are easily found by
-looking at this visualization.  After cleaned up, a Procfile can be
+As the ~.jsonnet~ file was developed, several bugs were easily found by
+looking at visualizations like this.  After fixing, a Procfile can be
 generated simply by changing the ~zgraph~ sub-command name and the
 output file name.
 
@@ -148,14 +151,21 @@ $ zgraph procfile \
   test/test-file-replay-window-sorted.jsonnet 
 #+END_EXAMPLE
 
-The result is [[./Procfile.test-file-replay-window-sorted]].  And, this file can be "run" like:
+An example result is [[./Procfile.test-file-replay-window-sorted]].  
+
+Using ~shoreman.sh~ downloaded as described above, such a Procfile can be "run" like:
 
 #+BEGIN_EXAMPLE
 $ shoreman.sh Procfile.test-file-replay-window-sorted envfile \
   test-file-replay-window-sorted.monlog > test-file-replay-window-sorted.toplog
 #+END_EXAMPLE
 
-Depending on how much data are in the files, the ~nmsgs~ external variable value, long the "countdowns" were set for the autonomous components, it is likely some components will finish early and some will continue to wait forever (especially with PUSH/PULL).  The ~shoreman.sh~ can be killed and it should reap any remaining processes.
+Depending on how much data are in the files, the value of the ~nmsgs~
+external variable value, how long the "countdowns" were set for the
+autonomous components, it is likely some components will finish early
+and some will continue to run, waiting forever (especially due to
+using PUSH/PULL and blocking).  The ~shoreman.sh~ can be killed (~Ctrl-C~)
+and that should cause all remaining processes to be reaped.
 
 #+BEGIN_EXAMPLE
 $ ps -ef|egrep 'test_|check_|czmqat'
