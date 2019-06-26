@@ -34,50 +34,54 @@
     //
     // FIXME: this structure only supports a single endpoint (although
     // czmqat supports multiple).
-    fsource(name, filename, port, clidata={}, program="czmqat") :: self.node(
+    fsource(name, filename, port, clidata={}, program="czmqat", cliargs="") :: self.node(
         name,
         ports=[port],
         data = {
             app_type: "subprocess",
-            cmdline: "{program} ifile -f {filename} osock " + $.cmdargstr(0),
+            cmdline: "{program} {cliargs} ifile -f {filename} osock " + $.cmdargstr(0),
             hwm: 1000,
             filename: filename,
-            program: program
+            program: program,
+            cliargs: cliargs
         } + clidata),
     
 
-    csource(name, port, clidata={}, program="check_send_rates") :: self.node(
+    csource(name, port, clidata={}, program="check_send_rates", cliargs="") :: self.node(
         name,
         ports=[port],
         data = {
             app_type: "subprocess",
-            cmdline: "{program} {timing} -t {time} -s {skip} " + $.cmdargstr(0),
+            cmdline: "{program} {cliargs} " + $.cmdargstr(0) + " {timing} -t {time} -s {skip} ",
             timing: "uniform",
             time: 10,
             skip: 0,
             hwm: 1000,
-            program: program
+            program: program,
+            cliargs: cliargs
         } + clidata),
     
-    csink(name, port, clidata={}, program="check_recv") :: self.node(
+    csink(name, port, clidata={}, program="check_recv", cliargs="") :: self.node(
         name,
         ports = [port],
         data = {
             app_type: "subprocess",
-            cmdline: "{program} " + $.cmdargstr(0),
+            cmdline: "{program} {cliargs} " + $.cmdargstr(0),
             hwm: 1000,
             program: program,
+            cliargs: cliargs
         } + clidata),
 
     // Create a check_* type proxy
-    cproxy(name, ports, clidata={}, program='check_replay') :: self.node(
+    cproxy(name, ports, clidata={}, program='check_replay', cliargs="") :: self.node(
         name,
         ports=ports,
         data = {
             app_type: "subprocess",
-            cmdline: "{program} input " + $.cmdargstr(0) + " output " + $.cmdargstr(1),
+            cmdline: "{program} {cliargs} input " + $.cmdargstr(0) + " output " + $.cmdargstr(1),
             hwm: 1000,
             program: program,
+            cliargs: cliargs
         } + clidata),
 
 }

@@ -1,6 +1,7 @@
 #+title zgraph
 
-PTMP's Python package provides a command line program ~zgraph~ which accepts and processes graphs described in JSON or Jsonnet format which represent PTMP networks.
+PTMP's Python package provides a command line program ~zgraph~ which accepts and processes graphs described in JSON or Jsonnet format which represent a network of PTMP components (ie, programs).
+This network description may be translated into a visual form in order to help validate its correctness.  It may then be translated into an executable form.  Several example description files are included, such as [[../test/test-replay.jsonnet]].
 
 * Installation
 
@@ -12,29 +13,61 @@ The PTMP Python package installs in the usual Python ways.  My favorite:
   $ python setup.py develop
 #+end_example
 
-* GraphViz
+* Network Visualization
 
-The graph can be visualized
+The graph can rendered to GraphViz ~dot~ for visualization and debugging
+
+#+begin_src sh :results none
+  zgraph dotify -o test-replay.dot ../test/test-replay.jsonnet
+  dot -Tsvg -o test-replay.svg test-replay.dot
+#+end_src
+
+[[file:test-replay.svg]]
+
+* Network Execution
+
+A ~Procfile~ is a simple way to list a number of processes to execute as one overall job.  A number of methods exist to "run" a ~Procfile~, most notably [[http://blog.daviddollar.org/2011/05/06/introducing-foreman.html][Foreman]].  If a PTMP network graph description is properly formed it can be rendered to a Procfile with the ~zgraph procfile~ command.
 
 #+begin_example
-  $ zgraph dotify -o foo.dot foo.jsonnet
-  $ dot -Tpdf -o foo.pdf foo.dot
+  $ zgraph procfile -o foo.procfile foo.jsonnet
 #+end_example
 
-* Foreman Procfile
-
-[[http://blog.daviddollar.org/2011/05/06/introducing-foreman.html][Foreman]] provides a mechanism to start multiple programs using a simple file in Procfile format.  The ~zgraph~ command will render the graph to a Procfile if it is properly formed.
-
-#+begin_example
-  $ zgraph procfile foo.jsonnet
-#+end_example
-
-In additional to the original there are many Foreman re-implementations that will operate on a Procfile.  For a Python-based implementation:
+In addition to the original Foreman there are many re-implementations that will operate on a Procfile.  For a Python-based implementation:
 
 #+begin_example
   $ pip install honcho
-  $ honcho start
+  $ honcho -f foo.procfile start
 #+end_example
 
+But, see the next section.
 
+* Monitoring
+
+A [[https://github.com/brettviren/shoreman][modified version of shoreman]], the [[https://www.chrismytton.uk/shoreman/][shell implementation of Foreman]], can be used to execute a Procfile and capture system monitoring information from Linux ~/proc/<pid>/~ file system about the programs and their threads.
+
+#+BEGIN_EXAMPLE
+  $ wget https://raw.githubusercontent.com/brettviren/shoreman/master/shoreman.sh
+  $ chmod +x shoreman.sh
+  $ echo 'PATH+=build:build/test:build/apps' > envfile
+  $ ./shoreman.sh procfile envfile mon.log > top.log 2>&1
+#+END_EXAMPLE
+
+The produced ~mon.log~ may then be processed to analyze the behavior of the programs and their threads.  Note, this log prepends the process ID to each sampled line from ~/proc/<pid>/task/<taskid>/stat~.  That is, when column 0 matches column 1, the line corresponds to the "main" thread, when they differ the line corresponds to a "sub-thread".  The meaning of the columns starting from 1 are described in ~proc(5)~.
+
+The ~top.log~ contains all ~stdout/stderr~ from the individual processes with their Procfile name prepended to each line.
+
+Killing the ~shoreman.sh~ process should also kill any remaining processes.
+
+** Visualizing
+
+The PTMP Python package provides processing and visualizing of a monitoring file as created above.
+
+This is highly subject to change but here's an example:
+
+#+BEGIN_EXAMPLE
+  $ procplot kitchen-sink -o test-replay-jobs.png log.test-replay-jobs 
+#+END_EXAMPLE
+
+
+[[file:test-replay-jobs.svg]]
 

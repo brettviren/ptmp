@@ -17,6 +17,7 @@ def load(fname):
 
 
 def dot(nodes):
+    'Emit dot text corresponding to a list of zgraph nodes'
     lines = ['graph "zgra" {']
     lines += ['rankdir=LR']
 
@@ -25,7 +26,6 @@ def dot(nodes):
     atts_nodes = ['// atts nodes', 'node[shape=ellipse]']
     np_edges = ['edge[style=solid]']
     pa_edges = ['edge[style=dotted]']
-
 
     for node in nodes:
         nn = node['name']
@@ -56,17 +56,6 @@ def cli():
     pass
 
 
-
-def cmdlines(nodes):
-    ret = list()
-    for node in nodes:
-        data = node['data']
-        if data['app_type'] == 'subprocess':
-            cmdline = data['cmdline']
-            cmdline = cmdline.format(ports=node['ports'], **data)
-            ret.append(cmdline)
-    return ret
-
 @cli.command('procfile')
 @click.option('-o','--output', default="/dev/stdout", help="Output file or stdout")
 @click.argument('infile')
@@ -89,7 +78,6 @@ def dotify(output, infile):
     'Emit a graphviz dot file for the given graph'
     dat = load(infile)
     open(output,"w").write(dot(dat))
-
 
 def main():
     cli()

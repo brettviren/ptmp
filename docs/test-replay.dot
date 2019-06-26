@@ -1,0 +1,30 @@
+graph "zgra" {
+	rankdir=LR
+	// node nodes
+	node[shape=box]
+	"source"
+	"replay"
+	"sink"
+	// port nodes
+	node[shape=circle]
+	"source_src"[label="PUSH"]
+	"replay_in"[label="PULL"]
+	"replay_out"[label="PUSH"]
+	"sink_in"[label="PULL"]
+	// atts nodes
+	node[shape=ellipse]
+	"tcp://127.0.0.1:5678"
+	"tcp://127.0.0.1:5678"
+	"tcp://127.0.0.1:5679"
+	"tcp://127.0.0.1:5679"
+	edge[style=solid]
+	"source" -- "source_src"[label="src"]
+	"replay" -- "replay_in"[label="in"]
+	"replay" -- "replay_out"[label="out"]
+	"sink" -- "sink_in"[label="in"]
+	edge[style=dotted]
+	"source_src" -- "tcp://127.0.0.1:5678"[label="bind"]
+	"replay_in" -- "tcp://127.0.0.1:5678"[label="connect"]
+	"replay_out" -- "tcp://127.0.0.1:5679"[label="bind"]
+	"sink_in" -- "tcp://127.0.0.1:5679"[label="connect"]
+}
