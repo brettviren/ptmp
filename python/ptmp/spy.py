@@ -95,7 +95,7 @@ def tap(output, spy_method, socket_spec_pairs):
     procs = list()
     for tapnum, ssp in enumerate(socket_spec_pairs):
         #tapep = "inproc://tap%d"%tapnum
-        tapep = "tcp://127.0.0.1:777%d"%tapnum
+        tapep = "tcp://127.0.0.1:%d"%(9000+tapnum)
         spy_sock = ztx.socket(socket_type_names.index(spytype))
         spy_sock.bind(tapep)
         taps[spy_sock] = tapnum
@@ -104,6 +104,7 @@ def tap(output, spy_method, socket_spec_pairs):
         sss = [parse_socket_spec(ss) for ss in ssp.split(";")]
         sss.append(parse_socket_spec("connect,%s,%s"%(taptype, tapep)))
         print ('making proxy %d: "%s"' % (tapnum, ssp))
+        print (sss)
         p = Process(target=lambda : make_proxy(*sss))
         p.start()
         procs.append(p)

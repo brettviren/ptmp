@@ -97,75 +97,128 @@ def load(dumpfile):
     return res.values()
         
     
-def pd_by_pid(pds):
-    'Collect ProcData objects by process ID, return dictionary pid->list(ProcData objects)'
-    ret = defaultdict(list)
-    for k,v in dat.items():
-        ret[k[0]].append(v)
-    return ret
-    
 def main_pid(pds):
     'Give a list of ProcData, return only those representing "main" thread'
     return [pd for pd in pds if pd.pid == pd.tid]
 
+def collect_pid(pds):
+    'Partition a ProcData into sublists with common pid'
+    ret = defaultdict(list)
+    for pd in pds:
+        ret[pd.pid].append(pd)
+    return list(ret.values())
 
-def cpu_usage(pd):
-    'Return tuple of arrays (t in seconds, per-sample CPU usage in %)'
-    # note: this implicitly assumes pd.*time are in units of ticks with 100 ticks per second
-    hz=100                      # fixme: assumption
 
-    rt = pd.utime + pd.stime
-    # include children
-    # rt += pd.cutime + pd.cstime 
-    rt /= hz
-    dt = pd.sample_time[1:] - pd.sample_time[:-1]
-    t = pd.sample_time[1:] - pd.sample_time[0]
-    drt = rt[1:] - rt[:-1]
-    return (t, 100.0*drt/dt)
+def cpu_usage(pds, hz=100, which="both"):
+    '''
+    Return tuple of arrays (t in seconds, per-sample CPU usage in %).
 
+    The utime and stime of all pds are summed up
+    '''
+    # note: this implicitly assumes pd.*time are in same "tick" units
+    # tick / hz = seconds.
+
+    cputime = numpy.zeros_like(pds[0].utime)
+    for pd in pds:
+        if which in "both utime":
+            nsamples = pd.utime.size
+            cputime[:nsamples] += pd.utime
+        if which in "both stime":
+            nsamples = pd.stime.size
+            cputime[:nsamples] += pd.stime
+    dcputime = cputime[1:] - cputime[:-1]
+
+    if numpy.any(dcputime<0):
+        print ("%s has negative delta cpu time" % (pds[0].name,))
+        dcputime[dcputime<0] = 0
+
+
+    sample_time = pds[0].sample_time
+    dt = sample_time[1:] - sample_time[:-1]
+    t = (sample_time[1:] - sample_time[0])/hz
+    return (t, 100.0*dcputime/dt)
+
+def rss_usage_kbyte(pd, kb_per_page=4, hz=100):
+    '''
+    Return tuple of arrays (t in seconds, per-sample RSS usage in
+    kByte).
+    '''
+    rss = pd.rss * kb_per_page
+    t = (pd.sample_time[1:] - pd.sample_time[0])/hz
+    return (t, rss[1:])
+    
 #######
 # cli #
 #######
 
 import click
 import matplotlib.pyplot as plt
+from matplotlib.backends.backend_pdf import PdfPages
+
 
 @click.group()
 def cli():
     pass
 
 @cli.command('kitchen-sink')
-@click.option('-o','--output', help="Output file")
+@click.option('-o','--output', help="Output PDF file")
 @click.argument('monlog')
 def kitchen_sink(output, monlog):
     'Plot a bunch of stuff'
-    pds = main_pid(load(monlog))
+    all_pds = load(monlog)
+    pd_sets = collect_pid(all_pds)
 
-    fig, axes = plt.subplots(1,3)
+    popts=dict(linewidth=0.5)
 
-    ax = axes[0]
-    for pd in pds:
-        x,y = cpu_usage(pd)
-        ax.plot(x,y)
-    ax.set_ylabel("CPU%")
-    ax.set_xlabel("wall clock [s]")
+    prog_groups = ["czmqat", "check_replay", "check_window", "check_sorted check_recv", "ptmp-spy"]
 
-    ax = axes[1]
-    for pd in pds:
-        ax.plot(pd.sample_time-pd.sample_time[0], pd.rss, label=pd.name)
-    ax.set_ylabel("RSS [pages]")
-    ax.set_xlabel("wall clock [s]")
-    ax.legend(prop=dict(size=6))
+    with PdfPages(output) as pdf:
 
-    ax = axes[2]
-    for pd in pds:
-        ax.plot(pd.sample_time-pd.sample_time[0], pd.processor)
-    ax.set_ylabel("proc num")
-    ax.set_xlabel("wall clock [s]")
+        for prog in prog_groups:
 
-    fig.tight_layout()
+            for which in "utime stime both".split():
 
-    fig.savefig(output)    
+                fig, ax = plt.subplots(1,1)
+                for pds in pd_sets:
+                    if pds[0].name not in prog:
+                        continue
+                    x,y = cpu_usage(pds, which=which)
+                    ax.plot(x,y, label=pds[0].name, **popts)
+                ax.set_ylabel("CPU%% (%s)"%which)
+                ax.set_xlabel("wall clock [s]")
+                ax.legend(prop=dict(size=6))
+                pdf.savefig(fig)
+
+            plt.close('all')
+
+        for prog in prog_groups:
+
+            fig, ax = plt.subplots(1,1)
+            for pds in pd_sets:
+                if pds[0].name not in prog:
+                    continue
+                x,y = rss_usage_kbyte(pds[0])
+                ax.plot(x,y, label=pds[0].name, **popts)
+            ax.set_ylabel("RSS [kB]")
+            ax.set_xlabel("wall clock [s]")
+            ax.legend(prop=dict(size=6))
+            pdf.savefig(fig)
+
+        plt.close('all')
+
+        for prog in prog_groups:
+            fig, ax = plt.subplots(1,1)
+            for pds in pd_sets:
+                if pds[0].name not in prog:
+                    continue
+                for pd in pds:
+                    ax.plot(pd.sample_time-pd.sample_time[0], pd.processor, label=pd.name, **popts)
+            ax.set_ylabel("proc num")
+            ax.set_xlabel("wall clock [s]")
+            ax.legend(prop=dict(size=6))
+            pdf.savefig(fig)
+
+        plt.close('all')
 
 def main():
     cli()

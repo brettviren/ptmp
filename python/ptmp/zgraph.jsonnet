@@ -100,4 +100,25 @@
             cliargs: cliargs,
         } + clidata),
 
+    
+    sock_spec(port) ::
+    std.join(",", [port.atts[0][0], port.type, std.join(',', [att[1] for att in port.atts])]),
+
+    sock_spec_pair(iport, oport) ::
+    '"' + std.join(";", [$.sock_spec(iport), $.sock_spec(oport)]) + '"',
+
+    sock_spec_zip(iports, oports) ::
+    std.join(' ', [$.sock_spec_pair(iports[ind], oports[ind])
+                   for ind in std.range(0, std.length(iports)-1)]),
+
+    pyspy(name, iports, oports, clidata={}, program='ptmp-spy tap', cliargs='-o spy.txt') :: self.node(
+        name,
+        ports=iports+oports,
+        data = {
+            app_type: "subprocess",
+            cmdline: "{program} {cliargs} " + $.sock_spec_zip(iports, oports),
+            program: program,
+            cliargs: cliargs,
+        } + clidata),
+
 }

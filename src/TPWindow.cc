@@ -146,8 +146,8 @@ struct TPWindower {
         const ptmp::data::data_time_t tstart = tp.tstart();
         const int cmp = window.cmp(tstart);
         if (cmp < 0) {
-            zsys_debug("window: tardy TP @%ld dt=%ld",
-                       tstart, window.tbegin()-tstart);
+            // zsys_debug("window: tardy TP @%ld dt=%ld",
+            //            tstart, window.tbegin()-tstart);
             // dump_window(window);
             return false;
         }

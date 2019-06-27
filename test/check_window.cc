@@ -25,8 +25,11 @@ int main(int argc, char* argv[])
 
     int countdown = -1;         // forever
     app.add_option("-c,--count", countdown,
-                   "Number of seconds to count down before exiting, simulating real app work");
-    
+                   "Number of snoozes before exiting");
+    int snooze = 5000;         // ms
+    app.add_option("-z,--snooze", snooze,
+                   "Number of ms to snoze");
+
     CLI::App* isocks = app.add_subcommand("input", "Input socket specification");
     CLI::App* osocks = app.add_subcommand("output", "Output socket specification");
     app.require_subcommand(2);
@@ -51,7 +54,6 @@ int main(int argc, char* argv[])
     {
         ptmp::TPWindow proxy(cfgstr);
 
-        int snooze = 1000;
         while (countdown != 0) {
             -- countdown;
             auto t1 = ptmp::data::now();
