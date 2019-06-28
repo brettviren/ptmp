@@ -28,7 +28,7 @@ def configure(cfg):
     #cfg.check(header_name="dlfcn.h", uselib_store='DYNAMO',
     #          lib=['dl'], mandatory=True)
 
-    cfg.env.CXXFLAGS += ['-std=c++17']
+    cfg.env.CXXFLAGS += ['-std=c++14']
     cfg.env.CXXFLAGS += to_list(cfg.options.cxxflags)
 
 def build(bld):

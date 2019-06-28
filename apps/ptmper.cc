@@ -29,7 +29,8 @@
 #include "ptmp/api.h"
 
 #include <iostream>
-#include <map>
+#include <fstream>
+#include <vector>
 
 #include "json.hpp"
 
@@ -44,7 +45,10 @@ int main(int argc, char* argv[])
         return -1;
     }
 
-    auto config = json::parse((const char*) argv[1]);
+    std::ifstream cfgfile(argv[1]);
+    json config;
+    cfgfile >> config;
+
     int ttl = 0;
     if (config["ttl"].is_number()) {
         ttl = config["ttl"];
@@ -66,18 +70,17 @@ int main(int argc, char* argv[])
         zclock_sleep(pause*1000);
     }
 
-    std::map<std::string, ptmp::TPAgent*> agents;
+    std::vector<ptmp::TPAgent*> agents;
     for (auto& jprox : config["proxies"]) {
-        const std::string name = jprox["name"];
         const std::string type = jprox["type"];
         const std::string data = jprox["data"].dump();
 
         ptmp::TPAgent* agent = ptmp::agent_factory(type, data);
         if (!agent) {
-            std::cerr << "failed to create agent (" << type << ") \"" << name << "\"\n";
+            std::cerr << "failed to create agent of type " << type << "\n";
             return -1;
         }
-        agents[name] = agent;
+        agents.push_back(agent);
     }
     
     const auto die_at = zclock_usecs() + ttl*1000000;
@@ -93,7 +96,7 @@ int main(int argc, char* argv[])
 
     zclock_sleep(reprieve*1000);
 
-    for (auto& [name, agent] : agents) {
+    for (auto& agent : agents) {
         delete agent;
     }
 

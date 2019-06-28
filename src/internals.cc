@@ -44,6 +44,9 @@ zsock_t* ptmp::internals::endpoint(const std::string& config)
 {
     auto jcfg = json::parse(config);
     auto jsock = jcfg["socket"];
+    if (jsock.is_null() or jsock.empty()) {
+        return NULL;
+    }
     std::string stype = jsock["type"];
     int hwm = 1000;
     if (jsock["hwm"].is_number()) {

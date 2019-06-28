@@ -18,5 +18,8 @@ ptmp::TPAgent* ptmp::agent_factory(const std::string& type, const std::string& c
     if (type == "TPMonitor" or type == "monitor") {
         return new ptmp::TPSorted(config);
     }
+    if (type == "TPCat" or type == "cat" or type == "czmqat") {
+        return new ptmp::TPCat(config);
+    }
     return nullptr;
 }

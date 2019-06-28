@@ -86,7 +86,6 @@ void tpcat(zsock_t* pipe, void* vargs)
 
     }
 
-
     if (isock) zsock_destroy(&isock);
     if (osock) zsock_destroy(&osock);
     if (ifp) fclose(ifp);
