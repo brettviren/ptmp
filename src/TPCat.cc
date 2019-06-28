@@ -3,6 +3,7 @@
 
 #include <cstdio>
 
+#include <iostream>
 
 #include "json.hpp"
 
@@ -10,8 +11,11 @@ using json = nlohmann::json;
 
 void tpcat(zsock_t* pipe, void* vargs)
 {
+    zsys_init();
+
     auto config = json::parse((const char*) vargs);
 
+    // std::cerr << config.dump(4) << std::endl;
 
     int number = -1;
     if (config["number"].is_number()) {
@@ -23,25 +27,44 @@ void tpcat(zsock_t* pipe, void* vargs)
     }
 
     zsock_t* isock = NULL;
-    if (!config["isock"].is_null()) {
-        isock = ptmp::internals::endpoint(config["input"].dump());
+    if (!config["input"].is_null()) {
+        std::string cfg = config["input"].dump();
+        isock = ptmp::internals::endpoint(cfg);
+        if (isock) {
+            zsys_info("isock: %s", cfg.c_str());
+        }
     }
     zsock_t* osock = NULL;
-    if (!config["osock"].is_null()) {
-        osock = ptmp::internals::endpoint(config["output"].dump());
+    if (!config["output"].is_null()) {
+        std::string cfg = config["output"].dump();
+        osock = ptmp::internals::endpoint(cfg);
+        if (isock) {
+            zsys_info("isock: %s", cfg.c_str());
+        }
     }
     FILE* ifp = NULL;
     if (!config["ifile"].is_null()) {
         std::string fname = config["ifile"];
         ifp = fopen(fname.c_str(), "r");
+        if (ifp) {
+            zsys_info("ifile: %s", fname.c_str());
+        }
     }
     FILE* ofp = NULL;
     if (!config["ofile"].is_null()) {
         std::string fname = config["ofile"];
         ofp = fopen(fname.c_str(), "w");
+        if (ofp) {
+            zsys_info("ofile: %s", fname.c_str());
+        }
     }
-
     zsock_signal(pipe, 0); // signal ready    
+
+
+    if (! (isock or ifp)) {
+        zsys_error("TPCat: no input, why bother?");
+        return;
+    }
 
     int count = 0;
     while (!zsys_interrupted) {
@@ -55,17 +78,20 @@ void tpcat(zsock_t* pipe, void* vargs)
         if (ifp) {
             msg = ptmp::internals::read(ifp);
             if (!msg) {
+                zsys_info("end of file after %d", count);
                 break;
             }
         }
         if (isock) {
             msg = zmsg_recv(isock);
             if (!msg) {
-                zsys_warning("interupted");
+                zsys_warning("interupted stream after %d", count);
                 break;
             }
         }
         
+        //zsys_debug("%d", count);
+
         if (delayus > 0) {
             ptmp::internals::microsleep(delayus);
         }
@@ -76,6 +102,7 @@ void tpcat(zsock_t* pipe, void* vargs)
         if (osock) {
             int rc = zmsg_send(&msg, osock);
             if (rc != 0) {
+                zsys_warning("send failed after %d", count);
                 break;
             }
         }

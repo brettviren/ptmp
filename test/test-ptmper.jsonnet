@@ -1,10 +1,22 @@
 local ptmp = import "ptmp.jsonnet";
 
-local datadir="/data/fast/bviren/ptmp-dumps/2019-06-10";
-local testfile="FELIX_BR_601.dump";
 
-local cp = ptmp.api.czmqat(ifile=datadir+"/"+testfile, ofile=testfile+".copy");
+local nmsgs=500000;
+local datadir="/data/fast/bviren/ptmp-dumps/2019-06-10/";
+local dataset="FELIX_BR_601";
 
+local infile=datadir+dataset+".dump";
+local outfile=dataset+".copy";
+
+local cp = ptmp.czmqat("cp", number = nmsgs, ifile = infile, ofile = outfile);
+local rd = ptmp.czmqat("rd", number = nmsgs, ifile = infile);
+
+local rd2 = ptmp.czmqat("rd", number = nmsgs, ifile = infile,
+                        osocket = ptmp.sitm('bind','push',5678));
+local wt2 = ptmp.czmqat("wt", number = nmsgs, ofile = outfile,
+                        isocket = ptmp.sitm('connect','pull',5678));
 {
-    "test-ptmper-copy-internal.json": ptmp.cli.ptmper([cp]),
+    "test-ptmper-copy.json": ptmp.ptmper([cp]),
+    "test-ptmper-read.json": ptmp.ptmper([rd]),
+    "test-ptmper-inout.json": ptmp.ptmper([rd2, wt2]),
 }

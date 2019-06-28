@@ -18,7 +18,7 @@
 
    Each element of the proxies array is a JSON object with these top level attributes.
 
-   - name :: a name identifying the instance
+   - name :: uniquely identify this instance
 
    - type :: the C++ type name of the proxy class
 
@@ -44,6 +44,8 @@ int main(int argc, char* argv[])
         std::cerr << "usage: ptmper config.json\n";
         return -1;
     }
+
+    zsys_init();
 
     std::ifstream cfgfile(argv[1]);
     json config;
@@ -72,12 +74,13 @@ int main(int argc, char* argv[])
 
     std::vector<ptmp::TPAgent*> agents;
     for (auto& jprox : config["proxies"]) {
+        const std::string name = jprox["name"];
         const std::string type = jprox["type"];
         const std::string data = jprox["data"].dump();
 
         ptmp::TPAgent* agent = ptmp::agent_factory(type, data);
         if (!agent) {
-            std::cerr << "failed to create agent of type " << type << "\n";
+            std::cerr << "failed to create agent \"" << name << "\" of type " << type << "\n";
             return -1;
         }
         agents.push_back(agent);
