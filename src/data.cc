@@ -1,6 +1,7 @@
 #include "ptmp/data.h"
 #include <chrono>
 #include <czmq.h>
+#include <cstdio>
 
 using namespace ptmp::data;
 
@@ -55,4 +56,5 @@ ptmp::data::real_time_t ptmp::data::now()
     // quite the mouthful
     return std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
 }
+
 

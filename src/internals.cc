@@ -171,3 +171,29 @@ void ptmp::internals::send(zsock_t* sock, const ptmp::data::TPSet& tps)
     
 }
 
+zmsg_t* ptmp::internals::read(FILE* fp)
+{
+    size_t size=0;
+    int nread = fread(&size, sizeof(size_t), 1, fp);
+    if (nread != 1) {
+        return NULL;
+    }
+    zchunk_t* chunk = zchunk_read(fp, size);
+    zframe_t* frame = zchunk_pack(chunk);
+    zchunk_destroy(&chunk);
+    zmsg_t* msg = zmsg_decode(frame);
+    zframe_destroy(&frame);
+    return msg;
+}
+
+int ptmp::internals::write(FILE* fp, zmsg_t* msg)
+{
+    zframe_t* frame = zmsg_encode(msg);
+    zchunk_t* chunk = zchunk_unpack(frame);
+    zframe_destroy(&frame);
+    size_t size = zchunk_size(chunk);
+    fwrite(&size, sizeof(size_t), 1, fp);
+    int rc = zchunk_write(chunk, fp);
+    zchunk_destroy(&chunk);
+    return rc;
+}

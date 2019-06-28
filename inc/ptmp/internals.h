@@ -2,6 +2,7 @@
 #define PTMP_INTERNALS_H
 #include "ptmp/data.h"
 #include <czmq.h>
+#include <cstdio>
 #include <string>
 
 namespace ptmp {
@@ -17,7 +18,12 @@ namespace ptmp {
 
         void microsleep(ptmp::data::real_time_t microseconds);
 
-        //void send_cfg(zsock_t* sock, const char* cfgstr);
+
+        // Very primitive file I/O.
+        // Caller takes ownership of returned msg.
+        zmsg_t* read(FILE* fp);
+        int write(FILE* fp, zmsg_t* msg);
+
 
         class Socket {
             zsock_t* m_sock;
