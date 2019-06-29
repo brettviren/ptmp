@@ -38,7 +38,7 @@ struct fill_and_serialize_t {
 
 
 template<typename tpset_doer_t>
-int test_ntimes(int count, tpset_doer_t& dosomething)
+void test_ntimes(int count, tpset_doer_t& dosomething)
 {
     for (int ind=0; ind<count; ++ind) {
         TPSet tpset;
@@ -48,7 +48,7 @@ int test_ntimes(int count, tpset_doer_t& dosomething)
 }
 
 template<typename tpset_doer1_t, typename tpset_doer2_t>
-int test_fillonce(int count, tpset_doer1_t& filler, tpset_doer2_t& doer)
+void test_fillonce(int count, tpset_doer1_t& filler, tpset_doer2_t& doer)
 {
     TPSet tpset;
     ptmp::testing::init(tpset);
