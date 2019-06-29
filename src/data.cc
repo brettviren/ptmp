@@ -7,13 +7,11 @@ using namespace ptmp::data;
 
 void ptmp::data::dump(const ptmp::data::TPSet& tpset, const std::string& msg)
 {
-    const auto& tps = tpset.tps();
-    const size_t ntps = tps.size();
+    const int ntps = tpset.tps_size();
     data_time_t tmin=0, tmax=0, tbeg_max=0, tend_min=0;
 
-
-    for (size_t ind=0; ind<ntps; ++ind) {
-        const auto& tp = tps[ind];
+    for (int ind=0; ind<ntps; ++ind) {
+        const auto& tp = tpset.tps(ind);
         const data_time_t tstart = tp.tstart();
         const data_time_t tspan = tp.tspan();
         if (!ind) {
