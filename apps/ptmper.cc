@@ -4,7 +4,7 @@
 
    The configuration consists of an object with these attributes:
 
-   - ttl :: time to live in seconds.
+   - ttl :: time to live in seconds.  If negative (default), wait forever.
 
    - snooze :: snooze time in milliseconds.  Every wake up prints a
      diagnostic.  TTL is tested after a snooze so this sets the
@@ -51,7 +51,7 @@ int main(int argc, char* argv[])
     json config;
     cfgfile >> config;
 
-    int ttl = 0;
+    int ttl = -1;
     if (config["ttl"].is_number()) {
         ttl = config["ttl"];
     }
@@ -90,7 +90,7 @@ int main(int argc, char* argv[])
     zsys_debug("ttl %d", ttl);
 
     int tick = 0;
-    while (!zsys_interrupted) {
+    while (ttl > 0 and !zsys_interrupted) {
 
         if (ttl > 0 and die_at < zclock_usecs()) {
             zsys_debug("ttl of %d s reached", ttl);

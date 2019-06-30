@@ -46,4 +46,6 @@ local calls = [test_files[ind][0](test_files[ind][1], baseport + 100*ind) for in
 //     "test-ptmper-inout.json": ptmp.ptmper([rd2, wt2]),
 // }
 
+{["test-%s-fast.json"%t.name]:ptmp.ptmper(t.components, ttl=0, reprieve=0) for t in calls}
++
 {["test-%s.json"%t.name]:ptmp.ptmper(t.components, ttl=1, reprieve=1) for t in calls}
