@@ -61,6 +61,7 @@ public:
     typedef typename std::vector<value_type> collection_type;
 
     ptmp::data::data_time_t span() const {
+        if (empty()) { return 0; }
         return m_recent - m_pqueue.top().tstart();
     }
 
@@ -155,7 +156,7 @@ struct TPWindower {
 
         while (buffer.span() >= tbuf) {  // drain buffer
             reset(buffer.top().tstart());
-            while (window.in(buffer.top().tstart())) {
+            while (buffer.size() > 0 and window.in(buffer.top().tstart())) {
                 ptmp::data::TrigPrim* newtp = tps.add_tps();
                 *newtp = buffer.top();
                 buffer.pop();
@@ -272,14 +273,20 @@ void tpwindow_proxy(zsock_t* pipe, void* vargs)
     }
     ptmp::data::data_time_t tbuf=0;
     if (config["tbuf"].is_number()) {
-        tspan = config["tbuf"];
+        tbuf = config["tbuf"].get<int>();
+    }
+    if (tbuf == 0) {
+        std::string dump = config.dump(4);
+        zsys_error("tpwindow requires non-zero tbuf.\n%s", dump.c_str());
+        throw std::runtime_error("tpwindow requires non-zero tbuf");        
     }
 
     zsock_t* isock = ptmp::internals::endpoint(config["input"].dump());
     zsock_t* osock = ptmp::internals::endpoint(config["output"].dump());
     if (!isock or !osock) {
         zsys_error("tpwindow requires socket configuration");
-        return;
+        throw std::runtime_error("tpwindow requires socket configuration");
+
     }
     
     zsock_signal(pipe, 0);      // signal ready
