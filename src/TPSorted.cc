@@ -136,6 +136,11 @@ void tpsorted_proxy(zsock_t* pipe, void* vargs)
 
     const size_t ninputs = input.size();
 
+    if (config["tardy"].is_null()) {
+        std::string dump = config.dump(4);
+        zsys_error("sorted: no tardy set.\n%s", dump.c_str());
+        throw std::runtime_error("tpsorted: no tardy value set");
+    }
     // We will wait no more than this long for any new input.  If an
     // input stream fails to provide any input w/in this time, it's
     // subsequent data is at risk of being dropped if other streams

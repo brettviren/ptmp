@@ -115,6 +115,8 @@ void tpcat(zsock_t* pipe, void* vargs)
             ptmp::internals::write(ofp, msg);
         }
         if (osock) {
+            // Note, this will block if using eg PUSH and then this
+            // actor will hang even if there is a shutdown waiting.
             int rc = zmsg_send(&msg, osock);
             if (rc != 0) {
                 zsys_warning("send failed after %d", count);

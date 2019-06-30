@@ -48,8 +48,9 @@ do_test () {
 
     echo "$args"
 
-    set -x
+    #set -x
     for cfg in $(jsonnet $args "$testfile") ; do
+        echo "ptmper $cfg"
         time ptmper $cfg || exit -1
     done
     rm -rf $tmpdir

@@ -22,9 +22,24 @@
 
 
     maybe_socket(io, s) :: if std.type(s) == 'null' then {} else { [io]: { socket: s } },
-
     maybe_sockets(is, os) :: $.maybe_socket('input', is) + $.maybe_socket('output', os),
 
+
+    //
+    // Create actor configurations
+    //
+
+
+    replay(name, isocket, osocket, speed=50.0, rewrite_count=1) :: {
+        name: name,
+        type: 'replay',
+        data: {
+            // Speed in hardware clock ticks per microsecond to replay the messages.
+            speed: speed,
+            // If nonzero then rewrite the output TPSet.count number 
+            rewrite_count: rewrite_count,
+        } + $.maybe_sockets(isocket, osocket),
+    },
 
     // Create a configuration for TPSorted. 
     sorted(name, isocket, osocket, tardy, tardy_policy="drop") :: {
@@ -71,6 +86,7 @@
     },
 
 
+    // Create a ptmper configuration
     ptmper(proxies, ttl=0, snooze=1000, pause=0, reprieve=0) :: {
         // An array of proxy configuration objects (see above)
         proxies:proxies,

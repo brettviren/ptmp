@@ -73,10 +73,12 @@ int main(int argc, char* argv[])
     }
 
     std::vector<ptmp::TPAgent*> agents;
+    std::unordered_map<ptmp::TPAgent*, std::string> agent_name;
     for (auto& jprox : config["proxies"]) {
         const std::string name = jprox["name"];
         const std::string type = jprox["type"];
         const std::string data = jprox["data"].dump();
+        std::cerr << "(" << type << ") " << name << ": " << data << std::endl;
 
         ptmp::TPAgent* agent = ptmp::agent_factory(type, data);
         if (!agent) {
@@ -84,6 +86,7 @@ int main(int argc, char* argv[])
             return -1;
         }
         agents.push_back(agent);
+        agent_name[agent] = name;
     }
     
     const auto die_at = zclock_usecs() + ttl*1000000;
@@ -110,7 +113,7 @@ int main(int argc, char* argv[])
 
     zsys_debug("deleting agents");
     for (auto& agent : agents) {
-        zsys_debug("delete");
+        zsys_debug("delete %s", agent_name[agent].c_str());
         delete agent;
     }
 

@@ -1,5 +1,7 @@
 local input = std.extVar("input");
 
+local input_iota = std.range(0, std.length(input)-1);
+
 local baseport = 7000;
 
 local nmsgs=100000;
@@ -35,17 +37,72 @@ local test_inout = function(filename, port) {
     components: [rd, wt],
 };
 
-local test_files = [[t,f] for t in [test_copy, test_read, test_inout] for f in input];
+local test_window = function(filename, port) {
+    local bname = basename(filename),
+    local rd = ptmp.czmqat("rd", number = nmsgs, ifile = filename,
+                           osocket = ptmp.sitm('bind','push', port)),
+    local wi = ptmp.window("wi",  tspan = 50/0.02, tbuf = 5000/0.02,
+                           isocket = ptmp.sitm('connect','pull', port),
+                           osocket = ptmp.sitm('bind','push', port+1)),
+    local wt = ptmp.czmqat("wt", number = nmsgs, 
+                           isocket = ptmp.sitm('connect','pull', port+1)),
+    name : "window-%s"%bname,
+    components: [rd, wi, wt],
 
-local calls = [test_files[ind][0](test_files[ind][1], baseport + 100*ind) for ind in std.range(0, std.length(test_files)-1)];
+};
+
+local back = function(arr) arr[std.length(arr)-1];
+
+local link_pipeline = function(filename, port) {
+    local bname = basename(filename),
+    local send = ptmp.czmqat("send-"+bname, number = nmsgs, ifile = filename,
+                             osocket = ptmp.sitm('bind','push', port+1)),
+    local replay = ptmp.replay("replay-"+bname, 
+                               isocket = ptmp.sitm('connect','pull', port+1),
+                               osocket = ptmp.sitm('bind','push', port+2)),
+    local window = ptmp.window("window-"+bname, tspan = 50/0.02, tbuf = 5000/0.02,
+                               isocket = ptmp.sitm('connect','pull', port+2),
+                               osocket = ptmp.sitm('bind','push', port+3)),
+
+    name: "pipeline-"+bname,
+    components: [send, replay, window]
+};
+
+local single_files = {
+    local tests = [[t,f] for t in [test_copy, test_read, test_inout, test_window] for f in input],
+    local test_iota = std.range(0, std.length(tests)-1),
+    local calls = [tests[ind][0](tests[ind][1], baseport + 100*ind) for ind in test_iota],
+    
+    ret: {["test-%s-fast.json"%t.name]:ptmp.ptmper(t.components, ttl=0, reprieve=0) for t in calls}
+        +
+        {["test-%s.json"%t.name]:ptmp.ptmper(t.components, ttl=1, reprieve=1) for t in calls}
+}.ret;
+
+//
+// multi files
+// 
+
+local get_socket = function(actor, which="output") actor.data[which].socket;
+
+local link_sorted = function(pipelines, port) {
+    local addrs = std.flattenArrays([get_socket(back(pl.components)).bind for pl in pipelines]),
+    local sorted = ptmp.sorted("sorted", 
+                               ptmp.socket('pull', 'connect', addrs),
+                               ptmp.sitm('bind','push', port),
+                               100,
+                              ),
+    name: "sorted",
+    components: [sorted] + std.flattenArrays([pl.components for pl in pipelines]),
+};
 
 
-// {
-//     "test-ptmper-copy.json": ptmp.ptmper([cp]),
-//     "test-ptmper-read.json": ptmp.ptmper([rd]),
-//     "test-ptmper-inout.json": ptmp.ptmper([rd2, wt2]),
-// }
 
-{["test-%s-fast.json"%t.name]:ptmp.ptmper(t.components, ttl=0, reprieve=0) for t in calls}
-+
-{["test-%s.json"%t.name]:ptmp.ptmper(t.components, ttl=1, reprieve=1) for t in calls}
+local multi_files = {
+    local pipelines = [link_pipeline(input[ind], 7000 + ind*10) for ind in input_iota],
+
+    local sorted = link_sorted(pipelines, 8000),
+
+    ret: {['test-%s.json'%sorted.name]: ptmp.ptmper(sorted.components, ttl=1, reprieve=1)},
+}.ret;
+
+single_files + multi_files
