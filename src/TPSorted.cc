@@ -160,13 +160,14 @@ void tpsorted_proxy(zsock_t* pipe, void* vargs)
     ptmp::data::data_time_t last_msg_time = EOT;
 
     int wait_time_ms = 0;
-
+    bool got_quit = false;
     while (!zsys_interrupted) {
 
 
         void* which = zpoller_wait(pipe_poller, wait_time_ms);
         if (which) {
             zsys_info("TPSorted proxy got quit");
+            got_quit = true;
             break;
         }
 
@@ -296,6 +297,11 @@ void tpsorted_proxy(zsock_t* pipe, void* vargs)
     for (auto s : output) {
         zsock_destroy(&s);
     }
+    if (got_quit) {
+        return;
+    }
+    zsys_debug("sorted: waiting for quit");
+    zsock_wait(pipe);
 }
 
 
@@ -309,6 +315,5 @@ ptmp::TPSorted::~TPSorted()
 {
     zsys_info("signal actor to quit");
     zsock_signal(zactor_sock(m_actor), 0); // signal quit
-
     zactor_destroy(&m_actor);
 }

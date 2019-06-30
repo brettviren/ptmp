@@ -11,8 +11,6 @@ using json = nlohmann::json;
 
 void tpcat(zsock_t* pipe, void* vargs)
 {
-    zsys_init();
-
     auto config = json::parse((const char*) vargs);
 
     // std::cerr << config.dump(4) << std::endl;
@@ -60,36 +58,53 @@ void tpcat(zsock_t* pipe, void* vargs)
     }
     zsock_signal(pipe, 0); // signal ready    
 
-
     if (! (isock or ifp)) {
         zsys_error("TPCat: no input, why bother?");
         return;
     }
 
+    zpoller_t* poller = zpoller_new(pipe, NULL);
+    int timeout = 0;
+    if (isock) {
+        timeout = -1;
+        zpoller_add(poller, isock);
+    }
+
     int count = 0;
+    bool got_quit = false;
     while (!zsys_interrupted) {
         if (number > 0 and count >= number) {
             break;
         }
         ++count;
 
+        void* which = zpoller_wait(poller, timeout);
+        if (which == pipe) {
+            zsys_info("czmqat: got quit");
+            got_quit = true;
+            break;
+        }
+
         zmsg_t* msg=NULL;
 
-        if (ifp) {
-            msg = ptmp::internals::read(ifp);
-            if (!msg) {
-                zsys_info("end of file after %d", count);
-                break;
-            }
-        }
-        if (isock) {
+        if (isock and which == isock) {
             msg = zmsg_recv(isock);
             if (!msg) {
                 zsys_warning("interupted stream after %d", count);
                 break;
             }
         }
-        
+        else if (ifp) {
+            msg = ptmp::internals::read(ifp);
+            if (!msg) {
+                zsys_info("end of file after %d", count);
+                break;
+            }
+        }
+        else {
+            zsys_warning("got something weird");
+        }
+
         //zsys_debug("%d", count);
 
         if (delayus > 0) {
@@ -113,11 +128,18 @@ void tpcat(zsock_t* pipe, void* vargs)
 
     }
 
+    zsys_debug("czmqat: finished");
+
+    zpoller_destroy(&poller);
     if (isock) zsock_destroy(&isock);
     if (osock) zsock_destroy(&osock);
     if (ifp) fclose(ifp);
     if (ofp) fclose(ofp);
-
+    if (got_quit) {
+        return;
+    }
+    zsys_debug("czmqat: waiting for quit");
+    zsock_wait(pipe);
 }
 ptmp::TPCat::TPCat(const std::string& config)
     : m_actor(zactor_new(tpcat, (void*)config.c_str()))
@@ -126,6 +148,8 @@ ptmp::TPCat::TPCat(const std::string& config)
 
 ptmp::TPCat::~TPCat()
 {
+    // actor may already have exited so sending this signal can hang.
+    zsys_debug("czmqat: sending actor quit message");
     zsock_signal(zactor_sock(m_actor), 0); // signal quit
     zactor_destroy(&m_actor);
 }

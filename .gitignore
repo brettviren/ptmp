@@ -23,3 +23,9 @@ ups
 dist
 *.npz
 Procfile
+ptmp.pb.h
+log
+junk
+FELIX_*
+*.dump
+*.json

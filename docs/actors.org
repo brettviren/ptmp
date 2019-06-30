@@ -1,0 +1,122 @@
+#+title: PTMP Actors
+
+Much of PTMP's functionality is based around [[https://en.wikipedia.org/wiki/Actor_model][actor model]].  Most of the
+high level [[../inc/ptmp/api.h][API]] classes are meant to be instantiated and then simple
+kept alive until their functionality is no longer needed.  This
+document describes how actors work in PTMP.
+
+* Configuration
+
+* The ~ptmper~ CLI 
+
+* Internals
+
+Internally, each actor class constructs a CZMQ ~zactor~ which is a
+function called in a thread with a "pipe" socket for communication
+with the actor class.  The actor function then loops, processing input
+from the pipe and from any other sockets it may have been asked to
+make.
+
+Subsequent communication between the actor class instance and the code
+running in the function is via this pipe.  This pipe is typically not
+exposed to the owner of the class instance, but instead class methods
+are used to provide a *synchronous* interface to this asynchronous
+communication.
+
+Thus, both ends of the "pipe" must honor a contract for what messages
+it passes.  A protocol governing the traffic must be defined, at least
+implicitly.  
+
+** Actor shutdown protocol
+
+All actors must have a robust mechanism to shutdown.  Shutdown can be
+initiated by the actor class instance such as when it is destroyed.
+The actor function may also determine that its main loop should
+complete.  Since either shutdown paths may be initiated independently
+an obvious race condition could be allowed.
+
+The nominal *actor shutdown protocol* in PTMP has the actor class
+initiate a shutdown command on the actor function and the function
+shall exit only upon receiving this command.  Thus, if the function
+has exhausted its work it must nonetheless *wait* on its pipe to deliver
+this shutdown command.  Conversely, even while the actor is performing
+work it must also be checking the "pipe" for the shutdown message and
+terminate itself when a shutdown is sent.  
+
+Other shutdown protocols are allowed but this nominal shutdown will
+suffice for all currently known cases.  It is also rather easy to
+implement, as described next.
+
+The actor class constructor creates the actor function, passing the
+configuration string:
+
+#+BEGIN_SRC c++
+  ptmp::ActorClass::ActorClass(const std::string& config)
+      : m_actor(zactor_new(actor_function, (void*)config.c_str()))
+  {
+  }
+#+END_SRC
+
+The ~m_actor~ member of ~ActorClass~ is a CZMQ ~*zactor_t*~ which is
+effectively a ~zsock_t*~ and represents one end of the of the actor
+"pipe".  The other end is given to the actor function as is the
+configuration string (passed as ~void*~ because this is C after all).
+
+#+BEGIN_SRC c++
+  void actor_function(zsock_t* pipe, void*) 
+  {
+      auto config = json::parse((const char*) vargs);
+
+      // config parsing and other setup including creating more sockets,
+      // maybe also creating a zpoller on all the "input" sockets.
+
+      zsock_signal(pipe, 0); // signal ready    
+
+      // see below
+      bool got_quit = false;
+
+      // main loop
+      while (!zsys_interrupted) {
+
+          // process "pipe" and other input sockets
+          if (...) {
+              got_quit = true
+              break;
+          }
+
+          // ...
+
+          if (am_i_done()) {
+              got_quit = false;
+              break;
+          }
+      }
+
+      // destroy any sockets or other ZMQ object created here
+      if (got_quit) {
+          return;
+      }
+      zsock_wait(pipe);
+  }
+#+END_SRC
+
+The body of this example actor function is intentionally left vague.
+There are several code patterns that are likely employed such as using
+a CZMQ ~zpoller~ or ~zloop~ to respond to incoming messages on the pipe
+and any other sockets.  If a shutdown message is received then the
+code sets ~got_quit~ to ~true~ before breaking from the main loop.  This
+lets the function know if it may then exit or if it must further wait.
+
+The actor class destructor may then be assured that even if the actor
+function completed its task that it's still alive to receive a
+shutdown command.  Without that assurance, the following code would
+hang.
+
+#+BEGIN_SRC c++
+  ptmp::ActorClass::~ActorClass()
+  {
+      zsock_signal(zactor_sock(m_actor), 0); // signal quit
+      zactor_destroy(&m_actor);
+  }
+#+END_SRC
+

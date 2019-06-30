@@ -287,7 +287,7 @@ void tpwindow_proxy(zsock_t* pipe, void* vargs)
 
     // initial window is most likely way before any data.
     TPWindower windower(osock, tspan, toff, tbuf, detid);
-
+    bool got_quit = false;
     while (!zsys_interrupted) {
 
         void* which = zpoller_wait(pipe_poller, -1);
@@ -298,6 +298,7 @@ void tpwindow_proxy(zsock_t* pipe, void* vargs)
         if (which == pipe) {
             zsys_info("TPWindow proxy got quit with %d TPs", windower.tps.tps().size());
             dump_window(windower.window, "quit");
+            got_quit = true;
             break;
         }
 
@@ -353,7 +354,12 @@ void tpwindow_proxy(zsock_t* pipe, void* vargs)
     zpoller_destroy(&pipe_poller);
     zsock_destroy(&isock);
     zsock_destroy(&osock);
-    // zsys_debug("tpwindow done");
+
+    if (got_quit) {
+        return;
+    }
+    zsys_debug("window: waiting for quit");
+    zsock_wait(pipe);
 }
 
 ptmp::TPWindow::TPWindow(const std::string& config)

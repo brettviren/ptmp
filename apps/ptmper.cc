@@ -87,9 +87,15 @@ int main(int argc, char* argv[])
     }
     
     const auto die_at = zclock_usecs() + ttl*1000000;
+    zsys_debug("ttl %d", ttl);
 
     int tick = 0;
-    while (!zsys_interrupted and die_at > zclock_usecs()) {
+    while (!zsys_interrupted) {
+
+        if (ttl > 0 and die_at < zclock_usecs()) {
+            zsys_debug("ttl of %d s reached", ttl);
+            break;
+        }
 
         zclock_sleep(snooze);
         zsys_info("tick %d", tick);
@@ -97,9 +103,14 @@ int main(int argc, char* argv[])
 
     }
 
-    zclock_sleep(reprieve*1000);
+    if (reprieve) {
+        zsys_debug("sleep %d seconds before deleting agents", reprieve);
+        zclock_sleep(reprieve*1000);
+    }
 
+    zsys_debug("deleting agents");
     for (auto& agent : agents) {
+        zsys_debug("delete");
         delete agent;
     }
 

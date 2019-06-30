@@ -57,7 +57,7 @@ void tpreplay_proxy(zsock_t* pipe, void* vargs)
     ptmp::data::data_time_t last_mesg_time = 0;
 
     int count = 0;
-
+    bool got_quit = false;
     while (!zsys_interrupted) {
 
         void* which = zpoller_wait(pipe_poller, wait_time_ms);
@@ -67,6 +67,7 @@ void tpreplay_proxy(zsock_t* pipe, void* vargs)
         }
         if (which == pipe) {
             zsys_info("TPReplay proxy got quit");
+            got_quit = true;
             break;
         }
 
@@ -130,6 +131,11 @@ void tpreplay_proxy(zsock_t* pipe, void* vargs)
     zsock_destroy(&isock);
     zsock_destroy(&osock);
     
+    if (got_quit) {
+        return;
+    }
+    zsys_debug("replay: waiting for quit");
+    zsock_wait(pipe);
 }
 
 

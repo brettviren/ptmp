@@ -23,6 +23,7 @@ void tptap(zsock_t* pipe, void* vargs)
 
     zsock_signal(pipe, 0); // signal ready    
 
+    bool got_quit = false;
     while (!zsys_interrupted) {
 
         void* which = zpoller_wait(poller, -1);
@@ -32,6 +33,7 @@ void tptap(zsock_t* pipe, void* vargs)
         }
         if (which == pipe) {
             zsys_info("tptap got quit with %d seen", nrecv);
+            got_quit = true;
             break;
         }
         zmsg_t* msg = zmsg_recv(which);
@@ -72,6 +74,11 @@ void tptap(zsock_t* pipe, void* vargs)
     zpoller_destroy(&poller);
     zsock_destroy(&isock);
     zsock_destroy(&osock);
+    if (got_quit) {
+        return;
+    }
+    zsys_debug("monitor: waiting for quit");
+    zsock_wait(pipe);
 }
 
 // Main actor.  It creates the tap proxies, receives TPSets from them

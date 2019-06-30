@@ -87,7 +87,6 @@ namespace ptmp {
     class TPAgent {
     public:
         virtual ~TPAgent();
-
     };
 
     /** A factory method for agents */
