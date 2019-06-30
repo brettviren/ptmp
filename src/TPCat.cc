@@ -63,6 +63,12 @@ void tpcat(zsock_t* pipe, void* vargs)
         return;
     }
 
+    const int output_timeout = 100;
+    zpoller_t* opoller = NULL;
+    if (osock) {
+        opoller = zpoller_new(osock, NULL);
+    }
+
     zpoller_t* poller = zpoller_new(pipe, NULL);
     int timeout = 0;
     if (isock) {
@@ -82,7 +88,7 @@ void tpcat(zsock_t* pipe, void* vargs)
         if (which == pipe) {
             zsys_info("czmqat: got quit");
             got_quit = true;
-            break;
+            goto cleanup;
         }
 
         zmsg_t* msg=NULL;
@@ -117,10 +123,24 @@ void tpcat(zsock_t* pipe, void* vargs)
         if (osock) {
             // Note, this will block if using eg PUSH and then this
             // actor will hang even if there is a shutdown waiting.
-            int rc = zmsg_send(&msg, osock);
-            if (rc != 0) {
-                zsys_warning("send failed after %d", count);
-                break;
+            
+            while (true) {
+                void* which = zpoller_wait(opoller, output_timeout);
+                if (which == osock) {
+                    int rc = zmsg_send(&msg, osock);
+                    if (rc != 0) {
+                        zsys_warning("send failed after %d", count);
+                        break;
+                    }
+                    break;
+                }
+                which = zpoller_wait(poller, 0);
+                if (which == pipe) {
+                    zsys_info("czmqat: got quit");
+                    got_quit = true;
+                    goto cleanup;
+                }
+                // loop and wait to send again
             }
         }
 
@@ -130,6 +150,8 @@ void tpcat(zsock_t* pipe, void* vargs)
 
     }
 
+  cleanup:
+    
     zsys_debug("czmqat: finished");
 
     zpoller_destroy(&poller);
