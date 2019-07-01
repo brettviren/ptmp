@@ -56,7 +56,7 @@ void tptap(zsock_t* pipe, void* vargs)
             pi[1].socket = zsock_resolve(osock);
             pi[1].events = ZMQ_POLLOUT;
             int rc = zmq_poll(pi, 2, -1);
-            if (rd <= 0) {
+            if (rc <= 0) {
                 zsys_debug("tap: interupted in poll on osock");
                 break;
             }
@@ -74,7 +74,7 @@ void tptap(zsock_t* pipe, void* vargs)
             pi[1].socket = zsock_resolve(isock);
             pi[1].events = ZMQ_POLLOUT;
             int rc = zmq_poll(pi, 2, -1);
-            if (rd <= 0) {
+            if (rc <= 0) {
                 zsys_debug("tap: interupted in poll on isock");
                 break;
             }
