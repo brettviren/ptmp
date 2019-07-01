@@ -49,7 +49,7 @@ void tpreplay_proxy(zsock_t* pipe, void* vargs)
 
     zsock_signal(pipe, 0);      // signal ready
 
-    zpoller_t* pipe_poller = zpoller_new(pipe, isock, NULL);
+    zpoller_t* poller = zpoller_new(pipe, isock, NULL);
 
     int wait_time_ms = -1;
 
@@ -60,25 +60,29 @@ void tpreplay_proxy(zsock_t* pipe, void* vargs)
     bool got_quit = false;
     while (!zsys_interrupted) {
 
-        void* which = zpoller_wait(pipe_poller, wait_time_ms);
+        // zsys_debug("replay: waiting");
+
+        void* which = zpoller_wait(poller, wait_time_ms);
         if (!which) {
-            zsys_info("TPReplay proxy interrupted");
+            zsys_info("replay: interrupted in poll");
             break;
         }
         if (which == pipe) {
-            zsys_info("TPReplay proxy got quit");
+            zsys_info("replay: got quit");
             got_quit = true;
             break;
         }
-
+        
         // got input
 
         zmsg_t* msg = zmsg_recv(isock);
         if (!msg) {
-            zsys_info("TPReplay proxy interrupted");
+            zsys_info("replay: interrupted in recv");
             break;
         }
         auto header = msg_header(msg);
+
+        // dump_header("send", header);
 
         if (header.tstart == 0xffffffffffffffff) {
             dump_header("kill", header);
@@ -86,6 +90,7 @@ void tpreplay_proxy(zsock_t* pipe, void* vargs)
             continue;
         }
         
+
         if (last_send_time == 0) { // first message
             last_send_time = ptmp::data::now();
             last_mesg_time = header.tstart;
@@ -100,8 +105,6 @@ void tpreplay_proxy(zsock_t* pipe, void* vargs)
             zsys_debug("replay: first");
             continue;
         }
-
-        // dump_header("send", header);
 
         const ptmp::data::real_time_t delta_tau = (header.tstart - last_mesg_time)/speed;
         const ptmp::data::real_time_t t_now = ptmp::data::now();
@@ -127,7 +130,9 @@ void tpreplay_proxy(zsock_t* pipe, void* vargs)
         }
     }
 
-    zpoller_destroy(&pipe_poller);
+    zsys_debug("replay: finished after %d", count);
+
+    zpoller_destroy(&poller);
     zsock_destroy(&isock);
     zsock_destroy(&osock);
     

@@ -87,13 +87,13 @@ private:
 
 static void dump_window(const time_window_t& window, std::string msg="")
 {
-    zsys_debug("window %s #%ld [%ld]+%ld @ %ld",
+    zsys_debug("window: %s #%ld [%ld]+%ld @ %ld",
                msg.c_str(), window.wind, window.toff, window.tspan, window.tbegin());
 }
 static void dump_tpset(const ptmp::data::TPSet& tps, std::string msg="")
 {
     ptmp::data::data_time_t tstart = tps.tstart();
-    zsys_debug("tpset: %s @ %ld + %d # %d detid: %d",
+    zsys_debug("window: tpset: %s @ %ld + %d # %d detid: %d",
                msg.c_str(), tstart, tps.tspan(), tps.count(), tps.detid());
     for (const auto& tp : tps.tps()) {
         ptmp::data::data_time_t tp_ts = tp.tstart();
@@ -173,7 +173,7 @@ struct TPWindower {
                 ptmp::internals::send(osock, tps); // fixme: can throw
             }
             else {
-                zsys_debug("testing mode, not actually sending a TPSet");
+                zsys_debug("window: testing mode, not actually sending a TPSet");
             }
             // note, this leaves tps full of stale/sent info....
 
@@ -267,7 +267,7 @@ void tpwindow_proxy(zsock_t* pipe, void* vargs)
         tspan = config["tspan"];
     }
     if (!tspan) {
-        zsys_error("tpwindow requires finite tspan");
+        zsys_error("window: requires finite tspan");
         throw std::runtime_error("tpwindow requires finite tspan");
 
     }
@@ -277,14 +277,14 @@ void tpwindow_proxy(zsock_t* pipe, void* vargs)
     }
     if (tbuf == 0) {
         std::string dump = config.dump(4);
-        zsys_error("tpwindow requires non-zero tbuf.\n%s", dump.c_str());
+        zsys_error("window: requires non-zero tbuf.\n%s", dump.c_str());
         throw std::runtime_error("tpwindow requires non-zero tbuf");        
     }
 
     zsock_t* isock = ptmp::internals::endpoint(config["input"].dump());
     zsock_t* osock = ptmp::internals::endpoint(config["output"].dump());
     if (!isock or !osock) {
-        zsys_error("tpwindow requires socket configuration");
+        zsys_error("window: requires socket configuration");
         throw std::runtime_error("tpwindow requires socket configuration");
 
     }
@@ -295,15 +295,16 @@ void tpwindow_proxy(zsock_t* pipe, void* vargs)
     // initial window is most likely way before any data.
     TPWindower windower(osock, tspan, toff, tbuf, detid);
     bool got_quit = false;
+    int count_in = 0;
     while (!zsys_interrupted) {
 
         void* which = zpoller_wait(pipe_poller, -1);
         if (!which) {
-            zsys_info("TPWindow proxy interrupted");
+            zsys_info("window: interrupted in poll");
             break;
         }
         if (which == pipe) {
-            zsys_info("TPWindow proxy got quit with %d TPs", windower.tps.tps().size());
+            zsys_info("window: got quit after %d", count_in);
             dump_window(windower.window, "quit");
             got_quit = true;
             break;
@@ -314,10 +315,10 @@ void tpwindow_proxy(zsock_t* pipe, void* vargs)
 
         zmsg_t* msg = zmsg_recv(isock);
         if (!msg) {
-            zsys_info("TPWindow proxy interrupted");
-            zmsg_destroy(&msg);
+            zsys_info("window: interrupted in recv");
             break;
         }
+        ++count_in;
 
         ptmp::data::TPSet tps;
         ptmp::internals::recv(msg, tps); // throws
@@ -357,7 +358,7 @@ void tpwindow_proxy(zsock_t* pipe, void* vargs)
     } // message loop
 
 
-    // zsys_debug("tpwindow actor cleaning up");
+    zsys_debug("window: finishing after %d", count_in);
     zpoller_destroy(&pipe_poller);
     zsock_destroy(&isock);
     zsock_destroy(&osock);

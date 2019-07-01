@@ -29,7 +29,7 @@ void tpcat(zsock_t* pipe, void* vargs)
         std::string cfg = config["input"].dump();
         isock = ptmp::internals::endpoint(cfg);
         if (isock) {
-            zsys_info("isock: %s", cfg.c_str());
+            zsys_info("czmqat: isock: %s", cfg.c_str());
         }
     }
     zsock_t* osock = NULL;
@@ -37,7 +37,7 @@ void tpcat(zsock_t* pipe, void* vargs)
         std::string cfg = config["output"].dump();
         osock = ptmp::internals::endpoint(cfg);
         if (isock) {
-            zsys_info("isock: %s", cfg.c_str());
+            zsys_info("czmqat: isock: %s", cfg.c_str());
         }
     }
     FILE* ifp = NULL;
@@ -45,7 +45,7 @@ void tpcat(zsock_t* pipe, void* vargs)
         std::string fname = config["ifile"];
         ifp = fopen(fname.c_str(), "r");
         if (ifp) {
-            zsys_info("ifile: %s", fname.c_str());
+            zsys_info("czmqat: ifile: %s", fname.c_str());
         }
     }
     FILE* ofp = NULL;
@@ -53,20 +53,27 @@ void tpcat(zsock_t* pipe, void* vargs)
         std::string fname = config["ofile"];
         ofp = fopen(fname.c_str(), "w");
         if (ofp) {
-            zsys_info("ofile: %s", fname.c_str());
+            zsys_info("czmqat: ofile: %s", fname.c_str());
         }
     }
     zsock_signal(pipe, 0); // signal ready    
 
     if (! (isock or ifp)) {
-        zsys_error("TPCat: no input, why bother?");
+        zsys_error("czmqat: no input, why bother?");
         return;
     }
 
     const int output_timeout = 100;
-    zpoller_t* opoller = NULL;
+    zmq_pollitem_t pollitems[2];
+    int npollitems = 1;
+    pollitems[0].socket = zsock_resolve(pipe);
+    pollitems[0].events = ZMQ_POLLIN;
     if (osock) {
-        opoller = zpoller_new(osock, NULL);
+        void* vsock = zsock_resolve(osock);
+        assert(vsock);
+        pollitems[1].socket = vsock;
+        pollitems[1].events = ZMQ_POLLOUT;
+        ++npollitems;
     }
 
     zpoller_t* poller = zpoller_new(pipe, NULL);
@@ -96,24 +103,25 @@ void tpcat(zsock_t* pipe, void* vargs)
         if (isock and which == isock) {
             msg = zmsg_recv(isock);
             if (!msg) {
-                zsys_warning("interupted stream after %d", count);
+                zsys_warning("czmqat: interupted stream after %d", count);
                 break;
             }
         }
         else if (ifp) {
             msg = ptmp::internals::read(ifp);
             if (!msg) {
-                zsys_info("end of file after %d", count);
+                zsys_info("czmqat: end of file after %d", count);
                 break;
             }
         }
         else {
-            zsys_warning("got something weird");
+            zsys_warning("czmqat: got something weird");
         }
-
-        //zsys_debug("%d", count);
+        
+        // zsys_debug("czmqat: message %d", count);
 
         if (delayus > 0) {
+            zsys_debug("czmqat: sleeping %d us", delayus);
             ptmp::internals::microsleep(delayus);
         }
 
@@ -125,22 +133,24 @@ void tpcat(zsock_t* pipe, void* vargs)
             // actor will hang even if there is a shutdown waiting.
             
             while (true) {
-                void* which = zpoller_wait(opoller, output_timeout);
-                if (which == osock) {
+                int rc = zmq_poll(pollitems, 2, output_timeout);
+                if (rc == 0) {
+                    continue;   // keep waiting
+                }
+                if (pollitems[1].revents & ZMQ_POLLOUT) {
                     int rc = zmsg_send(&msg, osock);
                     if (rc != 0) {
-                        zsys_warning("send failed after %d", count);
+                        zsys_warning("czmqat: send failed after %d", count);
                         break;
                     }
+                    //zsys_debug("czmqat: send %d", count);
                     break;
                 }
-                which = zpoller_wait(poller, 0);
-                if (which == pipe) {
+                if (pollitems[0].revents & ZMQ_POLLIN) {
                     zsys_info("czmqat: got quit");
                     got_quit = true;
                     goto cleanup;
                 }
-                // loop and wait to send again
             }
         }
 
@@ -152,7 +162,7 @@ void tpcat(zsock_t* pipe, void* vargs)
 
   cleanup:
     
-    zsys_debug("czmqat: finished");
+    zsys_debug("czmqat: finished after %d", count);
 
     zpoller_destroy(&poller);
     if (isock) zsock_destroy(&isock);

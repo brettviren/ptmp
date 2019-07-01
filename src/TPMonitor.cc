@@ -23,30 +23,36 @@ void tptap(zsock_t* pipe, void* vargs)
 
     zsock_signal(pipe, 0); // signal ready    
 
+    int count = 0;
     bool got_quit = false;
     while (!zsys_interrupted) {
 
+        // zsys_debug("tptap: waiting");
         void* which = zpoller_wait(poller, -1);
         if (!which) {
-            zsys_info("tptap interrupted");
+            zsys_info("tap: interrupted");
             break;
         }
         if (which == pipe) {
-            zsys_info("tptap got quit with %d seen", nrecv);
+            zsys_info("tap: got quit with %d seen", nrecv);
             got_quit = true;
             break;
         }
         zmsg_t* msg = zmsg_recv(which);
 
+        // zsys_debug("tptap: got message");
+
         zmsg_t* mymsg = NULL;
 
         // Forward original message
         if (which == isock) {
+            // zsys_debug("tptap: forward going message");
             mymsg = zmsg_dup(msg);
-            zmsg_send(&msg, osock);
+            zmsg_send(&msg, osock); // fixme: POLLOUT?
         }
         if (which == osock) {
-            zmsg_send(&msg, isock);
+            // zsys_debug("tptap: backward going message");
+            zmsg_send(&msg, isock); // fixme: POLLOUT?
             continue;           // only tap into "input" messages
         }
 
@@ -65,19 +71,21 @@ void tptap(zsock_t* pipe, void* vargs)
             tpset.tspan(),
             (uint32_t)tpset.tps_size()
         };
-        int rc = zsock_send(pipe, "%p", summary); // receiver must delete!
+        int rc = zsock_send(pipe, "p", summary); // receiver must delete!
         if (rc != 0) {
-            zsys_error("tptap: failed to send to pipe");
+            zsys_error("tap: failed to send to pipe");
             break;
         }
+        ++count;
     }
+    zsys_debug("tap: finishing after %d", count);
     zpoller_destroy(&poller);
     zsock_destroy(&isock);
     zsock_destroy(&osock);
     if (got_quit) {
         return;
     }
-    zsys_debug("monitor: waiting for quit");
+    zsys_debug("tap: waiting for quit");
     zsock_wait(pipe);
 }
 
@@ -92,15 +100,17 @@ void tpmonitor(zsock_t* pipe, void* vargs)
     std::vector<zactor_t*> taps;
     zpoller_t* poller = zpoller_new(pipe, NULL);
 
-    // Just want something unique.  Is it okay if filename contains "/"?
-    const std::string spigot_addr = "inproc://" + filename;
-    zsock_t* spigot = zsock_new_pull(spigot_addr.c_str());
+
+    /// could make monitor spit out a message instead of writing a file....
+    // const std::string spigot_addr = "inproc://" + filename;
+    // zsock_t* spigot = zsock_new_pull(spigot_addr.c_str());
 
     for (const auto& jtap : config["taps"]) {
         const std::string cfg = jtap.dump();
         zactor_t* tap = zactor_new(tptap, (void*)cfg.c_str());
         taps.push_back(tap);
         zpoller_add(poller, tap);
+        zsys_debug("monitor: made tap %d", jtap["id"].get<int>());
     }
     
     zsock_signal(pipe, 0); // signal ready    
@@ -108,38 +118,51 @@ void tpmonitor(zsock_t* pipe, void* vargs)
     // open file...
     FILE* fp = fopen(filename.c_str(), "w");
     if (!fp) {
-        zsys_error("Failed to open file %s", filename.c_str());
+        zsys_error("monitor: failed to open file %s", filename.c_str());
         return;
     }
 
+    bool got_quit = false;
     while (!zsys_interrupted) {
 
         void* which = zpoller_wait(poller, -1);
         if (!which) {
-            zsys_info("tpmonitor interrupted");
+            zsys_info("monitor: interrupted");
             break;
         }
         if (which == pipe) {
-            zsys_info("tpmonitor got quit");
+            zsys_info("monitor: got quit");
+            got_quit = true;
             break;
         }
 
         void* vptr = 0;
-        int rc = zsock_recv(which, "%p", &vptr);
+        int rc = zsock_recv(which, "p", &vptr);
         // write summary to file....
-        // type safety?  we don't need no stinking type safety!
-        fwrite(vptr, sizeof(ptmp::TPMonitor::Summary), 1, fp);
-        delete ((ptmp::TPMonitor::Summary*)vptr); vptr=NULL;
+        // binary:
+        // fwrite(vptr, sizeof(ptmp::TPMonitor::Summary), 1, fp);
+        {
+            ptmp::TPMonitor::Summary* s = (ptmp::TPMonitor::Summary*)vptr;
+            fprintf(fp, "%d %ld %d %d %d %ld %ld %d %d\n",
+                    s->tapid, s->trecv, s->nrecv, s->count, s->detid, s->created, s->tstart, s->tspan, s->ntps);
+            delete (s);
+        }
     }
 
     // close file ...
     fclose(fp); fp=NULL;
 
+    zsys_debug("monitor: signalling taps to shutdown");
     zpoller_destroy(&poller);
     for (zactor_t* tap : taps) {
         zsock_signal(zactor_sock(tap), 0);
         zactor_destroy(&tap);
     }
+    if (got_quit) {
+        return;
+    }
+    zsys_debug("monitor: waiting for quit");
+    zsock_wait(pipe);
 }
 
 

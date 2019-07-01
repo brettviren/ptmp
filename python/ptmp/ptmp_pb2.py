@@ -7,7 +7,6 @@ from google.protobuf import descriptor as _descriptor
 from google.protobuf import message as _message
 from google.protobuf import reflection as _reflection
 from google.protobuf import symbol_database as _symbol_database
-from google.protobuf import descriptor_pb2
 # @@protoc_insertion_point(imports)
 
 _sym_db = _symbol_database.Default()
@@ -19,9 +18,9 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   name='src/ptmp.proto',
   package='ptmp.data',
   syntax='proto2',
+  serialized_options=None,
   serialized_pb=_b('\n\x0esrc/ptmp.proto\x12\tptmp.data\"j\n\x08TrigPrim\x12\x0f\n\x07\x63hannel\x18\x01 \x02(\r\x12\x0e\n\x06tstart\x18\x02 \x02(\x04\x12\r\n\x05tspan\x18\x03 \x01(\r\x12\x0e\n\x06\x61\x64\x63sum\x18\x04 \x01(\r\x12\x0f\n\x07\x61\x64\x63peak\x18\x05 \x01(\r\x12\r\n\x05\x66lags\x18\x06 \x01(\r\"\xab\x01\n\x05TPSet\x12\r\n\x05\x63ount\x18\x01 \x02(\r\x12\r\n\x05\x64\x65tid\x18\x02 \x02(\r\x12\x0f\n\x07\x63reated\x18\x03 \x02(\x03\x12\x0e\n\x06tstart\x18\x04 \x02(\x04\x12\r\n\x05tspan\x18\x05 \x01(\r\x12\x0f\n\x07\x63hanbeg\x18\x06 \x01(\r\x12\x0f\n\x07\x63hanend\x18\x07 \x01(\r\x12\x10\n\x08totaladc\x18\x08 \x01(\r\x12 \n\x03tps\x18\t \x03(\x0b\x32\x13.ptmp.data.TrigPrim')
 )
-_sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
 
 
@@ -39,49 +38,49 @@ _TRIGPRIM = _descriptor.Descriptor(
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
       name='tstart', full_name='ptmp.data.TrigPrim.tstart', index=1,
       number=2, type=4, cpp_type=4, label=2,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
       name='tspan', full_name='ptmp.data.TrigPrim.tspan', index=2,
       number=3, type=13, cpp_type=3, label=1,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
       name='adcsum', full_name='ptmp.data.TrigPrim.adcsum', index=3,
       number=4, type=13, cpp_type=3, label=1,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
       name='adcpeak', full_name='ptmp.data.TrigPrim.adcpeak', index=4,
       number=5, type=13, cpp_type=3, label=1,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
       name='flags', full_name='ptmp.data.TrigPrim.flags', index=5,
       number=6, type=13, cpp_type=3, label=1,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
   ],
   extensions=[
   ],
   nested_types=[],
   enum_types=[
   ],
-  options=None,
+  serialized_options=None,
   is_extendable=False,
   syntax='proto2',
   extension_ranges=[],
@@ -105,70 +104,70 @@ _TPSET = _descriptor.Descriptor(
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
       name='detid', full_name='ptmp.data.TPSet.detid', index=1,
       number=2, type=13, cpp_type=3, label=2,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
       name='created', full_name='ptmp.data.TPSet.created', index=2,
       number=3, type=3, cpp_type=2, label=2,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
       name='tstart', full_name='ptmp.data.TPSet.tstart', index=3,
       number=4, type=4, cpp_type=4, label=2,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
       name='tspan', full_name='ptmp.data.TPSet.tspan', index=4,
       number=5, type=13, cpp_type=3, label=1,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
       name='chanbeg', full_name='ptmp.data.TPSet.chanbeg', index=5,
       number=6, type=13, cpp_type=3, label=1,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
       name='chanend', full_name='ptmp.data.TPSet.chanend', index=6,
       number=7, type=13, cpp_type=3, label=1,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
       name='totaladc', full_name='ptmp.data.TPSet.totaladc', index=7,
       number=8, type=13, cpp_type=3, label=1,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
       name='tps', full_name='ptmp.data.TPSet.tps', index=8,
       number=9, type=11, cpp_type=10, label=3,
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
   ],
   extensions=[
   ],
   nested_types=[],
   enum_types=[
   ],
-  options=None,
+  serialized_options=None,
   is_extendable=False,
   syntax='proto2',
   extension_ranges=[],
@@ -181,6 +180,7 @@ _TPSET = _descriptor.Descriptor(
 _TPSET.fields_by_name['tps'].message_type = _TRIGPRIM
 DESCRIPTOR.message_types_by_name['TrigPrim'] = _TRIGPRIM
 DESCRIPTOR.message_types_by_name['TPSet'] = _TPSET
+_sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
 TrigPrim = _reflection.GeneratedProtocolMessageType('TrigPrim', (_message.Message,), dict(
   DESCRIPTOR = _TRIGPRIM,

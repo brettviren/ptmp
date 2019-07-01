@@ -27,25 +27,25 @@ local test_read = function(filename, port=0) {
     components: [rd],
 };
 
-local test_inout = function(filename, port) {
-    local bname = basename(filename),
+local test_inout = function(filename, port, sitm = ptmp.sitm.tcp) {
+    local bname = basename(filename),    
     local rd = ptmp.czmqat("rd", number = nmsgs, ifile = filename,
-                           osocket = ptmp.sitm('bind','push', port)),
+                           osocket = sitm('bind','push', port)),
     local wt = ptmp.czmqat("wt", number = nmsgs, ofile = bname + '.copy',
-                           isocket = ptmp.sitm('connect','pull', port)),
+                           isocket = sitm('connect','pull', port)),
     name : "inout-%s"%bname,
     components: [rd, wt],
 };
 
-local test_window = function(filename, port) {
+local test_window = function(filename, port, sitm = ptmp.sitm.tcp) {
     local bname = basename(filename),
     local rd = ptmp.czmqat("rd", number = nmsgs, ifile = filename,
-                           osocket = ptmp.sitm('bind','push', port)),
+                           osocket = sitm('bind','push', port)),
     local wi = ptmp.window("wi",  tspan = 50/0.02, tbuf = 5000/0.02,
-                           isocket = ptmp.sitm('connect','pull', port),
-                           osocket = ptmp.sitm('bind','push', port+1)),
+                           isocket = sitm('connect','pull', port),
+                           osocket = sitm('bind','push', port+1)),
     local wt = ptmp.czmqat("wt", number = nmsgs, 
-                           isocket = ptmp.sitm('connect','pull', port+1)),
+                           isocket = sitm('connect','pull', port+1)),
     name : "window-%s"%bname,
     components: [rd, wi, wt],
 
@@ -53,16 +53,16 @@ local test_window = function(filename, port) {
 
 local back = function(arr) arr[std.length(arr)-1];
 
-local link_pipeline = function(filename, port) {
+local link_pipeline = function(filename, port, sitm = ptmp.sitm.tcp) {
     local bname = basename(filename),
     local send = ptmp.czmqat("send-"+bname, number = nmsgs, ifile = filename,
-                             osocket = ptmp.sitm('bind','push', port+1)),
+                             osocket = sitm('bind','push', port+1)),
     local replay = ptmp.replay("replay-"+bname, 
-                               isocket = ptmp.sitm('connect','pull', port+1),
-                               osocket = ptmp.sitm('bind','push', port+2)),
+                               isocket = sitm('connect','pull', port+1),
+                               osocket = sitm('bind','push', port+2)),
     local window = ptmp.window("window-"+bname, tspan = 50/0.02, tbuf = 5000/0.02,
-                               isocket = ptmp.sitm('connect','pull', port+2),
-                               osocket = ptmp.sitm('bind','push', port+3)),
+                               isocket = sitm('connect','pull', port+2),
+                               osocket = sitm('bind','push', port+3)),
 
     name: "pipeline-"+bname,
     components: [send, replay, window]
@@ -84,11 +84,11 @@ local single_files = {
 
 local get_socket = function(actor, which="output") actor.data[which].socket;
 
-local link_sorted = function(pipelines, port) {
+local link_sorted = function(pipelines, port, sitm = ptmp.sitm.tcp) {
     local addrs = std.flattenArrays([get_socket(back(pl.components)).bind for pl in pipelines]),
     local sorted = ptmp.sorted("sorted", 
-                               ptmp.socket('pull', 'connect', addrs),
-                               ptmp.sitm('bind','push', port),
+                               ptmp.socket('connect', 'pull', addrs),
+                               sitm('bind','push', port),
                                100,
                               ),
     name: "sorted",
@@ -105,4 +105,7 @@ local multi_files = {
     ret: {['test-%s.json'%sorted.name]: ptmp.ptmper(sorted.components, ttl=1, reprieve=1)},
 }.ret;
 
+
+
+// output of this file
 single_files + multi_files

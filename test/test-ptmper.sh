@@ -1,6 +1,6 @@
 #!/bin/bash
 
-datadirs=". /data/fast/bviren/ptmp-dumps /data /tmp"
+datadirs=". /data/fast/bviren/ptmp-dumps/2019-06-10 /data /tmp"
 dataurl="https://www.phy.bnl.gov/~bviren/tmp/ptmp/ptmp-dumps/2019-06-10"
 
 tstdir=$(dirname $(realpath "$BASH_SOURCE"))
@@ -23,8 +23,15 @@ getfile () {
     echo /tmp/$filename
 }
 
+argify_list () {
+    local list=$@
+    echo "["\"${list// /\",\"}\""]"
+}
+
+
 do_test () {
     local name=${1} ; shift
+    local args="$1" ; shift
     local testfile="$tstdir/test-${name}.jsonnet"
     if [ ! -f $testfile ] ; then
         echo "no such test \"$name\""
@@ -39,22 +46,21 @@ do_test () {
     echo "Using files: ${files[*]}"
 
     local tmpdir=$(mktemp -d "/tmp/test-ptmper-XXXXX")
-    local args="-m $tmpdir -J $topdir/python/ptmp"
-
-    if [ -n "$files" ] ; then
-        local sfiles=${files[@]}
-        args+=" --ext-code input=["\"${sfiles// /\",\"}\""]"
-    fi
+    args+=" -m $tmpdir -J $topdir/python/ptmp"
+    args+=" --ext-code input="$(argify_list "${files[*]}")
 
     echo "$args"
 
-    #set -x
+    set -x
     for cfg in $(jsonnet $args "$testfile") ; do
         echo "ptmper $cfg"
         time ptmper $cfg || exit -1
     done
-    rm -rf $tmpdir
-    #echo "not deleting $tmpdir"
+    #rm -rf $tmpdir
+    echo "not deleting $tmpdir"
 }
 
-do_test ptmper FELIX_BR_601.dump FELIX_BR_603.dump
+#do_test ptmper "" FELIX_BR_60{1,3,5,7,9}.dump
+do_test ptmper-monitored "-V output=ptmper.mon" FELIX_BR_601.dump
+
+
