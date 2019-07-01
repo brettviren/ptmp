@@ -23,8 +23,10 @@ void tptap(zsock_t* pipe, void* vargs)
 
     zsock_signal(pipe, 0); // signal ready    
 
+    const int output_timeout = 100;
     int count = 0;
     bool got_quit = false;
+
     while (!zsys_interrupted) {
 
         // zsys_debug("tptap: waiting");
@@ -46,12 +48,41 @@ void tptap(zsock_t* pipe, void* vargs)
 
         // Forward original message
         if (which == isock) {
-            // zsys_debug("tptap: forward going message");
             mymsg = zmsg_dup(msg);
-            zmsg_send(&msg, osock); // fixme: POLLOUT?
+
+            zmq_pollitem_t pi[2];
+            pi[0].socket = zsock_resolve(pipe);
+            pi[0].events = ZMQ_POLLIN;
+            pi[1].socket = zsock_resolve(osock);
+            pi[1].events = ZMQ_POLLOUT;
+            int rc = zmq_poll(pi, 2, -1);
+            if (rd <= 0) {
+                zsys_debug("tap: interupted in poll on osock");
+                break;
+            }
+            if (pi[0].revents & ZMQ_POLLIN) {
+                zsys_debug("tap: got quit while polling output");
+                got_quit = true;
+                break;
+            }
+            zmsg_send(&msg, osock);
         }
         if (which == osock) {
-            // zsys_debug("tptap: backward going message");
+            zmq_pollitem_t pi[2];
+            pi[0].socket = zsock_resolve(pipe);
+            pi[0].events = ZMQ_POLLIN;
+            pi[1].socket = zsock_resolve(isock);
+            pi[1].events = ZMQ_POLLOUT;
+            int rc = zmq_poll(pi, 2, -1);
+            if (rd <= 0) {
+                zsys_debug("tap: interupted in poll on isock");
+                break;
+            }
+            if (pi[0].revents & ZMQ_POLLIN) {
+                zsys_debug("tap: got quit while polling input");
+                got_quit = true;
+                break;
+            }
             zmsg_send(&msg, isock); // fixme: POLLOUT?
             continue;           // only tap into "input" messages
         }
