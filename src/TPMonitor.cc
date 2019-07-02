@@ -9,7 +9,7 @@
 
 using json = nlohmann::json;
 
-
+static
 void tptap(zsock_t* pipe, void* vargs)
 {
     auto config = json::parse((const char*) vargs);
@@ -122,6 +122,7 @@ void tptap(zsock_t* pipe, void* vargs)
 
 // Main actor.  It creates the tap proxies, receives TPSets from them
 // and writes summary to file.
+static
 void tpmonitor(zsock_t* pipe, void* vargs)
 {
     auto config = json::parse((const char*) vargs);

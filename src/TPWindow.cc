@@ -251,6 +251,7 @@ static void test_tpwindower()
 
 
 // The actor function
+static
 void tpwindow_proxy(zsock_t* pipe, void* vargs)
 {
     auto config = json::parse((const char*) vargs);

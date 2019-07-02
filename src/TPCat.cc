@@ -9,6 +9,7 @@
 
 using json = nlohmann::json;
 
+static
 void tpcat(zsock_t* pipe, void* vargs)
 {
     auto config = json::parse((const char*) vargs);

@@ -29,6 +29,7 @@ void dump_header(const char* label, msg_header_t& head)
 
 
 // The actor function
+static
 void tpreplay_proxy(zsock_t* pipe, void* vargs)
 {
     auto config = json::parse((const char*) vargs);

@@ -121,6 +121,7 @@ bool recv_prompt(SockInfo& si, ptmp::data::data_time_t last_msg_time, bool drop_
 }
 
 // The actor function
+static
 void tpsorted_proxy(zsock_t* pipe, void* vargs)
 {
 

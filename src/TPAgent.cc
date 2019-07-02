@@ -17,7 +17,8 @@ ptmp::TPAgent* ptmp::agent_factory(const std::string& type, const std::string& c
         return new ptmp::TPWindow(config.c_str());
     }
     if (type == "TPMonitor" or type == "monitor") {
-        return new ptmp::TPMonitor(config.c_str());
+        //return new ptmp::TPMonitor(config.c_str());
+        return new ptmp::TPMonitorz(config.c_str());
     }
     if (type == "TPCat" or type == "cat" or type == "czmqat") {
         return new ptmp::TPCat(config.c_str());

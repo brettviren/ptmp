@@ -310,6 +310,28 @@ namespace ptmp {
     };
 
 
+    // a libzmq based proxy
+    class TPMonitorz : public TPAgent {
+    public:
+        TPMonitorz(const std::string& config);
+        virtual ~TPMonitorz();
+
+    private:
+        zactor_t* m_actor;
+
+    };
+
+    // A czmq based proxy
+    class TPMonitorcz : public TPAgent {
+    public:
+        TPMonitorcz(const std::string& config);
+        virtual ~TPMonitorcz();
+
+    private:
+        zactor_t* m_actor;
+
+    };
+
 }
 
 #endif
