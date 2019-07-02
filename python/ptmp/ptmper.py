@@ -98,6 +98,81 @@ def dotify(output, ext_str, ext_code, infile):
 
     open(output,"w").write(dot(dat['proxies']))
 
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_pdf import PdfPages
+
+@cli.command('monplots')
+@click.option('-o','--output', default="/dev/stdout", help="Output file or stdout")
+@click.argument('monfile')
+def monplots(output, monfile):
+    mon = pd.read_csv(monfile, delim_whitespace=True)
+    bytap = {n:mon[mon.tapid==n] for n in set(mon.tapid)} 
+
+    dat = dict()
+    for tid,mon in bytap.items():
+        now = 1.0e-6*np.array(mon.now)
+        tstart = 20.0e-9*np.array(mon.tstart)
+        created = 1.0e-6*np.array(mon.created)
+        nrecv = np.array(mon.nrecv)
+        count = np.array(mon["count"])
+
+        # these all have 1 less than mon and times are in units of seconds
+        dat[tid] = dict(
+            now = now[1:] - now[0],
+            tstart = tstart[1:] - tstart[0],
+            created = created[1:] - now[0],
+            dnow = now[1:] - now[:-1],
+            dtstart = tstart[1:] - tstart[:-1],
+            dnrecv = nrecv[1:] - nrecv[:-1],
+            dcount = count[1:] - count[:-1],
+            nrecv = nrecv[1:] - nrecv[0],
+            count = count[1:] - count[0],
+        )
+        
+    popts = dict(linewidth=0.5)
+    #fopts = dict(figsize=(30,10))
+    fopts = dict()
+
+    # this depends on what span of files were replayed
+    groups = [("replay",range(200,205)),
+              #("window",range(400,405)),
+              #("sorted",[600]),
+    ]
+
+    with PdfPages(output) as pdf:
+
+
+        for group_name, group in groups:
+
+            def key(d):
+                return d[key]
+
+
+            def one(xkey, ykey, xlab, ylab, lab="%d", tit = "%s"):
+                fig, ax = plt.subplots(1,1, **fopts)
+                ax.set_title(tit % group_name)
+                ax.set_xlabel(xlab)
+                ax.set_ylabel(ylab)
+                for tapid in group:
+                    d = dat[tapid]
+                    ax.plot(xkey(d), ykey(d), label=lab%tapid, **popts)
+                ax.legend(prop=dict(size=6))
+                pdf.savefig(fig)
+
+            one(lambda d: d["tstart"], lambda d: d["count"], "data clock [s]", "count")
+            one(lambda d: d["now"], lambda d: d["nrecv"], "wall clock [s]", "nrecv")
+            one(lambda d: d["now"], lambda d: d["tstart"], "wall clock [s]", "data clock [s]")
+            one(lambda d: d["now"], lambda d: d["now"]-d["tstart"], "wall clock [s]", "now - data clock [s]")
+            one(lambda d: d["now"], lambda d: d["now"]-d["created"], "wall clock [s]", "now - created [s]")
+            one(lambda d: d["now"], lambda d: d["nrecv"]-d["count"], "wall clock [s]", "nrecv - count")
+            one(lambda d: d["now"], lambda d: d["dnrecv"]/d["dnow"], "wall clock [s]", "nrecv rate [Hz]")
+            one(lambda d: d["tstart"], lambda d: d["dcount"]/d["dtstart"], "data clock [s]", "count rate [Hz]")
+                         
+            
+            
+
 def main():
     cli()
 

@@ -104,15 +104,20 @@ bool recv_prompt(SockInfo& si, ptmp::data::data_time_t last_msg_time, bool drop_
     bool tardy = last_msg_time < EOT and header.tstart < EOT and header.tstart < last_msg_time;
     if (tardy) {
         ++si.ntardy;
-        zsys_debug("sorted: tardy: msg=%ld last=%ld %d/%d",
-                   header.tstart, last_msg_time, si.ntardy, si.nrecved); 
+        //zsys_debug("sorted: tardy: msg=%ld last=%ld %d/%d",
+        //           header.tstart, last_msg_time, si.ntardy, si.nrecved); 
     }
     if (drop_tardy and tardy) {
         // Message is tardy and policy is drop.
-        header_dump("tardy", header);
+        // header_dump("tardy", header);
         zmsg_destroy(&msg);
         // next one might be on time
-        return recv_prompt(si, last_msg_time, drop_tardy);
+        // return recv_prompt(si, last_msg_time, drop_tardy);
+        // 
+        // C++ doesn't do tail call optimization!  Can blow out the
+        // stack with many tardies.  Just return and let the loop deal
+        // with it.
+        return false;
     }
     si.msg = msg;
     si.msg_header = header;
@@ -186,9 +191,12 @@ void tpsorted_proxy(zsock_t* pipe, void* vargs)
             if (!si.msg) {
                 void* which = zpoller_wait(si.poller, 0);
                 if (which) {
-                    si.seen_time = now;
-                    recv_prompt(si, last_msg_time, drop_tardy);
-                    continue;
+                    // fixme: this is probably broken.
+                    bool ok = recv_prompt(si, last_msg_time, drop_tardy);
+                    if (ok) {
+                        si.seen_time = now;
+                        continue;
+                    }
                 }
                 if (si.seen_time == 0) {
                     continue; // never yet seen

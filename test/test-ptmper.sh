@@ -61,6 +61,7 @@ do_test () {
 }
 
 #do_test ptmper "" FELIX_BR_60{1,3,5,7,9}.dump
-do_test ptmper-monitored "-V output=ptmper.mon" FELIX_BR_601.dump
+do_test ptmper-monitored "-V output=ptmper.mon" FELIX_BR_60{1,3,5,7,9}.dump > log.ptmper-monitored 2>&1
+
 
 

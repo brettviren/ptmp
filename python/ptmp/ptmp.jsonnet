@@ -47,7 +47,7 @@
     //
 
 
-    replay(name, isocket, osocket, speed=50.0, rewrite_count=1) :: {
+    replay(name, isocket, osocket, speed=50.0, rewrite_count=0) :: {
         name: name,
         type: 'replay',
         data: {
@@ -143,6 +143,7 @@
 
     files_sorted_monitored(filenames, mon_filename,
                            port_base=7000, nmsgs=100000, tspan = 50/0.02, tbuf = 5000/0.02,
+                           rewrite_count=0,
                            socker = $.sitm.tcp
                           ) ::
     {
@@ -157,7 +158,8 @@
         
         local replays = [$.replay("replay-"+bnames[ind], 
                                   isocket = socker('connect','pull', port_base + 100 + ind),
-                                  osocket = socker('bind',   'push', port_base + 200 + ind))
+                                  osocket = socker('bind',   'push', port_base + 200 + ind),
+                                  rewrite_count=rewrite_count)
                          for ind in fiota],
 
         local windows = [$.window("window-"+bnames[ind], tspan = tspan, tbuf = tbuf,
