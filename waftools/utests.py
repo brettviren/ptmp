@@ -11,8 +11,8 @@ def build(bld):
 @conf
 def utesting(bld, name, use=''):
     appsrc = bld.path.ant_glob('apps/*.cc')
-    checksrc = bld.path.ant_glob('test/check_*.cc')
-    testsrc = bld.path.ant_glob('test/test_*.cc')
+    checksrc = bld.path.ant_glob('test/check*.cc')
+    testsrc = bld.path.ant_glob('test/test*.cc')
     test_scripts = bld.path.ant_glob('test/test*.sh') + bld.path.ant_glob('test/test*.py')
 
     if getattr(bld.options, "notests", False):
