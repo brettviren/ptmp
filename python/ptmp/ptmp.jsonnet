@@ -141,6 +141,31 @@
 
     // make some topologies
 
+    just_files(filenames, mon_filename, port_base=7000, nmsgs=100000, socker = $.sitm.tcp) :: {
+        local nfiles = std.length(filenames),
+        local fiota = std.range(0, nfiles-1),
+        local bnames = [$.util.basename(fn) for fn in filenames],
+
+        local fsends = [$.czmqat("fsend-"+bnames[ind],
+                                 number = nmsgs, ifile = filenames[ind],
+                                 osocket = socker('bind','push', port_base + 100 + ind))
+                        for ind in fiota],
+        
+        local taps =
+            [$.tap(100 + ind,
+                   socker('connect','pull', port_base + 100 + ind),
+                   socker('bind',   'push', port_base + 200 + ind))
+             for ind in fiota],
+
+        local sinks = [$.czmqat("sink-"+bnames[ind],
+                                isocket = socker('connect', 'pull', port_base + 200 + ind))
+                       for ind in fiota],
+
+        local monitor = $.monitor("monitor", mon_filename, taps),
+
+        ret: fsends + sinks + [monitor],
+    }.ret,
+
     files_sorted_monitored(filenames, mon_filename,
                            port_base=7000, nmsgs=100000, tspan = 50/0.02, tbuf = 5000/0.02,
                            rewrite_count=0,

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-datadirs=". /data/fast/bviren/ptmp-dumps/2019-06-10 /data /tmp"
+datadirs=". /data/fast/bviren/ptmp-dumps/2019-06-10 /srv/bv/data /data /tmp"
 dataurl="https://www.phy.bnl.gov/~bviren/tmp/ptmp/ptmp-dumps/2019-06-10"
 
 tstdir=$(dirname $(realpath "$BASH_SOURCE"))

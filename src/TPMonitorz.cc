@@ -55,7 +55,7 @@ void tpmonitorz(zsock_t* pipe, void* vargs)
         zsock_t* cap;           // capture
         zsock_t* con;           // control
         int id;
-        int nrecv{0};
+        int nrecv;
     };
 
     std::vector<zactor_t*> taps;
