@@ -291,16 +291,17 @@ void tpwindow_proxy(zsock_t* pipe, void* vargs)
     }
     
     zsock_signal(pipe, 0);      // signal ready
-    zpoller_t* pipe_poller = zpoller_new(pipe, isock, NULL);
+    zpoller_t* poller = zpoller_new(pipe, isock, NULL);
 
     // initial window is most likely way before any data.
     TPWindower windower(osock, tspan, toff, tbuf, detid);
     bool got_quit = false;
     int count_in = 0;
+    const int pay_attention = 100;
     while (!zsys_interrupted) {
 
-        void* which = zpoller_wait(pipe_poller, -1);
-        if (!which) {
+        void* which = zpoller_wait(poller, -1);
+        if (zpoller_terminated(poller)) {
             zsys_info("window: interrupted in poll");
             break;
         }
@@ -308,7 +309,7 @@ void tpwindow_proxy(zsock_t* pipe, void* vargs)
             zsys_info("window: got quit after %d", count_in);
             dump_window(windower.window, "quit");
             got_quit = true;
-            break;
+            goto cleanup;
         }
 
         // zsys_info("TPWindow got input");
@@ -339,7 +340,22 @@ void tpwindow_proxy(zsock_t* pipe, void* vargs)
                   [](const ptmp::data::TrigPrim& a, const ptmp::data::TrigPrim& b) {
                       return a.tstart() < b.tstart();
                   });
+
         for (const auto& tp : tps.tps()) {
+
+            // maybe_add() will block if output queue is full.  do a
+            // sleepy loop, checking for shutdown or until we can
+            // send.  This is an ugly hack in lieu of restructuring
+            // this code to make it clearer.
+            while (! (zsock_events(osock) & ZMQ_POLLOUT)) { // if output is full
+                if (zsock_events(pipe) & ZMQ_POLLIN) {
+                    got_quit = true;
+                    goto cleanup;
+                }
+                zclock_sleep(1); // ms
+            }
+
+
             bool ok = windower.maybe_add(tp);
             if (!ok) {
                 ++ntps_failed;
@@ -358,9 +374,10 @@ void tpwindow_proxy(zsock_t* pipe, void* vargs)
 
     } // message loop
 
+  cleanup:
 
     zsys_debug("window: finishing after %d", count_in);
-    zpoller_destroy(&pipe_poller);
+    zpoller_destroy(&poller);
     zsock_destroy(&isock);
     zsock_destroy(&osock);
 
@@ -378,10 +395,10 @@ ptmp::TPWindow::TPWindow(const std::string& config)
 
 ptmp::TPWindow::~TPWindow()
 {
-    // zsys_debug("tpwindow: signaling done");
+    zsys_debug("window: signaling done");
     zsock_signal(zactor_sock(m_actor), 0); // signal quit
     zactor_destroy(&m_actor);
-    // zsys_debug("tpwindow: destroying");
+    zsys_debug("window: destroying");
 }
 
 void ptmp::TPWindow::test()

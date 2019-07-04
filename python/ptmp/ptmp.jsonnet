@@ -58,13 +58,13 @@
         } + $.maybe_sockets(isocket, osocket),
     },
 
-    // Create a configuration for TPSorted. 
-    sorted(name, isocket, osocket, tardy, tardy_policy="drop") :: {
+    // Create a configuration for TPZipper. 
+    zipper(name, isocket, osocket, sync_time, tardy_policy="drop") :: {
         name: name,
-        type: 'sorted',
+        type: 'zipper',
         data: {
-            // the tardy time in ms
-            tardy: tardy,
+            // the sync time in ms
+            sync_time: sync_time,
             // the tardy policy (drop vs block)
             tardy_policy: tardy_policy,
         } + $.maybe_sockets(isocket, osocket),
@@ -166,7 +166,7 @@
         ret: fsends + sinks + [monitor],
     }.ret,
 
-    files_sorted_monitored(filenames, mon_filename,
+    files_zipped_monitored(filenames, mon_filename,
                            port_base=7000, nmsgs=100000, tspan = 50/0.02, tbuf = 5000/0.02,
                            rewrite_count=0,
                            socker = $.sitm.tcp
@@ -192,11 +192,11 @@
                                   osocket = socker('bind',   'push', port_base + 400 + ind))
                          for ind in fiota],
 
-        local sorted = $.sorted("sorted", 
+        local zipper = $.zipper("zipper", 
                                 $.socket('connect', 'pull',
                                          [$.tcp(port = port_base + 500 + ind) for ind in fiota]),
                                 socker('bind','push', port_base + 600),
-                                tardy = 100),
+                                sync_time = 10),
 
         local sink = $.czmqat("sink",
                               isocket = socker('connect', 'pull', port_base + 700)),
@@ -207,17 +207,17 @@
                    socker('bind',   'push', port_base + 300 + ind))
              for ind in fiota]
             +
-            [$.tap(400 + ind,   // between windows and sorted
+            [$.tap(400 + ind,   // between windows and zipper
                    socker('connect','pull', port_base + 400 + ind),
                    socker('bind',   'push', port_base + 500 + ind))
              for ind in fiota]
             +
-            [$.tap(600,         // between sorted and sink
+            [$.tap(600,         // between zipper and sink
                    socker('connect','pull', port_base + 600),
                    socker('bind',   'push', port_base + 700))],
 
         local monitor = $.monitor("monitor", mon_filename, taps),
 
-        ret: fsends + replays + windows + [sorted, sink, monitor]
+        ret: fsends + replays + windows + [zipper, sink, monitor]
     }.ret,
 }

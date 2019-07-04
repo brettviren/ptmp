@@ -1,6 +1,6 @@
 #!/bin/bash
 
-datadirs=". /data/fast/bviren/ptmp-dumps/2019-06-10 /srv/bv/data /data /tmp"
+datadirs=". /data/fast/bviren/ptmp-dumps/2019-06-10 /srv/bv/data /data/bviren /data /tmp"
 dataurl="https://www.phy.bnl.gov/~bviren/tmp/ptmp/ptmp-dumps/2019-06-10"
 
 tstdir=$(dirname $(realpath "$BASH_SOURCE"))
@@ -61,7 +61,8 @@ do_test () {
 }
 
 #do_test ptmper "" FELIX_BR_60{1,3,5,7,9}.dump
-do_test ptmper-monitored "-V output=ptmper.mon" FELIX_BR_60{1,3,5,7,9}.dump > log.ptmper-monitored 2>&1
+do_test ptmper "" FELIX_BR_60{1,3}.dump
+#do_test ptmper-monitored "-V output=ptmper.mon" FELIX_BR_60{1,3,5,7,9}.dump > log.ptmper-monitored 2>&1
 
 
 

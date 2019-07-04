@@ -133,6 +133,17 @@ struct sender_t {
         outputs.clear();
     }
     ~sender_t() { destroy(); }
+
+    bool blocked() {
+        for (size_t ind=0; ind < outputs.size(); ++ind) {
+            if (! (zsock_events(outputs[ind]) & ZMQ_POLLOUT)) {
+                // zsys_debug("zipper: blocked on output %d", ind);
+                return true;
+            }
+        }
+        return false;
+    }
+
 };
 
 // The actor function
@@ -191,11 +202,11 @@ void tpzipper(zsock_t* pipe, void* vargs)
         void* which = zpoller_wait(poller, wait_time_ms);
 
         if (zpoller_terminated(poller)) {
-            break;
+            goto cleanup;
         }
         if (which == pipe) {
             got_quit = true;
-            break;
+            goto cleanup;
         }
 
 
@@ -213,6 +224,15 @@ void tpzipper(zsock_t* pipe, void* vargs)
                     zmsg_destroy(&msg);
                 }
                 else {          // destroy output time ordering,
+
+                    // fixme: kludge to avoid output block stopping shutdown
+                    while (sender.blocked()) {
+                        if (zsock_events(pipe) & ZMQ_POLLIN) {
+                            got_quit = true;
+                            goto cleanup;
+                        }
+                        zclock_sleep(1); // ms
+                    }
                     sender(&msg);
                 }
             }
@@ -239,6 +259,15 @@ void tpzipper(zsock_t* pipe, void* vargs)
                 last_tstart = si->tpset.tstart();
                 zmsg_t* msg = si->release();
 
+                // fixme: kludge to avoid output block stopping shutdown
+                while (sender.blocked()) {
+                    if (zsock_events(pipe) & ZMQ_POLLIN) {
+                        got_quit = true;
+                        goto cleanup;
+                    }
+                    zclock_sleep(1); // ms
+                }
+
                 sender(&msg);
                 si = NULL;
             }
@@ -257,7 +286,9 @@ void tpzipper(zsock_t* pipe, void* vargs)
     }
 
 
-    // clean up
+  cleanup:
+
+    zsys_debug("zipper: finishing");
     zpoller_destroy(&poller);
     for (auto& siit : source_infos) {
         auto& si = siit.second;
@@ -282,6 +313,7 @@ ptmp::TPZipper::TPZipper(const std::string& config)
 
 ptmp::TPZipper::~TPZipper()
 {
+    zsys_debug("zipper: signaling done");
     zsock_signal(zactor_sock(m_actor), 0); // signal quit
     zactor_destroy(&m_actor);
 }

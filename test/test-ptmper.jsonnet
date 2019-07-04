@@ -84,25 +84,24 @@ local single_files = {
 
 local get_socket = function(actor, which="output") actor.data[which].socket;
 
-local link_sorted = function(pipelines, port, sitm = ptmp.sitm.tcp) {
+local zip_links = function(pipelines, port, sitm = ptmp.sitm.tcp) {
     local addrs = std.flattenArrays([get_socket(back(pl.components)).bind for pl in pipelines]),
-    local sorted = ptmp.sorted("sorted", 
+    local zipper = ptmp.zipper("zipper", 
                                ptmp.socket('connect', 'pull', addrs),
                                sitm('bind','push', port),
-                               100,
+                               sync_time = 10,
                               ),
-    name: "sorted",
-    components: [sorted] + std.flattenArrays([pl.components for pl in pipelines]),
-};
+    components: std.flattenArrays([pl.components for pl in pipelines]) + [zipper],
+}.components;
 
 
 
 local multi_files = {
     local pipelines = [link_pipeline(input[ind], 7000 + ind*10) for ind in input_iota],
 
-    local sorted = link_sorted(pipelines, 8000),
+    local zipped = zip_links(pipelines, 8000),
 
-    ret: {['test-%s.json'%sorted.name]: ptmp.ptmper(sorted.components, ttl=1, reprieve=1)},
+    ret: {'test-zipped.json': ptmp.ptmper(zipped, ttl=1, reprieve=1)},
 }.ret;
 
 

@@ -71,7 +71,7 @@ void tpreplay_proxy(zsock_t* pipe, void* vargs)
         if (which == pipe) {
             zsys_info("replay: got quit");
             got_quit = true;
-            break;
+            goto cleanup;
         }
         
         // got input
@@ -101,6 +101,16 @@ void tpreplay_proxy(zsock_t* pipe, void* vargs)
             if (rewrite_count) {
                 tpset.set_count(count);
             }
+
+            // fixme: kludge to avoid output block stopping shutdown
+            while (! (zsock_events(osock) & ZMQ_POLLOUT)) {
+                if (zsock_events(pipe) & ZMQ_POLLIN) {
+                    got_quit = true;
+                    goto cleanup;
+                }
+                zclock_sleep(1); // ms
+            }
+
             ptmp::internals::send(osock, tpset);
             ++count;
             zsys_debug("replay: first");
@@ -126,11 +136,22 @@ void tpreplay_proxy(zsock_t* pipe, void* vargs)
             if (rewrite_count) {
                 tpset.set_count(count);
             }
+
+            // fixme: kludge to avoid output block stopping shutdown
+            while (! (zsock_events(osock) & ZMQ_POLLOUT)) {
+                if (zsock_events(pipe) & ZMQ_POLLIN) {
+                    got_quit = true;
+                    goto cleanup;
+                }
+                zclock_sleep(1); // ms
+            }
+
             ptmp::internals::send(osock, tpset);
             ++count;
         }
     }
 
+  cleanup:
     zsys_debug("replay: finished after %d", count);
 
     zpoller_destroy(&poller);
