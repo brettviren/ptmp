@@ -1,4 +1,5 @@
 #include "ptmp/api.h"
+#include "ptmp/internals.h"
 
 #include <czmq.h>
 #include <json.hpp>
@@ -10,28 +11,6 @@
 
 using json = nlohmann::json;
 
-// TPSorted interprets the list of endpoints as being for individual
-// sockets while normally, one socket may have many endpoints.  So, we
-// do a little private jostling of the config into many confgs.
-static
-std::vector<zsock_t*> make_sockets(json jcfg)
-{
-    const std::vector<std::string> bcs{"bind","connect"};
-    std::vector<zsock_t*> ret;
-    for (auto bc : bcs) {
-        for (auto jaddr : jcfg[bc]) {
-            json cfg = {
-                { "socket", {
-                        { "type", jcfg["type"] },
-                        { "hwm", jcfg["hwm"] },
-                        { bc, jaddr } } } };
-            std::string cfgstr = cfg.dump();
-            zsock_t* sock = ptmp::internals::endpoint(cfgstr);
-            ret.push_back(sock);
-        }
-    }
-    return ret;
-}
 
 // This is probably a painfully slow function that gets run multiple
 // times on the same message.  The PTMP message coded design is
@@ -75,7 +54,7 @@ static const ptmp::data::data_time_t EOT = 0x7FFFFFFFFFFFFFFF;
 // keep track of state for each input
 struct SockInfo {
     size_t index;
-    zsock_t* sock;     // the socket
+    zsock_t* sock;
     zpoller_t* poller; 
     ptmp::data::real_time_t seen_time; // wall clock time when last message arrived
     msg_header_t msg_header;
@@ -131,8 +110,8 @@ void tpsorted_proxy(zsock_t* pipe, void* vargs)
 {
 
     auto config = json::parse((const char*) vargs);
-    auto input = make_sockets(config["input"]["socket"]);
-    auto output = make_sockets(config["output"]["socket"]);
+    auto input = ptmp::internals::perendpoint(config["input"].dump());
+    auto output = ptmp::internals::perendpoint(config["output"].dump());
 
     auto tardy_policy = config["tardy_policy"];
     bool drop_tardy = true;

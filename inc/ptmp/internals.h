@@ -4,6 +4,7 @@
 #include <czmq.h>
 #include <cstdio>
 #include <string>
+#include <vector>
 
 namespace ptmp {
     namespace internals {
@@ -12,6 +13,7 @@ namespace ptmp {
         int socket_type(std::string name);
 
         zsock_t* endpoint(const std::string& config);
+        std::vector<zsock_t*> perendpoint(const std::string& config);
 
         void recv(zmsg_t* &msg, ptmp::data::TPSet& tps);
         void send(zsock_t* sock, const ptmp::data::TPSet& tps);

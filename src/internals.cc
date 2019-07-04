@@ -85,6 +85,31 @@ zsock_t* ptmp::internals::endpoint(const std::string& config)
     return sock;
 }
 
+
+// Most sockets are meant to allow for multiple endpoints to
+// bind/connect.  Some uses require one socket per endpoint.  This
+// function is like endpoint() but provides a per-endpoint socket interpretation.
+std::vector<zsock_t*> ptmp::internals::perendpoint(const std::string& config)
+{
+    auto jcfg = json::parse(config)["socket"];
+    const std::vector<std::string> bcs{"bind","connect"};
+    std::vector<zsock_t*> ret;
+    for (auto bc : bcs) {
+        for (auto jaddr : jcfg[bc]) {
+            json cfg = {
+                { "socket", {
+                        { "type", jcfg["type"] },
+                        { "hwm", jcfg["hwm"] },
+                        { bc, jaddr } } } };
+            std::string cfgstr = cfg.dump();
+            zsock_t* sock = endpoint(cfgstr);
+            ret.push_back(sock);
+        }
+    }
+    return ret;
+}
+
+
 ptmp::internals::Socket::Socket(const std::string& config)
     : m_sock(endpoint(config))
     , m_poller(zpoller_new(m_sock, NULL))

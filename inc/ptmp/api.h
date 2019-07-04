@@ -117,6 +117,14 @@ namespace ptmp {
         zactor_t* m_actor;
     };
 
+    class TPZipper : public TPAgent {
+    public:
+        TPZipper(const std::string& config);
+        virtual ~TPZipper();
+    private:
+        zactor_t* m_actor;
+    };
+
     /**
        A "free agent" that accepts TPSets on an input socket and
        "replays" them to an output socket.  The replay is done in a
