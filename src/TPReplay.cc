@@ -4,27 +4,12 @@
 
 using json = nlohmann::json;
 
-// fixme: this is duplicated from TPSorted.  And, better to have
-// header outside of protobuf object.  This needs refactoring.
-struct msg_header_t {
-    uint32_t count, detid;
-    uint64_t tstart;
-    int ntps;
-};
-static msg_header_t msg_header(zmsg_t* msg)
-{
-    zmsg_first(msg);            // msg id
-    zframe_t* pay = zmsg_next(msg);
-    ptmp::data::TPSet tps;
-    tps.ParseFromArray(zframe_data(pay), zframe_size(pay));
-    return msg_header_t{tps.count(), tps.detid(), tps.tstart(), tps.tps_size()};
-}
-
 static
-void dump_header(const char* label, msg_header_t& head)
+void dump_header(const char* label, ptmp::data::TPSet& tpset)
 {
     zsys_debug("replay: %s 0x%x #%d %4d %ld",
-               label, head.detid, head.count, head.ntps, head.tstart);
+               label, tpset.detid(), tpset.count(),
+               tpset.tps_size(), tpset.tstart());
 }
 
 
@@ -54,8 +39,8 @@ void tpreplay_proxy(zsock_t* pipe, void* vargs)
 
     int wait_time_ms = -1;
 
-    ptmp::data::real_time_t last_send_time = 0;
-    ptmp::data::data_time_t last_mesg_time = 0;
+    ptmp::data::real_time_t first_created = 0, last_created = 0;
+    ptmp::data::data_time_t first_tstart = 0, last_tstart = 0;
 
     int count = 0;
     bool got_quit = false;
@@ -81,23 +66,17 @@ void tpreplay_proxy(zsock_t* pipe, void* vargs)
             zsys_info("replay: interrupted in recv");
             break;
         }
-        auto header = msg_header(msg);
 
-        // dump_header("send", header);
+        // unpack message to get timing
+        ptmp::data::TPSet tpset;
+        ptmp::internals::recv(msg, tpset);
+        const ptmp::data::data_time_t tstart = tpset.tstart();
 
-        if (header.tstart == 0xffffffffffffffff) {
-            dump_header("kill", header);
-            zmsg_destroy(&msg);
-            continue;
-        }
-        
+        if (last_created == 0) { // first message
+            first_created = last_created = ptmp::data::now();
+            first_tstart = last_tstart = tstart;
 
-        if (last_send_time == 0) { // first message
-            last_send_time = ptmp::data::now();
-            last_mesg_time = header.tstart;
-            ptmp::data::TPSet tpset;
-            ptmp::internals::recv(msg, tpset);
-            tpset.set_created(last_send_time);
+            tpset.set_created(last_created);
             if (rewrite_count) {
                 tpset.set_count(count);
             }
@@ -117,23 +96,23 @@ void tpreplay_proxy(zsock_t* pipe, void* vargs)
             continue;
         }
 
-        const ptmp::data::real_time_t delta_tau = (header.tstart - last_mesg_time)/speed;
-        const ptmp::data::real_time_t t_now = ptmp::data::now();
-        ptmp::data::real_time_t delta_t = last_send_time + delta_tau - t_now;
-        if (delta_t < 0) {
-            // tardy!
-            delta_t = 0;
+        if (tstart < last_tstart) {
+            // tardy
+            zsys_debug("replay: tardy %d", tpset.count());
             continue;
         }
-        if (delta_t > 0 ) {
-            ptmp::internals::microsleep(std::min(1L, delta_t));
+
+        const ptmp::data::real_time_t delta_tau = (tstart - first_tstart)/speed;
+        const ptmp::data::real_time_t t_now = ptmp::data::now();
+        const ptmp::data::real_time_t delta_t = t_now - first_created;
+        const ptmp::data::real_time_t to_sleep = delta_tau - delta_t;
+        last_tstart = tstart;
+        last_created = t_now;
+        if (to_sleep > 0) {
+            ptmp::internals::microsleep(to_sleep);
         }
-        last_mesg_time = header.tstart;
-        last_send_time = ptmp::data::now();
         {
-            ptmp::data::TPSet tpset;
-            ptmp::internals::recv(msg, tpset);
-            tpset.set_created(last_send_time);
+            tpset.set_created(ptmp::data::now());
             if (rewrite_count) {
                 tpset.set_count(count);
             }

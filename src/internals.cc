@@ -15,12 +15,12 @@ using namespace ptmp::internals;
 
 void ptmp::internals::microsleep(ptmp::data::real_time_t microseconds)
 {
-    //usleep(microseconds);
+    usleep(microseconds);
     
-    struct timespec req = {0};
-    req.tv_sec = microseconds / 1000000;
-    req.tv_nsec = 1000*(microseconds % 1000000);
-    nanosleep(&req, (struct timespec *)NULL);    
+    // struct timespec req = {0};
+    // req.tv_sec = microseconds / 1000000;
+    // req.tv_nsec = 1000*(microseconds % 1000000);
+    // nanosleep(&req, (struct timespec *)NULL);    
 }
 
 int ptmp::internals::socket_type(std::string name)

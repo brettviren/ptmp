@@ -20,8 +20,8 @@ void tap_proxy(zsock_t* pipe, void* vargs)
     zsock_t* be_sock = ptmp::internals::endpoint(config["output"].dump());
 
     char* cap_addr = zsys_sprintf("inproc://capture%05d", tapid);
-    //zsock_t* cap_sock = zsock_new_pub(cap_addr);
-    zsock_t* cap_sock = zsock_new_push(cap_addr);
+    zsock_t* cap_sock = zsock_new_pub(cap_addr);
+    //zsock_t* cap_sock = zsock_new_push(cap_addr);
     freen (cap_addr);
 
     char* con_addr = zsys_sprintf("inproc://control%05d", tapid);
@@ -74,8 +74,8 @@ void tpmonitorz(zsock_t* pipe, void* vargs)
         std::string tapcfg = jtap.dump();
         tapinfo_t ti {
             zactor_new(tap_proxy, (void*)tapcfg.c_str()),
-            //zsock_new_sub(cap_addr, ""),
-            zsock_new_pull(cap_addr),
+            zsock_new_sub(cap_addr, ""),
+            //zsock_new_pull(cap_addr),
             zsock_new_push(con_addr),
             tapid,
             0

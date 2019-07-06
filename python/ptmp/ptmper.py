@@ -133,7 +133,7 @@ def monplots(time_limit, output, config, monfile):
         dat[tid] = dict(
             now = now[1:] - now[0],
             tstart = tstart[1:] - tstart[0],
-            created = created[1:] - now[0],
+            created = created[1:] - created[0],
             dnow = now[1:] - now[:-1],
             dtstart = tstart[1:] - tstart[:-1],
             dnrecv = nrecv[1:] - nrecv[:-1],
@@ -163,7 +163,10 @@ def monplots(time_limit, output, config, monfile):
                 ax.set_xlabel(xlab)
                 ax.set_ylabel(ylab)
                 for tapid in group:
-                    d = dat[tapid]
+                    try:
+                        d = dat[tapid]
+                    except KeyError:
+                        continue
                     x = np.array(xkey(d))
                     y = np.array(ykey(d))
                     siz = min(x.size,y.size)
@@ -181,15 +184,67 @@ def monplots(time_limit, output, config, monfile):
                 ax.legend(prop=dict(size=6))
                 pdf.savefig(fig)
 
+
+            def two(name, xkey, ykey, xlab, ylab, lab="%d", tit = "%s", extent=[[0,50],[-1,1]]):
+                return
+                fig, ax = plt.subplots(1,1, **fopts)
+                ax.set_title(tit % group_name)
+                ax.set_xlabel(xlab)
+                ax.set_ylabel(ylab)
+                allx = list()
+                ally = list()
+                for tapid in group:
+                    d = dat[tapid]
+                    x = np.array(xkey(d))
+                    y = np.array(ykey(d))
+                    siz = min(x.size,y.size)
+                    x = x[:siz]
+                    y = y[:siz]
+                    print (x.size, y.size)
+                    if (time_limit > 0):
+                        tlim = x<time_limit
+                        x = x[tlim]
+                        y = y[tlim]
+                    allx.append(x)
+                    ally.append(y)
+                allx = np.hstack(allx)
+                allx[allx<extent[0][0]] = extent[0][0]
+                allx[allx>extent[0][1]] = extent[0][1]
+                ally = np.hstack(ally)
+                ally[ally<extent[1][0]] = extent[1][0]
+                ally[ally>extent[1][1]] = extent[1][1]
+                h = ax.hist2d(allx, ally, (100, 100), range=extent, cmap=plt.cm.jet)
+                plt.colorbar(h[3], ax=ax)
+                pdf.savefig(fig)
+
+
             one("count", lambda d: d["tstart"], lambda d: d["count"], "data clock [s]", "count")
             one("nrecv", lambda d: d["now"], lambda d: d["nrecv"], "wall clock [s]", "nrecv")
             one("tstart", lambda d: d["now"], lambda d: d["tstart"], "wall clock [s]", "data clock [s]")
+
             one("dlat", lambda d: d["now"], lambda d: d["now"]-d["tstart"], "wall clock [s]", "now - data clock [s]")
+            two("dlat", lambda d: d["now"], lambda d: d["now"]-d["tstart"], "wall clock [s]", "now - data clock [s]",
+                extent=[[0,50],[-0.200, -0.175]])
+
+            one("clat", lambda d: d["created"], lambda d: d["created"]-d["tstart"], "wall clock [s]", "created - data clock [s]")
+            two("clat", lambda d: d["created"], lambda d: d["created"]-d["tstart"], "wall clock [s]", "created - data clock [s]",
+                extent=[[0,50],[0,.0001]])
+
             one("rlat", lambda d: d["now"], lambda d: d["now"]-d["created"], "wall clock [s]", "now - created [s]")
+            two("rlat", lambda d: d["now"], lambda d: d["now"]-d["created"], "wall clock [s]", "now - created [s]",
+                extent=[[0,50],[-0.200, -0.175]])
+
             one("ndiff", lambda d: d["now"], lambda d: d["nrecv"]-d["count"], "wall clock [s]", "nrecv - count")
             one("nrecvrate", lambda d: d["now"], lambda d: d["dnrecv"]/d["dnow"], "wall clock [s]", "nrecv rate [Hz]")
+            two("nrecvrate", lambda d: d["now"], lambda d: d["dnrecv"]/d["dnow"], "wall clock [s]", "nrecv rate [Hz]",
+                extent=[[0,50],[0,20000]])
+
             one("countrate", lambda d: d["tstart"], lambda d: d["dcount"]/d["dtstart"], "data clock [s]", "count rate [Hz]")
-                         
+            two("countrate", lambda d: d["tstart"], lambda d: d["dcount"]/d["dtstart"], "data clock [s]", "count rate [Hz]",
+                extent=[[0,50],[0,10000]])
+
+
+
         np.savez("monplotsdump", **tosave)
             
 

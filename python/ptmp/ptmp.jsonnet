@@ -167,6 +167,92 @@
         ret: fsends + sinks + [monitor],
     }.ret,
 
+
+    just_replay(filenames, mon_filename,
+                port_base=7000, nmsgs=100000, tspan = 50/0.02, tbuf = 5000/0.02,
+                rewrite_count=0,
+                socker = $.sitm.tcp
+               ) ::
+    {
+        local nfiles = std.length(filenames),
+        local fiota = std.range(0, nfiles-1),
+        local bnames = [$.util.basename(fn) for fn in filenames],
+
+        local fsends = [$.czmqat("fsend-"+bnames[ind],
+                                 number = nmsgs, ifile = filenames[ind],
+                                 osocket = socker('bind','push', port_base + 100 + ind))
+                        for ind in fiota],
+        
+        local replays = [$.replay("replay-"+bnames[ind], 
+                                  isocket = socker('connect','pull', port_base + 100 + ind),
+                                  osocket = socker('bind',   'push', port_base + 200 + ind),
+                                  rewrite_count=rewrite_count)
+                         for ind in fiota],
+
+        local sink = $.czmqat("sink",
+                              isocket = socker('connect', 'pull', port_base + 700)),
+
+        local taps =
+            [$.tap(200 + ind,   // between replays and sink
+                   socker('connect','pull', port_base + 200 + ind),
+                   socker('bind',   'push', port_base + 700),
+                   layer='replay')
+             for ind in fiota],
+
+        local monitor = $.monitor("monitor", mon_filename, taps),
+
+        ret: fsends + replays + [sink, monitor]
+    }.ret,
+
+
+    just_window(filenames, mon_filename,
+                port_base=7000, nmsgs=100000, tspan = 50/0.02, tbuf = 5000/0.02,
+                rewrite_count=0,
+                socker = $.sitm.tcp
+               ) ::
+    {
+        local nfiles = std.length(filenames),
+        local fiota = std.range(0, nfiles-1),
+        local bnames = [$.util.basename(fn) for fn in filenames],
+
+        local fsends = [$.czmqat("fsend-"+bnames[ind],
+                                 number = nmsgs, ifile = filenames[ind],
+                                 osocket = socker('bind','push', port_base + 100 + ind))
+                        for ind in fiota],
+        
+        local replays = [$.replay("replay-"+bnames[ind], 
+                                  isocket = socker('connect','pull', port_base + 100 + ind),
+                                  osocket = socker('bind',   'push', port_base + 200 + ind),
+                                  rewrite_count=rewrite_count)
+                         for ind in fiota],
+
+        local windows = [$.window("window-"+bnames[ind], tspan = tspan, tbuf = tbuf,
+                                  isocket = socker('connect','pull', port_base + 300 + ind),
+                                  osocket = socker('bind',   'push', port_base + 400 + ind))
+                         for ind in fiota],
+
+        local sink = $.czmqat("sink",
+                              isocket = socker('connect', 'pull', port_base + 700)),
+
+        local taps =
+            [$.tap(200 + ind,   // between replays and windows
+                   socker('connect','pull', port_base + 200 + ind),
+                   socker('bind',   'push', port_base + 300 + ind),
+                   layer='replay')
+             for ind in fiota]
+            +
+            [$.tap(400 + ind,   // between windows and zipper
+                   socker('connect','pull', port_base + 400 + ind),
+                   socker('bind',   'push', port_base + 700),
+                   layer='window')
+             for ind in fiota],
+
+        local monitor = $.monitor("monitor", mon_filename, taps),
+
+        ret: fsends + replays + windows + [sink, monitor]
+    }.ret,
+
+
     files_zipped_monitored(filenames, mon_filename,
                            port_base=7000, nmsgs=100000, tspan = 50/0.02, tbuf = 5000/0.02,
                            rewrite_count=0,

@@ -69,8 +69,8 @@ do_test () {
 
 #do_test ptmper "" FELIX_BR_50{1,3,5,7,9}.dump
 #do_test ptmper "" FELIX_BR_50{1,3}.dump
-#do_test ptmper-monitored "-V outdir=$tmpdir" FELIX_BR_50{1,3,5,7,9}.dump > log.ptmper-monitored 2>&1
-do_test ptmper-monitored "-V outdir=$tmpdir" FELIX_BR_501.dump
+do_test ptmper-monitored "-V outdir=$tmpdir" FELIX_BR_50{1,3,5,7,9}.dump
+#do_test ptmper-monitored "-V outdir=$tmpdir" FELIX_BR_501.dump
 
 echo "output in: $tmpdir"
 
