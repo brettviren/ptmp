@@ -146,9 +146,9 @@ namespace ptmp {
            for output.  Note, each output message is sent to all
            output sockets.  The config is two objects each like
            TPSender/TPReceiver held by a key "sender" and "receiver".
-           An optional "speed" atribute may provide a multiplicative
-           "dt/dt" speed up (speed>1) or slow down (speed<1) of output
-           rate relative to that implied by the tstart values.
+           An optional "speed" atribute provides the number of
+           hardware data clock ticks per microsecond (eg, default of
+           50 for PDSP).
         */
 
             

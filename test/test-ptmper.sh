@@ -1,10 +1,12 @@
 #!/bin/bash
 
-datadirs=". /data/fast/bviren/ptmp-dumps/2019-06-10 /srv/bv/data /data/bviren /data /tmp"
-dataurl="https://www.phy.bnl.gov/~bviren/tmp/ptmp/ptmp-dumps/2019-06-10"
+dataset="2019-07-05"
+datadirs=". /data/fast/bviren/ptmp-dumps /srv/bv/data /data/bviren /data /tmp"
+dataurl="https://www.phy.bnl.gov/~bviren/tmp/ptmp/ptmp-dumps/$dataset"
 
 tstdir=$(dirname $(realpath "$BASH_SOURCE"))
 topdir=$(dirname "$tstdir")
+tmpdir=$(mktemp -d "/tmp/test-ptmper-XXXXX")
 
 getfile () {
     if [ -z "$1" ] ; then
@@ -14,19 +16,25 @@ getfile () {
     local filename="$1" ; shift
     local maybe
     for maybe in $datadirs ; do
-        if [ -f $maybe/$filename ] ; then
-            echo $maybe/$filename
+        if [ -f $maybe/$dataset/$filename ] ; then
+            echo $maybe/$dataset/$filename
             return
         fi
     done
-    wget -O /tmp/$filename $dataurl/$filename
-    echo /tmp/$filename
+    tmpdir=/tmp/$dataset
+    if [ ! -d $tmpdir ] ; then
+        mkdir -p $tmpdir
+    fi
+    wget -O $tmpdir/$filename $dataurl/$filename
+    echo $tmpdir/$filename
 }
 
 argify_list () {
     local list=$@
     echo "["\"${list// /\",\"}\""]"
 }
+
+
 
 
 do_test () {
@@ -45,24 +53,25 @@ do_test () {
 
     echo "Using files: ${files[*]}"
 
-    local tmpdir=$(mktemp -d "/tmp/test-ptmper-XXXXX")
     args+=" -m $tmpdir -J $topdir/python/ptmp"
     args+=" --ext-code input="$(argify_list "${files[*]}")
 
     echo "$args"
 
-    set -x
+    #set -x
+    echo "jsonnet $args $testfile"
     for cfg in $(jsonnet $args "$testfile") ; do
         echo "ptmper $cfg"
         time ptmper $cfg || exit -1
     done
     #rm -rf $tmpdir
-    echo "not deleting $tmpdir"
 }
 
-#do_test ptmper "" FELIX_BR_60{1,3,5,7,9}.dump
-do_test ptmper "" FELIX_BR_60{1,3}.dump
-#do_test ptmper-monitored "-V output=ptmper.mon" FELIX_BR_60{1,3,5,7,9}.dump > log.ptmper-monitored 2>&1
+#do_test ptmper "" FELIX_BR_50{1,3,5,7,9}.dump
+#do_test ptmper "" FELIX_BR_50{1,3}.dump
+#do_test ptmper-monitored "-V outdir=$tmpdir" FELIX_BR_50{1,3,5,7,9}.dump > log.ptmper-monitored 2>&1
+do_test ptmper-monitored "-V outdir=$tmpdir" FELIX_BR_501.dump
 
+echo "output in: $tmpdir"
 
 

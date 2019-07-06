@@ -1,5 +1,5 @@
 /**
-   The zipper (aka sorted) synchronizes a number of input streams into
+   The zipper (ne' sorted) synchronizes a number of input streams into
    one output stream.  Each input is assumed to be strictly ordered by
    their TPSet.tstart data times and ouput stream is likewise so
    ordered.
@@ -217,7 +217,7 @@ void tpzipper(zsock_t* pipe, void* vargs)
 
             // dispatch as tardy or enqueue
 
-            if (si->tpset.tstart() < last_tstart) {
+            while (si->tpset.tstart() < last_tstart) {
                 ++ si->ntardy;
                 zmsg_t* msg = si->release();
                 if (drop_tardy) { // enact correct tardy policy
@@ -235,11 +235,15 @@ void tpzipper(zsock_t* pipe, void* vargs)
                     }
                     sender(&msg);
                 }
-            }
-            else {
+                if (zsock_events(which) & ZMQ_POLLIN) {
+                    si->recv(); // go again on same input
+                }
+            } // loop can leave si empty or populated
+            if (si->msg) {
                 si_queue.push(si);
                 zpoller_remove(poller, si->sock);
             }
+
         }
         
 

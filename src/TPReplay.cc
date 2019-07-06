@@ -123,11 +123,12 @@ void tpreplay_proxy(zsock_t* pipe, void* vargs)
         if (delta_t < 0) {
             // tardy!
             delta_t = 0;
+            continue;
         }
         if (delta_t > 0 ) {
-            ptmp::internals::microsleep(delta_t);
-            last_mesg_time = header.tstart;
+            ptmp::internals::microsleep(std::min(1L, delta_t));
         }
+        last_mesg_time = header.tstart;
         last_send_time = ptmp::data::now();
         {
             ptmp::data::TPSet tpset;

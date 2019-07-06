@@ -2,6 +2,7 @@
 '''
 Do things related to the "ptmper" application
 '''
+from collections import defaultdict
 
 from . import jsonnet
 
@@ -104,11 +105,21 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 
 @cli.command('monplots')
+@click.option('-t','--time-limit', default=0.0, help="Limit time plots to this many seconds")
 @click.option('-o','--output', default="/dev/stdout", help="Output file or stdout")
+@click.option('-c','--config', default=None, help="The ptmper JSON config file")
 @click.argument('monfile')
-def monplots(output, monfile):
+def monplots(time_limit, output, config, monfile):
     mon = pd.read_csv(monfile, delim_whitespace=True)
     bytap = {n:mon[mon.tapid==n] for n in set(mon.tapid)} 
+
+    cfg = jsonnet.load(config)
+    mon = [m for m in cfg["proxies"] if m["type"] == "monitor"][0]
+    groups = defaultdict(list)
+    for tap in mon["data"]["taps"]:
+        groups[tap["layer"]].append(tap["id"])
+    print (groups)
+
 
     dat = dict()
     for tid,mon in bytap.items():
@@ -135,42 +146,51 @@ def monplots(output, monfile):
     #fopts = dict(figsize=(30,10))
     fopts = dict()
 
-    # this depends on what span of files were replayed
-    groups = [("replay",range(200,205)),
-              #("window",range(400,405)),
-              #("sorted",[600]),
-    ]
-
     with PdfPages(output) as pdf:
 
 
-        for group_name, group in groups:
+        tosave = dict()
+
+        for group_name, group in groups.items():
 
             def key(d):
                 return d[key]
 
 
-            def one(xkey, ykey, xlab, ylab, lab="%d", tit = "%s"):
+            def one(name, xkey, ykey, xlab, ylab, lab="%d", tit = "%s"):
                 fig, ax = plt.subplots(1,1, **fopts)
                 ax.set_title(tit % group_name)
                 ax.set_xlabel(xlab)
                 ax.set_ylabel(ylab)
                 for tapid in group:
                     d = dat[tapid]
-                    ax.plot(xkey(d), ykey(d), label=lab%tapid, **popts)
+                    x = np.array(xkey(d))
+                    y = np.array(ykey(d))
+                    siz = min(x.size,y.size)
+                    x = x[:siz]
+                    y = y[:siz]
+                    print (x.size, y.size)
+                    if (time_limit > 0):
+                        tlim = x<time_limit
+                        x = x[tlim]
+                        y = y[tlim]
+                    ax.plot(x, y, label=lab%tapid, **popts)
+                    tosave["%s_%d_%s_x"%(group_name, tapid, name)] = x
+                    tosave["%s_%d_%s_y"%(group_name, tapid, name)] = y
+
                 ax.legend(prop=dict(size=6))
                 pdf.savefig(fig)
 
-            one(lambda d: d["tstart"], lambda d: d["count"], "data clock [s]", "count")
-            one(lambda d: d["now"], lambda d: d["nrecv"], "wall clock [s]", "nrecv")
-            one(lambda d: d["now"], lambda d: d["tstart"], "wall clock [s]", "data clock [s]")
-            one(lambda d: d["now"], lambda d: d["now"]-d["tstart"], "wall clock [s]", "now - data clock [s]")
-            one(lambda d: d["now"], lambda d: d["now"]-d["created"], "wall clock [s]", "now - created [s]")
-            one(lambda d: d["now"], lambda d: d["nrecv"]-d["count"], "wall clock [s]", "nrecv - count")
-            one(lambda d: d["now"], lambda d: d["dnrecv"]/d["dnow"], "wall clock [s]", "nrecv rate [Hz]")
-            one(lambda d: d["tstart"], lambda d: d["dcount"]/d["dtstart"], "data clock [s]", "count rate [Hz]")
+            one("count", lambda d: d["tstart"], lambda d: d["count"], "data clock [s]", "count")
+            one("nrecv", lambda d: d["now"], lambda d: d["nrecv"], "wall clock [s]", "nrecv")
+            one("tstart", lambda d: d["now"], lambda d: d["tstart"], "wall clock [s]", "data clock [s]")
+            one("dlat", lambda d: d["now"], lambda d: d["now"]-d["tstart"], "wall clock [s]", "now - data clock [s]")
+            one("rlat", lambda d: d["now"], lambda d: d["now"]-d["created"], "wall clock [s]", "now - created [s]")
+            one("ndiff", lambda d: d["now"], lambda d: d["nrecv"]-d["count"], "wall clock [s]", "nrecv - count")
+            one("nrecvrate", lambda d: d["now"], lambda d: d["dnrecv"]/d["dnow"], "wall clock [s]", "nrecv rate [Hz]")
+            one("countrate", lambda d: d["tstart"], lambda d: d["dcount"]/d["dtstart"], "data clock [s]", "count rate [Hz]")
                          
-            
+        np.savez("monplotsdump", **tosave)
             
 
 def main():

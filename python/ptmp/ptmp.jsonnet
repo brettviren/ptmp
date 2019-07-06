@@ -134,8 +134,8 @@
 
     
     // make a "tap" description
-    tap(id, isock, osock) :: {
-        id: id,
+    tap(id, isock, osock, layer="") :: {
+        id: id, layer: layer,
     } + $.maybe_sockets(isock, osock),
 
 
@@ -154,7 +154,8 @@
         local taps =
             [$.tap(100 + ind,
                    socker('connect','pull', port_base + 100 + ind),
-                   socker('bind',   'push', port_base + 200 + ind))
+                   socker('bind',   'push', port_base + 200 + ind),
+                   layer="input")
              for ind in fiota],
 
         local sinks = [$.czmqat("sink-"+bnames[ind],
@@ -204,17 +205,20 @@
         local taps =
             [$.tap(200 + ind,   // between replays and windows
                    socker('connect','pull', port_base + 200 + ind),
-                   socker('bind',   'push', port_base + 300 + ind))
+                   socker('bind',   'push', port_base + 300 + ind),
+                   layer='replay')
              for ind in fiota]
             +
             [$.tap(400 + ind,   // between windows and zipper
                    socker('connect','pull', port_base + 400 + ind),
-                   socker('bind',   'push', port_base + 500 + ind))
+                   socker('bind',   'push', port_base + 500 + ind),
+                   layer='window')
              for ind in fiota]
             +
             [$.tap(600,         // between zipper and sink
                    socker('connect','pull', port_base + 600),
-                   socker('bind',   'push', port_base + 700))],
+                   socker('bind',   'push', port_base + 700),
+                   layer='zipper')],
 
         local monitor = $.monitor("monitor", mon_filename, taps),
 

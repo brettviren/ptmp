@@ -8,7 +8,7 @@ from setuptools import setup
 
 
 setup(name = 'ptmp',
-      version = '0.0.2',
+      version = '0.0.4',
       description = 'Prototype Trigger Message Passing',
       author = 'Brett Viren',
       author_email = 'brett.viren@gmail.com',
