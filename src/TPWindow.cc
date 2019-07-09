@@ -297,6 +297,7 @@ void tpwindow_proxy(zsock_t* pipe, void* vargs)
     TPWindower windower(osock, tspan, toff, tbuf, detid);
     bool got_quit = false;
     int count_in = 0;
+    int nfailed_total = 0;
     const int pay_attention = 100;
     while (!zsys_interrupted) {
 
@@ -350,6 +351,7 @@ void tpwindow_proxy(zsock_t* pipe, void* vargs)
             while (! (zsock_events(osock) & ZMQ_POLLOUT)) { // if output is full
                 if (zsock_events(pipe) & ZMQ_POLLIN) {
                     got_quit = true;
+                    zsys_debug("window: got quit while waiting to output");
                     goto cleanup;
                 }
                 zclock_sleep(1); // ms
@@ -368,6 +370,7 @@ void tpwindow_proxy(zsock_t* pipe, void* vargs)
         }
         if (ntps_failed) {
             //zsys_debug("tpwindow: failed to add %d TPs, latency:%ld", ntps_failed, latency);
+            nfailed_total += ntps_failed;
             continue;
         }        
 
@@ -376,7 +379,8 @@ void tpwindow_proxy(zsock_t* pipe, void* vargs)
 
   cleanup:
 
-    zsys_debug("window: finishing after %d", count_in);
+    zsys_debug("window: finishing with %d failed after %d with %ld in the buffer",
+               nfailed_total, count_in, windower.buffer.size());
     zpoller_destroy(&poller);
     zsock_destroy(&isock);
     zsock_destroy(&osock);

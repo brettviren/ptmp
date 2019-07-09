@@ -6,7 +6,8 @@ dataurl="https://www.phy.bnl.gov/~bviren/tmp/ptmp/ptmp-dumps/$dataset"
 
 tstdir=$(dirname $(realpath "$BASH_SOURCE"))
 topdir=$(dirname "$tstdir")
-tmpdir=$(mktemp -d "/tmp/test-ptmper-XXXXX")
+
+PATH=$topdir/build:$topdir/build/apps:$topdir/build/test:$PATH
 
 getfile () {
     if [ -z "$1" ] ; then
@@ -36,10 +37,23 @@ argify_list () {
 
 
 
+do_plots () {
+    local ldir=$(ls -trd /tmp/test-ptmper-*|tail -1)
+    for cfg in $ldir/*.json
+    do
+        echo $cfg
+        mon=${cfg//.json/.mon}
+        pdf=${cfg//.json/.pdf}
+        #ptmperpy monplots -t0.01 -o $pdf -c $cfg $mon
+        ptmperpy monplots -o $pdf -c $cfg $mon        
+    done
+    echo $pdf
+}
 
 do_test () {
+    tmpdir=$(mktemp -d "/tmp/test-ptmper-XXXXX")
+
     local name=${1} ; shift
-    local args="$1" ; shift
     local testfile="$tstdir/test-${name}.jsonnet"
     if [ ! -f $testfile ] ; then
         echo "no such test \"$name\""
@@ -53,7 +67,7 @@ do_test () {
 
     echo "Using files: ${files[*]}"
 
-    args+=" -m $tmpdir -J $topdir/python/ptmp"
+    args+=" -m $tmpdir -V outdir=$tmpdir -J $topdir/python/ptmp"
     args+=" --ext-code input="$(argify_list "${files[*]}")
 
     echo "$args"
@@ -65,13 +79,20 @@ do_test () {
         time ptmper $cfg || exit -1
     done
     #rm -rf $tmpdir
+    echo "output in: $tmpdir"
 }
 
-#do_test ptmper "" FELIX_BR_50{1,3,5,7,9}.dump
-#do_test ptmper "" FELIX_BR_50{1,3}.dump
-do_test ptmper-monitored "-V outdir=$tmpdir" FELIX_BR_50{1,3,5,7,9}.dump
-#do_test ptmper-monitored "-V outdir=$tmpdir" FELIX_BR_501.dump
+#do_test ptmper FELIX_BR_50{1,3,5,7,9}.dump
+#do_test ptmper FELIX_BR_50{1,3}.dump
+#do_test ptmper-monitored FELIX_BR_50{1,3,5,7,9}.dump
+do_monitored () {
+    do_test ptmper-monitored FELIX_BR_50{1,3,5,7,9}.dump
+}
 
-echo "output in: $tmpdir"
+for todo in $@
+do
+    do_$todo
+done
+
 
 

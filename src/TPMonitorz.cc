@@ -18,10 +18,23 @@ void tap_proxy(zsock_t* pipe, void* vargs)
     const uint32_t tapid = config["id"];
     zsock_t* fe_sock = ptmp::internals::endpoint(config["input"].dump());
     zsock_t* be_sock = ptmp::internals::endpoint(config["output"].dump());
+    std::string attach = "pushpull";
+    if (config["attach"].is_string()) {
+        attach = config["attach"];
+    }
 
+    zsock_t* cap_sock = NULL;
     char* cap_addr = zsys_sprintf("inproc://capture%05d", tapid);
-    zsock_t* cap_sock = zsock_new_pub(cap_addr);
-    //zsock_t* cap_sock = zsock_new_push(cap_addr);
+    if (attach == "pubsub") {
+        cap_sock = zsock_new_pub(cap_addr);
+    }
+    else if (attach == "pushpull") {
+        cap_sock = zsock_new_push(cap_addr);
+    }
+    else {
+        zsys_error("unknown attachement type: %s", attach.c_str());
+        throw std::runtime_error("unknown attachement type");
+    }
     freen (cap_addr);
 
     char* con_addr = zsys_sprintf("inproc://control%05d", tapid);
@@ -49,6 +62,10 @@ void tpmonitorz(zsock_t* pipe, void* vargs)
     auto config = json::parse((const char*) vargs);
 
     std::string filename = config["filename"];
+    std::string attach = "pushpull";
+    if (config["attach"].is_string()) {
+        attach = config["attach"];
+    }
 
     struct tapinfo_t {
         zactor_t* proxy;
@@ -64,18 +81,29 @@ void tpmonitorz(zsock_t* pipe, void* vargs)
     std::unordered_map<void*, tapinfo_t> tapinfos;
     zpoller_t* poller = zpoller_new(pipe, NULL);
 
-    for (const auto& jtap : config["taps"]) {
+    for (auto& jtap : config["taps"]) {
         const int tapid = jtap["id"];
         char* cap_addr = zsys_sprintf("inproc://capture%05d", tapid);
         char* con_addr = zsys_sprintf("inproc://control%05d", tapid);
 
-        zsys_debug("monitor: CAPTURE PULL %s CONTROL PUSH %s", cap_addr, con_addr);
+        zsys_debug("monitor: %s CAPTURE %s CONTROL %s", attach.c_str(), cap_addr, con_addr);
 
+        jtap["attach"] = attach;
         std::string tapcfg = jtap.dump();
+        zsock_t* cap_sock = NULL;
+        if (attach == "pubsub") {
+            cap_sock = zsock_new_sub(cap_addr, "");
+        }
+        else if (attach == "pushpull") {
+            cap_sock = zsock_new_pull(cap_addr);
+        }
+        else {
+            zsys_error("unknown attachement type: %s", attach.c_str());
+            throw std::runtime_error("unknown attachement type");
+        }
         tapinfo_t ti {
             zactor_new(tap_proxy, (void*)tapcfg.c_str()),
-            zsock_new_sub(cap_addr, ""),
-            //zsock_new_pull(cap_addr),
+            cap_sock,
             zsock_new_push(con_addr),
             tapid,
             0

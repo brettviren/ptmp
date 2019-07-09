@@ -10,6 +10,12 @@
 
         // return the last element of an array
         back(arr) :: arr[std.length(arr)-1],
+
+        // describe a parallel layer of cnum nodes with an input and output base numbers.
+        parlayer :: function(ibase=0, obase=0, cnum=0, name="") {
+            ibase:ibase, obase:obase, cnum:cnum, name:name
+        },
+        
     },
 
 
@@ -20,7 +26,7 @@
     // A socket description object is used by most TP proxy/agent
     // classes.  The bind or connect arguments should pass an
     // array of endpoint addresses, each in ZMQ string format.
-    socket(bc, stype, addrs, hwm=1000) :: {
+    socket(bc, stype, addrs, hwm=10000) :: {
         // The socket type.  PUSH, SUB, etc
         type: std.asciiUpper(stype),
         // The high water mark
@@ -104,7 +110,7 @@
 
 
     // Create a configuration for TPMonitor.  
-    monitor(name, filename, taps) :: {
+    monitor(name, filename, taps, tap_attach="pushpull") :: {
         name: name,
         type: 'monitor',
         data: {
@@ -115,6 +121,8 @@
             // numerical "id" as well as usual "input.socket" and
             // "output.socket" attributes.
             taps: taps,
+
+            attach: tap_attach,
         },
     },
 
@@ -140,174 +148,112 @@
 
 
     // make some topologies
+    default_topo_config: {
+        nmsgs: 100000,
+        tspan: 50/0.02,
+        tbuf: 5000/0.02,
+        rewrite_count: 0,
+        socker: $.sitm.tcp,
+        port_base: 7000,
+        sync_time: 10,
+        filenames: [],
+        mon_filename: "foo.mon",
+        tap_attach: "pushpull",
+    },
 
-    just_files(filenames, mon_filename, port_base=7000, nmsgs=100000, socker = $.sitm.tcp) :: {
-        local nfiles = std.length(filenames),
-        local fiota = std.range(0, nfiles-1),
-        local bnames = [$.util.basename(fn) for fn in filenames],
+    component_makers(cfg) :: {
+        local name(ind) = $.util.basename(cfg.filenames[ind]),
+        local iota(num) = if num == 0 then std.range(0, std.length(cfg.filenames)-1) else std.range(0,num-1),
+        fsenders(layer) :: [
+            $.czmqat("fsend-"+name(ind),
+                     number = cfg.nmsgs, ifile = cfg.filenames[ind],
+                     osocket = cfg.socker('bind','push', cfg.port_base + layer.obase + ind))
+            for ind in iota(layer.cnum)],
 
-        local fsends = [$.czmqat("fsend-"+bnames[ind],
-                                 number = nmsgs, ifile = filenames[ind],
-                                 osocket = socker('bind','push', port_base + 100 + ind))
-                        for ind in fiota],
+
+        replays(layer) :: [
+            $.replay("replay-"+name(ind), 
+                     isocket = cfg.socker('connect','pull', cfg.port_base + layer.ibase + ind),
+                     osocket = cfg.socker('bind',   'push', cfg.port_base + layer.obase + ind),
+                     rewrite_count=cfg.rewrite_count)
+            for ind in iota(layer.cnum)],
+
+
+        windows(layer) :: [
+            $.window("window-"+name(ind), tspan = cfg.tspan, tbuf = cfg.tbuf,
+                     isocket = cfg.socker('connect','pull', cfg.port_base + layer.ibase + ind),
+                     osocket = cfg.socker('bind',   'push', cfg.port_base + layer.obase + ind))
+            for ind in iota(layer.cnum)],
+
+
+        zipper(layer) :: {
+            local isocks = [cfg.socker('connect','pull', cfg.port_base + layer.ibase + ind)
+                            for ind in iota(layer.cnum)],
+            local addrs = [s.connect for s in isocks],
+            ret: [$.zipper("zipper", 
+                           isocket = $.socket('connect', 'pull', addrs),
+                           osocket = cfg.socker( 'bind', 'push', cfg.port_base + layer.obase),
+                           sync_time = cfg.sync_time)],
+        }.ret,
+
+        sinks(layer) :: [
+            $.czmqat("sink-"+name(ind),
+                     isocket = cfg.socker('connect', 'pull', cfg.port_base + layer.ibase + ind))
+            for ind in iota(layer.cnum)],
+
+        local tap_layer(layer) = [
+            $.tap(layer.ibase + ind,
+                  cfg.socker('connect','pull', cfg.port_base + layer.ibase + ind),
+                  cfg.socker('bind',   'push', cfg.port_base + layer.obase + ind),
+                  layer=layer.name)
+            for ind in iota(layer.cnum)],
+            
+        monitor(layers) :: $.monitor("monitor", cfg.mon_filename,
+                                     std.flattenArrays([ tap_layer(layer) for layer in layers]),
+                                     cfg.tap_attach),
+
+    },
+
+    just_files(cfg=$.default_topo_config) :: {
+        local cm = $.component_makers(cfg),
+        local layer = $.util.parlayer,
+        ret: []
+            + cm.fsenders(layer(obase=100))
+            + cm.sinks(layer(ibase=200))
+            + [ cm.monitor([ layer(100,200,name="files") ])],
+    }.ret,
         
-        local taps =
-            [$.tap(100 + ind,
-                   socker('connect','pull', port_base + 100 + ind),
-                   socker('bind',   'push', port_base + 200 + ind),
-                   layer="input")
-             for ind in fiota],
-
-        local sinks = [$.czmqat("sink-"+bnames[ind],
-                                isocket = socker('connect', 'pull', port_base + 200 + ind))
-                       for ind in fiota],
-
-        local monitor = $.monitor("monitor", mon_filename, taps),
-
-        ret: fsends + sinks + [monitor],
+    just_replay(cfg=$.default_topo_config) :: {
+        local cm = $.component_makers(cfg),
+        local layer = $.util.parlayer,
+        ret: []
+            + cm.fsenders(layer(obase=100))
+            + cm.replays(layer(ibase=100,obase=200))
+            + cm.sinks(layer(ibase=300))
+            + [ cm.monitor([ layer(200,300,name="replays") ])],
     }.ret,
 
-
-    just_replay(filenames, mon_filename,
-                port_base=7000, nmsgs=100000, tspan = 50/0.02, tbuf = 5000/0.02,
-                rewrite_count=0,
-                socker = $.sitm.tcp
-               ) ::
-    {
-        local nfiles = std.length(filenames),
-        local fiota = std.range(0, nfiles-1),
-        local bnames = [$.util.basename(fn) for fn in filenames],
-
-        local fsends = [$.czmqat("fsend-"+bnames[ind],
-                                 number = nmsgs, ifile = filenames[ind],
-                                 osocket = socker('bind','push', port_base + 100 + ind))
-                        for ind in fiota],
-        
-        local replays = [$.replay("replay-"+bnames[ind], 
-                                  isocket = socker('connect','pull', port_base + 100 + ind),
-                                  osocket = socker('bind',   'push', port_base + 200 + ind),
-                                  rewrite_count=rewrite_count)
-                         for ind in fiota],
-
-        local sink = $.czmqat("sink",
-                              isocket = socker('connect', 'pull', port_base + 700)),
-
-        local taps =
-            [$.tap(200 + ind,   // between replays and sink
-                   socker('connect','pull', port_base + 200 + ind),
-                   socker('bind',   'push', port_base + 700),
-                   layer='replay')
-             for ind in fiota],
-
-        local monitor = $.monitor("monitor", mon_filename, taps),
-
-        ret: fsends + replays + [sink, monitor]
+    just_window(cfg=$.default_topo_config) :: {
+        local cm = $.component_makers(cfg),
+        local layer = $.util.parlayer,
+        ret: []
+            + cm.fsenders(layer(obase=100))
+            + cm.replays(layer(ibase=100,obase=200))
+            + cm.windows(layer(ibase=200,obase=300))
+            + cm.sinks(layer(ibase=400))
+            + [ cm.monitor([ layer(300,400,name="windows") ])],
     }.ret,
 
-
-    just_window(filenames, mon_filename,
-                port_base=7000, nmsgs=100000, tspan = 50/0.02, tbuf = 5000/0.02,
-                rewrite_count=0,
-                socker = $.sitm.tcp
-               ) ::
-    {
-        local nfiles = std.length(filenames),
-        local fiota = std.range(0, nfiles-1),
-        local bnames = [$.util.basename(fn) for fn in filenames],
-
-        local fsends = [$.czmqat("fsend-"+bnames[ind],
-                                 number = nmsgs, ifile = filenames[ind],
-                                 osocket = socker('bind','push', port_base + 100 + ind))
-                        for ind in fiota],
-        
-        local replays = [$.replay("replay-"+bnames[ind], 
-                                  isocket = socker('connect','pull', port_base + 100 + ind),
-                                  osocket = socker('bind',   'push', port_base + 200 + ind),
-                                  rewrite_count=rewrite_count)
-                         for ind in fiota],
-
-        local windows = [$.window("window-"+bnames[ind], tspan = tspan, tbuf = tbuf,
-                                  isocket = socker('connect','pull', port_base + 300 + ind),
-                                  osocket = socker('bind',   'push', port_base + 400 + ind))
-                         for ind in fiota],
-
-        local sink = $.czmqat("sink",
-                              isocket = socker('connect', 'pull', port_base + 700)),
-
-        local taps =
-            [$.tap(200 + ind,   // between replays and windows
-                   socker('connect','pull', port_base + 200 + ind),
-                   socker('bind',   'push', port_base + 300 + ind),
-                   layer='replay')
-             for ind in fiota]
-            +
-            [$.tap(400 + ind,   // between windows and zipper
-                   socker('connect','pull', port_base + 400 + ind),
-                   socker('bind',   'push', port_base + 700),
-                   layer='window')
-             for ind in fiota],
-
-        local monitor = $.monitor("monitor", mon_filename, taps),
-
-        ret: fsends + replays + windows + [sink, monitor]
+    just_zipper(cfg=$.default_topo_config) :: {
+        local cm = $.component_makers(cfg),
+        local layer = $.util.parlayer,
+        ret: []
+            + cm.fsenders(layer(obase=100))
+            + cm.replays(layer(ibase=100,obase=200))
+            + cm.windows(layer(ibase=200,obase=300))
+            + cm.zipper(layer(ibase=300,obase=400))
+            + cm.sinks(layer(ibase=500))
+            + [ cm.monitor([ layer(400,500,name="zipper") ])],
     }.ret,
 
-
-    files_zipped_monitored(filenames, mon_filename,
-                           port_base=7000, nmsgs=100000, tspan = 50/0.02, tbuf = 5000/0.02,
-                           rewrite_count=0,
-                           socker = $.sitm.tcp
-                          ) ::
-    {
-        local nfiles = std.length(filenames),
-        local fiota = std.range(0, nfiles-1),
-        local bnames = [$.util.basename(fn) for fn in filenames],
-
-        local fsends = [$.czmqat("fsend-"+bnames[ind],
-                                 number = nmsgs, ifile = filenames[ind],
-                                 osocket = socker('bind','push', port_base + 100 + ind))
-                        for ind in fiota],
-        
-        local replays = [$.replay("replay-"+bnames[ind], 
-                                  isocket = socker('connect','pull', port_base + 100 + ind),
-                                  osocket = socker('bind',   'push', port_base + 200 + ind),
-                                  rewrite_count=rewrite_count)
-                         for ind in fiota],
-
-        local windows = [$.window("window-"+bnames[ind], tspan = tspan, tbuf = tbuf,
-                                  isocket = socker('connect','pull', port_base + 300 + ind),
-                                  osocket = socker('bind',   'push', port_base + 400 + ind))
-                         for ind in fiota],
-
-        local zipper = $.zipper("zipper", 
-                                $.socket('connect', 'pull',
-                                         [$.tcp(port = port_base + 500 + ind) for ind in fiota]),
-                                socker('bind','push', port_base + 600),
-                                sync_time = 10),
-
-        local sink = $.czmqat("sink",
-                              isocket = socker('connect', 'pull', port_base + 700)),
-
-        local taps =
-            [$.tap(200 + ind,   // between replays and windows
-                   socker('connect','pull', port_base + 200 + ind),
-                   socker('bind',   'push', port_base + 300 + ind),
-                   layer='replay')
-             for ind in fiota]
-            +
-            [$.tap(400 + ind,   // between windows and zipper
-                   socker('connect','pull', port_base + 400 + ind),
-                   socker('bind',   'push', port_base + 500 + ind),
-                   layer='window')
-             for ind in fiota]
-            +
-            [$.tap(600,         // between zipper and sink
-                   socker('connect','pull', port_base + 600),
-                   socker('bind',   'push', port_base + 700),
-                   layer='zipper')],
-
-        local monitor = $.monitor("monitor", mon_filename, taps),
-
-        ret: fsends + replays + windows + [zipper, sink, monitor]
-    }.ret,
 }

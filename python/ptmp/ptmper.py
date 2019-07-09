@@ -121,6 +121,9 @@ def monplots(time_limit, output, config, monfile):
     print (groups)
 
 
+    nsmooth = 9
+    ntrim = (nsmooth-1)//2
+
     dat = dict()
     for tid,mon in bytap.items():
         now = 1.0e-6*np.array(mon.now)
@@ -129,17 +132,24 @@ def monplots(time_limit, output, config, monfile):
         nrecv = np.array(mon.nrecv)
         count = np.array(mon["count"])
 
+        dnrecv = nrecv[1:] - nrecv[:-1]
+        dnow = now[1:] - now[:-1]
+        
         # these all have 1 less than mon and times are in units of seconds
         dat[tid] = dict(
             now = now[1:] - now[0],
             tstart = tstart[1:] - tstart[0],
             created = created[1:] - created[0],
-            dnow = now[1:] - now[:-1],
+            dnow = dnow,
             dtstart = tstart[1:] - tstart[:-1],
-            dnrecv = nrecv[1:] - nrecv[:-1],
+            dnrecv = dnrecv,
             dcount = count[1:] - count[:-1],
             nrecv = nrecv[1:] - nrecv[0],
             count = count[1:] - count[0],
+
+            adnrecv = np.convolve(np.ones((nsmooth,))/nsmooth, dnrecv, mode='valid'),
+            adnow = np.convolve(np.ones((nsmooth,))/nsmooth, dnow, mode='valid'),
+            anow = (now[1:] - now[0])[ntrim:-ntrim],
         )
         
     popts = dict(linewidth=0.5)
@@ -182,6 +192,7 @@ def monplots(time_limit, output, config, monfile):
                     tosave["%s_%d_%s_y"%(group_name, tapid, name)] = y
 
                 ax.legend(prop=dict(size=6))
+                fig.tight_layout()
                 pdf.savefig(fig)
 
 
@@ -215,32 +226,51 @@ def monplots(time_limit, output, config, monfile):
                 ally[ally>extent[1][1]] = extent[1][1]
                 h = ax.hist2d(allx, ally, (100, 100), range=extent, cmap=plt.cm.jet)
                 plt.colorbar(h[3], ax=ax)
+                fig.tight_layout()
                 pdf.savefig(fig)
 
 
-            one("count", lambda d: d["tstart"], lambda d: d["count"], "data clock [s]", "count")
-            one("nrecv", lambda d: d["now"], lambda d: d["nrecv"], "wall clock [s]", "nrecv")
-            one("tstart", lambda d: d["now"], lambda d: d["tstart"], "wall clock [s]", "data clock [s]")
-
-            one("dlat", lambda d: d["now"], lambda d: d["now"]-d["tstart"], "wall clock [s]", "now - data clock [s]")
-            two("dlat", lambda d: d["now"], lambda d: d["now"]-d["tstart"], "wall clock [s]", "now - data clock [s]",
+            one("count", lambda d: d["tstart"], lambda d: d["count"],
+                "data clock [s]", "count")
+            one("nrecv", lambda d: d["now"], lambda d: d["nrecv"], 
+                "wall clock [s]", "nrecv")
+            one("tstart", lambda d: d["now"], lambda d: d["tstart"], 
+                "wall clock [s]", "data clock [s]")
+            
+            one("dlat", lambda d: d["now"], lambda d: d["now"]-d["tstart"], 
+                "wall clock [s]", "now - data clock [s]")
+            two("dlat", lambda d: d["now"], lambda d: d["now"]-d["tstart"], 
+                "wall clock [s]", "now - data clock [s]",
                 extent=[[0,50],[-0.200, -0.175]])
 
-            one("clat", lambda d: d["created"], lambda d: d["created"]-d["tstart"], "wall clock [s]", "created - data clock [s]")
-            two("clat", lambda d: d["created"], lambda d: d["created"]-d["tstart"], "wall clock [s]", "created - data clock [s]",
+            one("clat", lambda d: d["tstart"], lambda d: d["created"]-d["tstart"],
+                "data clock [s]", "created - data clock [s]")
+            two("clat", lambda d: d["tstart"], lambda d: d["created"]-d["tstart"],
+                "data clock [s]", "created - data clock [s]",
                 extent=[[0,50],[0,.0001]])
 
-            one("rlat", lambda d: d["now"], lambda d: d["now"]-d["created"], "wall clock [s]", "now - created [s]")
-            two("rlat", lambda d: d["now"], lambda d: d["now"]-d["created"], "wall clock [s]", "now - created [s]",
+            one("rlat", lambda d: d["now"], lambda d: d["now"]-d["created"], 
+                "wall clock [s]", "now - created [s]")
+            two("rlat", lambda d: d["now"], lambda d: d["now"]-d["created"], 
+                "wall clock [s]", "now - created [s]",
                 extent=[[0,50],[-0.200, -0.175]])
 
-            one("ndiff", lambda d: d["now"], lambda d: d["nrecv"]-d["count"], "wall clock [s]", "nrecv - count")
-            one("nrecvrate", lambda d: d["now"], lambda d: d["dnrecv"]/d["dnow"], "wall clock [s]", "nrecv rate [Hz]")
-            two("nrecvrate", lambda d: d["now"], lambda d: d["dnrecv"]/d["dnow"], "wall clock [s]", "nrecv rate [Hz]",
+            one("ndiff", lambda d: d["now"], lambda d: d["nrecv"]-d["count"],
+                "wall clock [s]", "nrecv - count")
+            one("nrecvrate", lambda d: d["now"], lambda d: d["dnrecv"]/d["dnow"],
+                "wall clock [s]", "nrecv rate [Hz]")
+            two("nrecvrate", lambda d: d["now"], lambda d: d["dnrecv"]/d["dnow"],
+                "wall clock [s]", "nrecv rate [Hz]",
                 extent=[[0,50],[0,20000]])
 
-            one("countrate", lambda d: d["tstart"], lambda d: d["dcount"]/d["dtstart"], "data clock [s]", "count rate [Hz]")
-            two("countrate", lambda d: d["tstart"], lambda d: d["dcount"]/d["dtstart"], "data clock [s]", "count rate [Hz]",
+            one("arecvrate", lambda d: d["anow"][1:-1], lambda d: d["adnrecv"]/d["adnow"],
+                "wall clock [s]", "%d bin average nrecv rate [Hz]" % nsmooth)
+
+
+            one("countrate", lambda d: d["tstart"], lambda d: d["dcount"]/d["dtstart"], 
+                "data clock [s]", "count rate [Hz]")
+            two("countrate", lambda d: d["tstart"], lambda d: d["dcount"]/d["dtstart"], 
+                "data clock [s]", "count rate [Hz]",
                 extent=[[0,50],[0,10000]])
 
 
