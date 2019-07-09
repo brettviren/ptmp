@@ -4,18 +4,11 @@ local ptmp = import "ptmp.jsonnet";
 
 // omnibus config for components.  Not all attributes are used by all
 // functions.
-local ccfg = ptmp.default_topo_config {
-    nmsgs: 400000,
-    tspan: 50/0.02,
-    tbuf: 5000/0.02,
-    rewrite_count: 0,
-    socker: ptmp.sitm.inproc,
-    port_base: 7000,
-    sync_time: 10,
-    mon_filename: outdir + "junk.mon",
+local cfg = ptmp.topo_defaults {
     filenames: input,
-    tap_attach: "pubsub",
 };
+local ctx = ptmp.topo_context(cfg);
+local mons = ptmp.monitor(ctx);
 
 local jcfg = {
     ttl: 60,
@@ -25,14 +18,11 @@ local jcfg = {
 
 
 {
-    [name+".json"] :  ptmp.ptmper(ptmp[std.strReplace(name, '-','_')](ccfg {
-        mon_filename: outdir+"/"+name+".mon"
-    }), ttl=jcfg.ttl, reprieve=jcfg.reprieve)
+    ["monitor-%s.json"%name] :  ptmp.ptmper(mons.files[std.strReplace(name, '-','_')],
+                                            ttl=jcfg.ttl, reprieve=jcfg.reprieve)
     for name in [
-        //"just-files",
-        // "just-replay",
-        // "just-window",
-        "just-zipper",
+        "raw", "replay",
+        "window", "zipper",
     ]
 }
 

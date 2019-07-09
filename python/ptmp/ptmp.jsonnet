@@ -1,5 +1,7 @@
 // Jsonnet support for producing data structures for PTMP
 
+
+
 {
     util : {
         // Return the file name sans path and extension
@@ -10,17 +12,8 @@
 
         // return the last element of an array
         back(arr) :: arr[std.length(arr)-1],
-
-        // describe a parallel layer of cnum nodes with an input and output base numbers.
-        parlayer :: function(ibase=0, obase=0, cnum=0, name="") {
-            ibase:ibase, obase:obase, cnum:cnum, name:name
-        },
-        
     },
 
-
-    // Make a TCP address from its parts
-    tcp(host="127.0.0.1", port=5678) :: "tcp://%s:%d" % [host, port],
 
 
     // A socket description object is used by most TP proxy/agent
@@ -53,67 +46,32 @@
     //
 
 
-    replay(name, isocket, osocket, speed=50.0, rewrite_count=0) :: {
+    nodeconfig(type, name, isocket, osocket, cfg) :: {
         name: name,
-        type: 'replay',
-        data: {
-            // Speed in hardware clock ticks per microsecond to replay the messages.
-            speed: speed,
-            // If nonzero then rewrite the output TPSet.count number 
-            rewrite_count: rewrite_count,
-        } + $.maybe_sockets(isocket, osocket),
+        type: type,
+        data: cfg + $.maybe_sockets(isocket, osocket),
     },
+
+    replay(name, isocket, osocket, cfg={speed:50.0, rewrite_count:0})
+    :: $.nodeconfig('replay', name, isocket, osocket, cfg),
 
     // Create a configuration for TPZipper. 
-    zipper(name, isocket, osocket, sync_time, tardy_policy="drop") :: {
-        name: name,
-        type: 'zipper',
-        data: {
-            // the sync time in ms
-            sync_time: sync_time,
-            // the tardy policy (drop vs block)
-            tardy_policy: tardy_policy,
-        } + $.maybe_sockets(isocket, osocket),
-    },
+    zipper(name, isocket, osocket, cfg={sync_time:5000/0.02, tardy_policy:"drop"})
+    :: $.nodeconfig('zipper', name, isocket, osocket, cfg),
 
     // Create a configuration for TPWindow
-    window(name, isocket, osocket, tspan, tbuf, detid=-1, toffset=0) :: {
-        name: name,
-        type: 'window',
-        data: {
-            // The time span in data time (hardware clock) of the windowed output
-            tspan: tspan,
-            // Maximum buffer in data time (hardware clock) to hold TPs
-            tbuf: tbuf,
-            // An offset from zero to begin (mod-tspan) the windows.
-            toffset: toffset,
-            // Detector ID to use for output
-            detid: detid,
-        } + $.maybe_sockets(isocket, osocket),
-    },
+    window(name, isocket, osocket, cfg={tspan:50/0.02, tbuf:5000/0.02, detid:-1, toffset:0})
+    :: $.nodeconfig('window', name, isocket, osocket, cfg),
 
     // Create a configuration for TPCat
-    czmqat(name, isocket=null, osocket=null, ifile=null, ofile=null, number=-1, delayus=-1) :: {
-        name: name,
-        type:'czmqat',
-        data: {
-            // an input file name
-            ifile: ifile,
-            // an output file name
-            ofile: ofile,
-            // number of messages to process, less non-positive means run forever
-            number: number,
-            // number of (real time) microseconds to delay before emitting next message.
-            delayus: delayus,
-        } + $.maybe_sockets(isocket, osocket),
-    },
+    czmqat(name, isocket=null, osocket=null, cfg={ifile:null, ofile:null, number:-1, delayus:-1})
+    :: $.nodeconfig('czmqat', name, isocket, osocket, cfg),
 
-
-    // Create a configuration for TPMonitor.  
-    monitor(name, filename, taps, tap_attach="pushpull") :: {
+    // Create a configuration for TPMonitor.  It doesn't quite fit the nodeconfig() pattern
+    monitorz(name, filename=null, taps=[], tap_attach="pushpull", cfg={}) :: {
         name: name,
         type: 'monitor',
-        data: {
+        data: cfg + {
             // Name of monitor output file
             filename: filename,
             
@@ -122,8 +80,8 @@
             // "output.socket" attributes.
             taps: taps,
 
-            attach: tap_attach,
-        },
+            attach: tap_attach,            
+        } 
     },
 
     // Create a ptmper configuration
@@ -142,118 +100,159 @@
 
     
     // make a "tap" description
-    tap(id, isock, osock, layer="") :: {
-        id: id, layer: layer,
+    make_tap(id, isock, osock, name="") :: {
+        id: id, layer: name,
     } + $.maybe_sockets(isock, osock),
-
+    
+    make_taps(lp) :: [
+        $.make_tap(lp[0].ident(ind), lp[0].socket(ind), lp[1].socket(ind), name=lp[0].layer_name)
+        for ind in lp[0].iota
+        ],
+    
 
     // make some topologies
-    default_topo_config: {
+    topo_defaults: {
         nmsgs: 100000,
         tspan: 50/0.02,
         tbuf: 5000/0.02,
         rewrite_count: 0,
-        socker: $.sitm.tcp,
-        port_base: 7000,
         sync_time: 10,
-        filenames: [],
+        filenames: [], // list of file names (could be input or output)
+        
         mon_filename: "foo.mon",
         tap_attach: "pushpull",
+
+        // layer defaults
+        addrpat: "inproc://thread%05d",
+        port_base: 7000,
+        hwm: 1000,
     },
 
-    component_makers(cfg) :: {
-        local name(ind) = $.util.basename(cfg.filenames[ind]),
-        local iota(num) = if num == 0 then std.range(0, std.length(cfg.filenames)-1) else std.range(0,num-1),
-        fsenders(layer) :: [
-            $.czmqat("fsend-"+name(ind),
-                     number = cfg.nmsgs, ifile = cfg.filenames[ind],
-                     osocket = cfg.socker('bind','push', cfg.port_base + layer.obase + ind))
-            for ind in iota(layer.cnum)],
+    topo_context(cfg) :: {
+        // make a layer in the topo
+        layer(nam, offset, bc, stype) :: {
+            // data can be overriden
+            layer_name: nam,
+            mult: std.length(cfg.filenames),
 
+            iota : std.range(0, self.mult-1),
 
-        replays(layer) :: [
-            $.replay("replay-"+name(ind), 
-                     isocket = cfg.socker('connect','pull', cfg.port_base + layer.ibase + ind),
-                     osocket = cfg.socker('bind',   'push', cfg.port_base + layer.obase + ind),
-                     rewrite_count=cfg.rewrite_count)
-            for ind in iota(layer.cnum)],
+            ident(ind) :: cfg.port_base + offset + ind,
+            local _id(ind) = self.ident(ind),
 
+            name(ind) :: "%s-%d" % [ nam, _id(ind) ],
 
-        windows(layer) :: [
-            $.window("window-"+name(ind), tspan = cfg.tspan, tbuf = cfg.tbuf,
-                     isocket = cfg.socker('connect','pull', cfg.port_base + layer.ibase + ind),
-                     osocket = cfg.socker('bind',   'push', cfg.port_base + layer.obase + ind))
-            for ind in iota(layer.cnum)],
+            socket(ind) :: {
+                local ap = cfg.addrpat%_id(ind),
+                type: std.asciiUpper(stype),
+                hwm: cfg.hwm,
+                [bc]: [ap],
+            },
 
+            socket_maddrs(seq = self.iota) :: {
+                type: std.asciiUpper(stype),
+                hwm: cfg.hwm,
+                [bc]: [cfg.addrpat%_id(ind) for ind in seq],
+            },
 
-        zipper(layer) :: {
-            local isocks = [cfg.socker('connect','pull', cfg.port_base + layer.ibase + ind)
-                            for ind in iota(layer.cnum)],
-            local addrs = [s.connect for s in isocks],
-            ret: [$.zipper("zipper", 
-                           isocket = $.socket('connect', 'pull', addrs),
-                           osocket = cfg.socker( 'bind', 'push', cfg.port_base + layer.obase),
-                           sync_time = cfg.sync_time)],
-        }.ret,
-
-        sinks(layer) :: [
-            $.czmqat("sink-"+name(ind),
-                     isocket = cfg.socker('connect', 'pull', cfg.port_base + layer.ibase + ind))
-            for ind in iota(layer.cnum)],
-
-        local tap_layer(layer) = [
-            $.tap(layer.ibase + ind,
-                  cfg.socker('connect','pull', cfg.port_base + layer.ibase + ind),
-                  cfg.socker('bind',   'push', cfg.port_base + layer.obase + ind),
-                  layer=layer.name)
-            for ind in iota(layer.cnum)],
-            
-        monitor(layers) :: $.monitor("monitor", cfg.mon_filename,
-                                     std.flattenArrays([ tap_layer(layer) for layer in layers]),
-                                     cfg.tap_attach),
-
-    },
-
-    just_files(cfg=$.default_topo_config) :: {
-        local cm = $.component_makers(cfg),
-        local layer = $.util.parlayer,
-        ret: []
-            + cm.fsenders(layer(obase=100))
-            + cm.sinks(layer(ibase=200))
-            + [ cm.monitor([ layer(100,200,name="files") ])],
-    }.ret,
+        },
         
-    just_replay(cfg=$.default_topo_config) :: {
-        local cm = $.component_makers(cfg),
-        local layer = $.util.parlayer,
-        ret: []
-            + cm.fsenders(layer(obase=100))
-            + cm.replays(layer(ibase=100,obase=200))
-            + cm.sinks(layer(ibase=300))
-            + [ cm.monitor([ layer(200,300,name="replays") ])],
-    }.ret,
+        fsenders(layer) :: [
+            $.czmqat(layer.name(ind), osocket = layer.socket(ind),
+                     cfg=cfg+ {ifile: cfg.filenames[ind], number: cfg.nmsgs})
+            for ind in layer.iota],
 
-    just_window(cfg=$.default_topo_config) :: {
-        local cm = $.component_makers(cfg),
-        local layer = $.util.parlayer,
-        ret: []
-            + cm.fsenders(layer(obase=100))
-            + cm.replays(layer(ibase=100,obase=200))
-            + cm.windows(layer(ibase=200,obase=300))
-            + cm.sinks(layer(ibase=400))
-            + [ cm.monitor([ layer(300,400,name="windows") ])],
-    }.ret,
 
-    just_zipper(cfg=$.default_topo_config) :: {
-        local cm = $.component_makers(cfg),
-        local layer = $.util.parlayer,
-        ret: []
-            + cm.fsenders(layer(obase=100))
-            + cm.replays(layer(ibase=100,obase=200))
-            + cm.windows(layer(ibase=200,obase=300))
-            + cm.zipper(layer(ibase=300,obase=400))
-            + cm.sinks(layer(ibase=500))
-            + [ cm.monitor([ layer(400,500,name="zipper") ])],
-    }.ret,
+        replays(ilayer, olayer) :: [
+            $.replay(ilayer.name(ind),
+                     isocket = ilayer.socket(ind),
+                     osocket = olayer.socket(ind),
+                     cfg = cfg)
+            for ind in ilayer.iota],
 
+
+        windows(ilayer,olayer) :: [
+            $.window(ilayer.name(ind), 
+                     isocket = ilayer.socket(ind),
+                     osocket = olayer.socket(ind),
+                     cfg=cfg)
+            for ind in ilayer.iota],
+
+        
+        zipper(ilayer,olayer) :: [
+            $.zipper(ilayer.layer_name,
+                     isocket = ilayer.socket_maddrs(),
+                     osocket = ilayer.socket(0),
+                     cfg = cfg)],
+
+        sinks(ilayer) :: [
+            $.czmqat(ilayer.name(ind), isocket = ilayer.socket(ind))
+            for ind in ilayer.iota],
+
+
+        // cfg={filename:null, taps:[], tap_attach:"pushpull"}) :: {
+        monitor(layer_pairs) :: $.monitorz("monitor", 
+                                           cfg.mon_filename,
+                                           std.flattenArrays([ $.make_taps(lp) for lp in layer_pairs ]),
+                                           cfg.tap_attach),
+        
+    },                          // topo_context
+
+    monitor(ctx):: {
+
+        files: {
+
+            input: ctx.fsenders(ctx.layer('files', 100, 'bind', 'push')),
+            
+            raw: self.input
+                + ctx.sinks(     ctx.layer('sink',   200, 'connect', 'pull'))
+                + [ ctx.monitor([[ctx.layer('fmonin', 100, 'connect', 'pull'),
+                                  ctx.layer('fmonout',200, 'bind',    'push')]]) ],
+        
+            replay: self.input
+                + ctx.replays(   ctx.layer('replayin',  100, 'connect', 'pull'),
+                                 ctx.layer('replayout', 200, 'bind',    'pub'))
+                + ctx.sinks(     ctx.layer('sink',      300, 'connect', 'pub'))
+                + [ ctx.monitor([[ctx.layer('fmonin',    200, 'connect', 'sub'),
+                                  ctx.layer('fmonout',   300, 'bind',    'pub')]]) ],
+
+            window: self.input
+                + ctx.replays(ctx.layer('replayin',100, 'connect', 'pull'),
+                              ctx.layer('replayout',200, 'bind', 'pub'))
+                + ctx.windows(ctx.layer('windowin',200, 'connect', 'sub'),
+                              ctx.layer('windowout',300, 'bind', 'push'))
+                + ctx.sinks(   ctx.layer('sink',  400, 'connect', 'pub'))
+                + [ ctx.monitor([[ctx.layer('fmonin',300,'connect','pull'),
+                                 ctx.layer('fmonout',400,'bind','pub')]]) ],
+
+            zipper: self.input
+                + ctx.replays(ctx.layer('replayin',100, 'connect', 'pull'),
+                              ctx.layer('replayout',200, 'bind', 'pub'))
+                + ctx.windows(ctx.layer('windowin',200, 'connect', 'sub'),
+                              ctx.layer('windowout',300, 'bind', 'push'))
+                + ctx.zipper(ctx.layer('zipperin',300, 'connect', 'pull'),
+                             ctx.layer('zipperout',400,'bind', 'pub'))
+                + ctx.sinks(   ctx.layer('sink',  500, 'connect', 'sub'))
+                + [ ctx.monitor([[ctx.layer('fmonin',400,'connect','sub'),
+                                 ctx.layer('fmonout',500,'bind','pub')]]) ],
+        },
+
+        streams: self.files { input: ctx.sinput() },
+    },
+
+    // eventually for online use
+    online(ctx) :: {
+
+        streams: {
+            input: ctx.sinput(),
+
+            zipper: self.input
+                + ctx.replays(ctx.layer('replayin',100, 'connect', 'pull'),
+                              ctx.layer('replayout',200, 'bind', 'pub'))
+                + ctx.windows(ctx.layer('windowin',200, 'connect', 'sub'),
+                              ctx.layer('windowout',300, 'bind', 'push'))
+                + ctx.zipper(ctx.layer('zipperin',300, 'connect', 'pull'),
+                             ctx.layer('zipperout',400,'bind', 'pub'))
+        }
+    },
 }
