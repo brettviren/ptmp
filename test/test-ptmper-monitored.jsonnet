@@ -7,19 +7,21 @@ local ptmp = import "ptmp.jsonnet";
 local cfg = ptmp.topo_defaults {
     filenames: input,
 };
-local ctx = ptmp.topo_context(cfg);
-local mons = ptmp.monitor(ctx);
 
 local jcfg = {
-    ttl: 60,
+    ttl: 30,
     reprieve: 1,
 };
 
 
 
 {
-    ["monitor-%s.json"%name] :  ptmp.ptmper(mons.files[std.strReplace(name, '-','_')],
-                                            ttl=jcfg.ttl, reprieve=jcfg.reprieve)
+    ["monitor-%s.json"%name] :
+    ptmp.ptmper(
+        ptmp.monitor(
+            ptmp.topo_context(cfg {mon_filename:outdir+'/monitor-%s.mon'%name}))
+            .files[std.strReplace(name, '-','_')],
+        ttl=jcfg.ttl, reprieve=jcfg.reprieve)
     for name in [
         "raw", "replay",
         "window", "zipper",

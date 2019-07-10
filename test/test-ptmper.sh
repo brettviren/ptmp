@@ -39,11 +39,11 @@ argify_list () {
 
 do_plots () {
     local ldir=$(ls -trd /tmp/test-ptmper-*|tail -1)
-    for cfg in $ldir/*.json
+    for mon in $ldir/*.mon
     do
-        echo $cfg
-        mon=${cfg//.json/.mon}
-        pdf=${cfg//.json/.pdf}
+        echo $mon
+        cfg=${mon//.json/.json}
+        pdf=${mon//.json/.pdf}
         #ptmperpy monplots -t0.01 -o $pdf -c $cfg $mon
         ptmperpy monplots -o $pdf -c $cfg $mon        
     done
