@@ -223,18 +223,18 @@ void test1()
     const uint64_t period = 50*usec;
     // when a source is considered tardy, in usec
     int tardy_msec = 100;
-    const int hwm = 1000;
+    const int hwm = 1000000;
     // note, the test sends all before receiving so if using a
     // blocking socket pattern (PUSH/PULL) and nsends is more than
     // hmw*nsenders this test will DEADLOCK
-    const int nsends = 1000;
     const int nsenders = 3;
+    const int nsends = nsenders*hwm;
     const std::string trans = "tcp";
 
     // Test initially with push/pull as it blocks instead of drops.
     // any drops are thus due to TPSorted.
-    //std::vector<std::string> pattern{"PUSH","PULL"};
-    std::vector<std::string> pattern{"PUB","SUB"};
+    std::vector<std::string> pattern{"PUSH","PULL"};
+    //std::vector<std::string> pattern{"PUB","SUB"};
 
     // Proxy's input sockets first, then output.  If you get
     // "Operation not supported" then you've reversed them.
@@ -245,18 +245,12 @@ void test1()
     run_sequence1(jcfgs[0], jcfgs[1], jcfgs[2], nsends, period);
 }
 
-
-//#include <pthread.h>
-//#include <signal.h>
+#include <signal.h>
 int main()
 {
-    //sigset_t block_set;
-    ///sigfillset (&block_set);
-    //sigaddset (&block_set, SIGPROF);
-    //pthread_sigmask (SIG_SETMASK, &block_set, NULL);
+    //signal(SIGPROF, SIG_IGN);
 
     zsys_init();
-    // eventually loop over various combos
+
     test1();
-        
 }

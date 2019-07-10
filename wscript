@@ -28,6 +28,8 @@ def configure(cfg):
     #cfg.check(header_name="dlfcn.h", uselib_store='DYNAMO',
     #          lib=['dl'], mandatory=True)
 
+    #cfg.env.LDFLAGS += ['-pg']
+    #cfg.env.CXXFLAGS += ['-pg']
     cfg.env.CXXFLAGS += ['-std=c++14']
     cfg.env.CXXFLAGS += to_list(cfg.options.cxxflags)
 

@@ -34,6 +34,7 @@ For more info see:
  - the ~main()~ function of ~test_sorted.cc~ for the protective tooling
  - This SO https://stackoverflow.com/a/17694612 and the referenced:
  - https://git.lucina.net/zeromq-examples.git/tree/zmq-camera.c#n401
+ - http://250bpm.com/blog:12
 
 Here's how one /would/ run the profiler
 
@@ -44,6 +45,18 @@ Here's how one /would/ run the profiler
   $ google-pprof  --pdf build/test_sorted test_sorted.prof > test_sorted.prof.pdf
 #+END_EXAMPLE
 
+You can make the application "safe" against ~SIGPROF~ with:
+
+#+BEGIN_SRC c++
+#include <signal.h>
+int main()
+{
+    signal(SIGPROF, SIG_IGN);
+    // ...
+}
+#+END_SRC
+
+But, then, it's also immune to being profiled.
 
 
 * Understanding the network
