@@ -82,7 +82,7 @@ private:
     std::priority_queue<value_type, collection_type, tp_greater_t> m_pqueue;
 
     // most recent (largest) hw clock seen
-    ptmp::data::data_time_t m_recent;
+    ptmp::data::data_time_t m_recent{0};
 };
 
 static void dump_window(const time_window_t& window, std::string msg="")
@@ -129,17 +129,18 @@ static void test_time_window()
 struct TPWindower {
     zsock_t* osock;
     time_window_t window;
-    ptmp::data::TPSet tps;
+    ptmp::data::TPSet tpset;
     priority_tp_span_t buffer;
     ptmp::data::data_time_t tbuf;
     
-    TPWindower(zsock_t* osock, ptmp::data::data_time_t tspan, ptmp::data::data_time_t toff, ptmp::data::data_time_t tbuf, int detid)
+    TPWindower(zsock_t* osock, ptmp::data::data_time_t tspan,
+               ptmp::data::data_time_t toff, ptmp::data::data_time_t tbuf, int detid)
         : osock(osock), window(tspan, toff), tbuf(std::max(tspan,tbuf)) {
-        tps.set_count(0);
-        tps.set_tstart(toff);
-        tps.set_tspan(tspan);
-        tps.set_detid(detid);
-        tps.set_created(ptmp::data::now()); // maybe want to override this just before a send()
+        tpset.set_count(0);
+        tpset.set_tstart(toff);
+        tpset.set_tspan(tspan);
+        tpset.set_detid(detid);
+        tpset.set_created(ptmp::data::now()); // maybe want to override this just before a send()
     }
 
     // Maybe add (a copy of) the given tp.  Return true if added.
@@ -154,54 +155,54 @@ struct TPWindower {
         }
         buffer.add(tp);
 
-        while (buffer.span() >= tbuf) {  // drain buffer
+        while (buffer.span() >= tbuf) {  // drain buffer while it's bigger than tbuf.
             reset(buffer.top().tstart());
             while (buffer.size() > 0 and window.in(buffer.top().tstart())) {
-                ptmp::data::TrigPrim* newtp = tps.add_tps();
+                ptmp::data::TrigPrim* newtp = tpset.add_tps();
                 *newtp = buffer.top();
                 buffer.pop();
-                tps.set_totaladc(tps.totaladc() + newtp->adcsum());
+                tpset.set_totaladc(tpset.totaladc() + newtp->adcsum());
                 const auto chan = newtp->channel();
-                if (tps.chanbeg() == -1 or tps.chanbeg() > chan) {
-                    tps.set_chanbeg(chan);
+                if (tpset.chanbeg() == -1 or tpset.chanbeg() > chan) {
+                    tpset.set_chanbeg(chan);
                 }
-                if (tps.chanend() == -1 or tps.chanend() < chan) {
-                    tps.set_chanend(chan);
+                if (tpset.chanend() == -1 or tpset.chanend() < chan) {
+                    tpset.set_chanend(chan);
                 }
             }
             if (osock) {                       // allow null for testing
-                ptmp::internals::send(osock, tps); // fixme: can throw
+                ptmp::internals::send(osock, tpset); // fixme: can throw
             }
             else {
                 zsys_debug("window: testing mode, not actually sending a TPSet");
             }
-            // note, this leaves tps full of stale/sent info....
+            // note, this leaves tpset full of stale/sent info....
 
             // dump_window(window, "send");
-            // dump_tpset(tps, "send");
-            // ptmp::data::dump(tps, "send");
+            // dump_tpset(tpset, "send");
+            // ptmp::data::dump(tpset, "send");
         }
         return true;
     }
 
-    // Reset state.  Better send() tps before calling.
+    // Reset state.  Better send() tpset before calling.
     const time_window_t& reset(ptmp::data::data_time_t t) {
         window.set_bytime(t);
-        tps.set_count(tps.count()+1);
-        tps.set_created(ptmp::data::now());
-        tps.set_tstart(window.tbegin());
-        tps.set_chanbeg(-1);
-        tps.set_chanend(-1);
-        tps.set_totaladc(0);
-        tps.clear_tps();
+        tpset.set_count(tpset.count()+1);
+        tpset.set_created(ptmp::data::now());
+        tpset.set_tstart(window.tbegin());
+        tpset.set_chanbeg(-1);
+        tpset.set_chanend(-1);
+        tpset.set_totaladc(0);
+        tpset.clear_tps();
         return window;
     }
 };
 
 static void test_tpwindower()
 {
-    ptmp::data::data_time_t tspan=300, toff=53;
-    TPWindower tpw(nullptr, tspan, toff, 0, 1234);
+    ptmp::data::data_time_t tspan=300, toff=53, tbuf=0;
+    TPWindower tpw(nullptr, tspan, toff, tbuf, 1234);
     dump_window(tpw.window);
     const auto& tw = tpw.reset(tspan+toff);
     assert(tw.wind == 1);
@@ -214,7 +215,11 @@ static void test_tpwindower()
     tp.set_channel(42);
     bool ok = tpw.maybe_add(tp);
     assert(ok);
-    zsys_debug("buffered %d tps over %ld", (int)tpw.buffer.size(), tpw.buffer.span());
+    zsys_debug("buffered %d tpsets over time span %ld, tbuf=%ld",
+               (int)tpw.buffer.size(), tpw.buffer.span(), tpw.tbuf);
+    zsys_debug("tstart=%ld, w.tbeg=%ld w.toff=%ld w.tspan=%ld",
+               tpw.buffer.top().tstart(), tpw.window.tbegin(), tpw.window.toff, tpw.window.tspan);
+    zsys_debug("window in %d", tpw.window.in(tpw.buffer.top().tstart()));
     assert(tpw.buffer.size() == 1);
     dump_window(tpw.window);
 
@@ -222,14 +227,14 @@ static void test_tpwindower()
     tp.set_channel(43);    
     ok = tpw.maybe_add(tp);
     assert(ok);
-    zsys_debug("buffered %d tps over %ld", (int)tpw.buffer.size(), tpw.buffer.span());
+    zsys_debug("buffered %d tpsets over time span %ld", (int)tpw.buffer.size(), tpw.buffer.span());
     assert(tpw.buffer.size() == 2);
     dump_window(tpw.window);
     
     tp.set_tstart(toff);
     ok = tpw.maybe_add(tp);
     assert(!ok);
-    zsys_debug("buffered %d tps over %ld", (int)tpw.buffer.size(), tpw.buffer.span());
+    zsys_debug("buffered %d tpsets over time span %ld", (int)tpw.buffer.size(), tpw.buffer.span());
     assert(tpw.buffer.size() == 2);
     dump_window(tpw.window);
 
@@ -238,13 +243,13 @@ static void test_tpwindower()
     ok = tpw.maybe_add(tp);
     assert(ok);
     dump_window(tpw.window);
-    zsys_debug("buffered %d tps over %ld", (int)tpw.buffer.size(), tpw.buffer.span());
+    zsys_debug("buffered %d tpsets over time span %ld", (int)tpw.buffer.size(), tpw.buffer.span());
     assert(tpw.buffer.size() == 1);
 
     tp.set_tstart(tp.tstart() + 1);
     ok = tpw.maybe_add(tp);
     assert(ok);
-    zsys_debug("buffered %d tps over %ld", (int)tpw.buffer.size(), tpw.buffer.span());
+    zsys_debug("buffered %d tpsets over time span %ld", (int)tpw.buffer.size(), tpw.buffer.span());
     assert(tpw.buffer.size() == 2);
     dump_window(tpw.window);
 }
@@ -323,26 +328,26 @@ void tpwindow_proxy(zsock_t* pipe, void* vargs)
         }
         ++count_in;
 
-        ptmp::data::TPSet tps;
-        ptmp::internals::recv(msg, tps); // throws
-        ptmp::data::real_time_t latency = ptmp::data::now() - tps.created();
+        ptmp::data::TPSet tpset;
+        ptmp::internals::recv(msg, tpset); // throws
+        ptmp::data::real_time_t latency = ptmp::data::now() - tpset.created();
         // dump_window(windower.window, "recv");
-        // dump_tpset(tps, "recv");
-        // ptmp::data::dump(tps, "recv");
+        // dump_tpset(tpset, "recv");
+        // ptmp::data::dump(tpset, "recv");
 
         if (detid < 0) {        // forward if user doesn't provide
-            detid = tps.detid();
-            windower.tps.set_detid(detid);
+            detid = tpset.detid();
+            windower.tpset.set_detid(detid);
         }            
 
         int ntps_failed = 0;
         // We do not know ordering of TrigPrim inside TPSet
-        std::sort(tps.mutable_tps()->begin(), tps.mutable_tps()->end(),
+        std::sort(tpset.mutable_tps()->begin(), tpset.mutable_tps()->end(),
                   [](const ptmp::data::TrigPrim& a, const ptmp::data::TrigPrim& b) {
                       return a.tstart() < b.tstart();
                   });
 
-        for (const auto& tp : tps.tps()) {
+        for (const auto& tp : tpset.tps()) {
 
             // maybe_add() will block if output queue is full.  do a
             // sleepy loop, checking for shutdown or until we can
