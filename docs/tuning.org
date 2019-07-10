@@ -58,6 +58,24 @@ int main()
 
 But, then, it's also immune to being profiled.
 
+** oprofile
+
+This doesn't use ~SIGPROF~.
+
+#+BEGIN_EXAMPLE
+$ operf ./build/test_sorted  > log
+$ opreport --exclude-dependent --demangle=smart --symbols --threshold=1
+#+END_EXAMPLE
+
+Messages about throttling can apparently be ignored.
+
+** perf
+
+#+BEGIN_EXAMPLE
+$ perf record -g ./build/test_sorted  > log
+$ perf report -g
+#+END_EXAMPLE
+
 
 * Understanding the network
 

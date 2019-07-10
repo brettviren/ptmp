@@ -29,3 +29,10 @@ junk
 FELIX_*
 *.dump
 *.json
+*.mon
+gmon.out
+callgrind.*
+oprofile.*
+perf.*
+*.prof
+oprofile_data
