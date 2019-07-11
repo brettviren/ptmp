@@ -2,6 +2,8 @@
 
 #include "json.hpp"
 
+PTMP_AGENT(ptmp::TPReplay, replay)
+
 using json = nlohmann::json;
 
 static

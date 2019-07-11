@@ -5,6 +5,9 @@
 
 #include <queue>
 
+PTMP_AGENT(ptmp::TPWindow, window)
+
+
 using json = nlohmann::json;
 
 

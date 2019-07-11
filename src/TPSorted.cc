@@ -8,6 +8,7 @@
 #include <vector>
 #include <unordered_map>
 
+PTMP_AGENT(ptmp::TPSorted, sorted)
 
 using json = nlohmann::json;
 

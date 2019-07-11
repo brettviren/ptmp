@@ -7,6 +7,8 @@
 
 #include "json.hpp"
 
+PTMP_AGENT(ptmp::TPCat, czmqat)
+
 using json = nlohmann::json;
 
 static

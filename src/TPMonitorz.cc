@@ -9,6 +9,8 @@
 #include "json.hpp"
 using json = nlohmann::json;
 
+PTMP_AGENT(ptmp::TPMonitorz, monitor)
+
 
 // An actor function that starts a steerable proxy.  
 static

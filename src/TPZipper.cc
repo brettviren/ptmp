@@ -23,6 +23,9 @@
 #include <json.hpp>
 #include <queue>
 
+PTMP_AGENT(ptmp::TPZipper, zipper)
+
+
 using json = nlohmann::json;
 
 struct source_info_t {

@@ -36,3 +36,5 @@ oprofile.*
 perf.*
 *.prof
 oprofile_data
+*.html
+foo.*

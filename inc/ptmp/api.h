@@ -90,7 +90,7 @@ namespace ptmp {
     };
 
     /** A factory method for agents */
-    TPAgent* agent_factory(const std::string& type, const std::string& config);
+    TPAgent* agent_factory(const std::string& alias, const std::string& config);
 
 
     /**
@@ -341,5 +341,8 @@ namespace ptmp {
     };
 
 }
+
+#define PTMP_AGENT(TYPE,ALIAS) \
+extern "C" { void* ptmp_make_##ALIAS##_agent(const char* config) { return new TYPE(config); } }
 
 #endif

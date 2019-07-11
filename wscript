@@ -6,7 +6,7 @@ from waflib.Utils import to_list
 sys.path.append('waftools')
 
 
-pkg_deps = ['libzmq','czmq','protobuf']
+pkg_deps = ['libzmq','libczmq','protobuf','dynamo']
 
 
 def options(opt):
