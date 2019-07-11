@@ -30,7 +30,6 @@ def configure(cfg):
 
     #cfg.env.LDFLAGS += ['-pg']
     #cfg.env.CXXFLAGS += ['-pg']
-    cfg.env.CXXFLAGS += ['-std=c++14']
     cfg.env.CXXFLAGS += to_list(cfg.options.cxxflags)
 
 def build(bld):
