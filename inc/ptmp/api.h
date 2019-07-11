@@ -341,8 +341,4 @@ namespace ptmp {
     };
 
 }
-
-#define PTMP_AGENT(TYPE,ALIAS) \
-extern "C" { void* ptmp_make_##ALIAS##_agent(const char* config) { return new TYPE(config); } }
-
 #endif

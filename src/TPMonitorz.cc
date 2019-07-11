@@ -3,6 +3,7 @@
 #include "ptmp/api.h"
 #include "ptmp/data.h"
 #include "ptmp/internals.h"
+#include "ptmp/factory.h"
 
 #include <cstdio>
 

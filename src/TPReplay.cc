@@ -1,4 +1,5 @@
 #include "ptmp/api.h"
+#include "ptmp/factory.h"
 
 #include "json.hpp"
 

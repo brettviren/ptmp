@@ -27,6 +27,7 @@
  */
 
 #include "ptmp/api.h"
+#include "ptmp/factory.h"
 
 #include <iostream>
 #include <fstream>
@@ -50,6 +51,17 @@ int main(int argc, char* argv[])
     std::ifstream cfgfile(argv[1]);
     json config;
     cfgfile >> config;
+
+    ptmp::AgentFactory af;
+    for (auto jpi : config["plugins"]) {
+        std::string pi = jpi;
+        auto ok = af.plugin_cache().add(pi);
+        if (!ok) {
+            zsys_error("failed to add plugin: \"%s\"", pi.c_str());
+            return -1;
+        }
+        zsys_debug("adding plugin \"%s\"", pi.c_str());
+    }
 
     int ttl = -1;
     if (config["ttl"].is_number()) {
@@ -80,7 +92,7 @@ int main(int argc, char* argv[])
         const std::string data = jprox["data"].dump();
         std::cerr << "(" << type << ") " << name << ": " << data << std::endl;
 
-        ptmp::TPAgent* agent = ptmp::agent_factory(type, data);
+        ptmp::TPAgent* agent = af.make(type, data);
         if (!agent) {
             std::cerr << "failed to create agent \"" << name << "\" of type " << type << "\n";
             return -1;

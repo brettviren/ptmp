@@ -19,6 +19,7 @@
 
 #include "ptmp/api.h"
 #include "ptmp/internals.h"
+#include "ptmp/factory.h"
 
 #include <json.hpp>
 #include <queue>
