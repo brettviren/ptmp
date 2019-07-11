@@ -89,21 +89,31 @@ int main(int argc, char* argv[])
         agent_name[agent] = name;
     }
     
-    const auto die_at = zclock_usecs() + ttl*1000000;
-    zsys_debug("ttl %d", ttl);
-
     int tick = 0;
-    while (ttl > 0 and !zsys_interrupted) {
-
-        if (ttl > 0 and die_at < zclock_usecs()) {
-            zsys_debug("ttl of %d s reached", ttl);
-            break;
+    if (ttl < 0 ) {             // live forever
+        while (!zsys_interrupted) {
+            zclock_sleep(snooze);
+            zsys_info("tick %d", tick);
+            ++tick;
         }
+    }
+    else {
 
-        zclock_sleep(snooze);
-        zsys_info("tick %d", tick);
-        ++tick;
+        const auto die_at = zclock_usecs() + ttl*1000000;
+        zsys_debug("ttl %d", ttl);
 
+        while (ttl > 0 and !zsys_interrupted) {
+
+            if (ttl > 0 and die_at < zclock_usecs()) {
+                zsys_debug("ttl of %d s reached", ttl);
+                break;
+            }
+
+            zclock_sleep(snooze);
+            zsys_info("tick %d", tick);
+            ++tick;
+
+        }
     }
 
     if (reprieve) {

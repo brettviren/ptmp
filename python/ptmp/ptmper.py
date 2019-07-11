@@ -2,6 +2,7 @@
 '''
 Do things related to the "ptmper" application
 '''
+import os.path as osp
 from collections import defaultdict
 
 from . import jsonnet
@@ -98,6 +99,54 @@ def dotify(output, ext_str, ext_code, infile):
     dat = load_file(infile, ext_str, ext_code)
 
     open(output,"w").write(dot(dat['proxies']))
+
+@cli.command('gencfg')
+@click.option('-o','--output', default="/dev/stdout",
+              help="Output JSON file (def: stdout)")
+@click.option('-m','--multi',default=None,
+              type=click.Path(exists=True, dir_okay=True, writable=True),
+              help="Output directory for multiple output JSON files")
+@click.option('-V','--ext-str', default=None, type=str,
+              help="Jsonnet external var", multiple=True)
+@click.option('-C','--ext-code', default=None, type=str,
+              help="Jsonnet external code", multiple=True)
+@click.option('-j','--jsonnet-file', default="/dev/stdin",
+              help="input Jsonnet file to compile")
+@click.argument('input_streams', nargs=-1)
+def gencfg(output, multi, ext_str, ext_code, jsonnet_file, input_streams):
+    '''
+    Generate ptmp JSON config file from Jsonnet.
+
+    This command is mostly a wrapper around Python jsonnet with
+    special handling to form the "input_steam" list which will be
+    passed to the Jsonnet available via std.extVar("input").  Input
+    streams are typically interpreted in the Jsonnet as either files
+    or zeromq addresses.
+
+    Example:
+
+    $ rm -rf junk ; mkdir junk
+    
+    \b
+    $ ptmperpy gencfg                        \ 
+       -m junk                               \ # write multiple JSON files under junk/
+       -V outdir='junk'                      \ # Jsonnet requires varialbe 'outdir' defined
+       -j test/test-ptmper-monitored.jsonnet \ # the input Jsonnet file
+                                             \ # list of 'input streams' (files, here)
+      /data/fast/bviren/ptmp-dumps/2019-07-05/FELIX_BR_5*.dump
+    '''
+    ext_code = list(ext_code)
+    if input_streams:
+        ins = '","'.join(input_streams)
+        ext_code += ['input=["%s"]' % ins]
+    dat = load_file(jsonnet_file, ext_str, ext_code)
+    if not multi:
+        open(output,"w").write(jsonnet.json.dumps(dat, indent=4))
+        return
+    for k,v in sorted(dat.items()):
+        open(osp.join(multi,k), "w").write(jsonnet.json.dumps(v, indent=4))
+        
+        
 
 import pandas as pd
 import numpy as np

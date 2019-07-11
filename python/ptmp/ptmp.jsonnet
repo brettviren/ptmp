@@ -19,13 +19,14 @@
     // A socket description object is used by most TP proxy/agent
     // classes.  The bind or connect arguments should pass an
     // array of endpoint addresses, each in ZMQ string format.
-    socket(bc, stype, addrs, hwm=10000) :: {
+    socket(bc, stype, addrs, hwm=1000) :: {
+        local laddrs = if std.type(addrs) == 'array' then addrs else [addrs],
         // The socket type.  PUSH, SUB, etc
         type: std.asciiUpper(stype),
         // The high water mark
         hwm: hwm,
         // bind/connect endpoints
-        [bc]: addrs,
+        [bc]: laddrs,
     },
 
     // Some simplified socket makers.  (sock it to me) 

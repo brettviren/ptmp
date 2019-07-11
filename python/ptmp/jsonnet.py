@@ -23,6 +23,22 @@ def try_path(path, rel):
     with open(full_path) as f:
         return full_path, f.read()
 
+def resolve(filename, paths=()):
+    '''
+    Resolve filename against paths and built in paths including any
+    set in a JSONNET_PATH env var.
+
+    Return None if fail to locate file.
+    '''
+    if filename.startswith('/'):
+        return filename
+    paths = ['.', os.path.dirname(__file__)] + os.environ.get("JSONNET_PATH","").split(":")
+    for maybe in paths:
+        fp = os.path.join(maybe, filename)
+        if os.path.exists(fp):
+            return fp
+    return None
+
 def import_callback(path, rel):
     '''
     Help jsonnet find imports
@@ -50,6 +66,7 @@ def load(fname, **kwds):
 
     No kwds for JSON, go fish.
     '''
+    fname = resolve(fname)
     if fname.endswith(".jsonnet"):
         jpathdir = os.path.dirname(__file__)
         text = evaluate_file(fname, jpathdir=jpathdir, **kwds)
