@@ -1,0 +1,17 @@
+file00: czmqat -B 1000 -E 1000 ifile -f /data/fast/bviren/ptmp-dumps/2019-06-10/FELIX_BR_601.dump osock -m 1000 -p PUSH -a bind -e tcp://127.0.0.1:6000
+file01: czmqat -B 1000 -E 1000 ifile -f /data/fast/bviren/ptmp-dumps/2019-06-10/FELIX_BR_603.dump osock -m 1000 -p PUSH -a bind -e tcp://127.0.0.1:6001
+file02: czmqat -B 1000 -E 1000 ifile -f /data/fast/bviren/ptmp-dumps/2019-06-10/FELIX_BR_605.dump osock -m 1000 -p PUSH -a bind -e tcp://127.0.0.1:6002
+file03: czmqat -B 1000 -E 1000 ifile -f /data/fast/bviren/ptmp-dumps/2019-06-10/FELIX_BR_607.dump osock -m 1000 -p PUSH -a bind -e tcp://127.0.0.1:6003
+file04: czmqat -B 1000 -E 1000 ifile -f /data/fast/bviren/ptmp-dumps/2019-06-10/FELIX_BR_609.dump osock -m 1000 -p PUSH -a bind -e tcp://127.0.0.1:6004
+replay00: check_replay -c 30 input -m 1000 -p PULL -a connect -e tcp://127.0.0.1:6000 output -m 1000 -p PUSH -a bind -e tcp://127.0.0.1:7000
+replay01: check_replay -c 30 input -m 1000 -p PULL -a connect -e tcp://127.0.0.1:6001 output -m 1000 -p PUSH -a bind -e tcp://127.0.0.1:7001
+replay02: check_replay -c 30 input -m 1000 -p PULL -a connect -e tcp://127.0.0.1:6002 output -m 1000 -p PUSH -a bind -e tcp://127.0.0.1:7002
+replay03: check_replay -c 30 input -m 1000 -p PULL -a connect -e tcp://127.0.0.1:6003 output -m 1000 -p PUSH -a bind -e tcp://127.0.0.1:7003
+replay04: check_replay -c 30 input -m 1000 -p PULL -a connect -e tcp://127.0.0.1:6004 output -m 1000 -p PUSH -a bind -e tcp://127.0.0.1:7004
+window00: check_window -c 30 -s 3000 -b 150000 input -m 1000 -p PULL -a connect -e tcp://127.0.0.1:7000 output -m 1000 -p PUSH -a bind -e tcp://127.0.0.1:8000
+window01: check_window -c 30 -s 3000 -b 150000 input -m 1000 -p PULL -a connect -e tcp://127.0.0.1:7001 output -m 1000 -p PUSH -a bind -e tcp://127.0.0.1:8001
+window02: check_window -c 30 -s 3000 -b 150000 input -m 1000 -p PULL -a connect -e tcp://127.0.0.1:7002 output -m 1000 -p PUSH -a bind -e tcp://127.0.0.1:8002
+window03: check_window -c 30 -s 3000 -b 150000 input -m 1000 -p PULL -a connect -e tcp://127.0.0.1:7003 output -m 1000 -p PUSH -a bind -e tcp://127.0.0.1:8003
+window04: check_window -c 30 -s 3000 -b 150000 input -m 1000 -p PULL -a connect -e tcp://127.0.0.1:7004 output -m 1000 -p PUSH -a bind -e tcp://127.0.0.1:8004
+sorted: check_sorted -c 30 input -m 1000 -p PULL -a connect -e tcp://127.0.0.1:8000 tcp://127.0.0.1:8001 tcp://127.0.0.1:8002 tcp://127.0.0.1:8003 tcp://127.0.0.1:8004 output -m 1000 -p PUSH -a bind -e tcp://127.0.0.1:9000
+sink: check_recv -n 10000 -m 1000 -p PULL -a connect -e tcp://127.0.0.1:9000

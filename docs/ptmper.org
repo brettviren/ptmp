@@ -1,0 +1,102 @@
+#+title: ~ptmper~
+
+The PTMP package provides a generic application called ~ptmper~ which
+can execute an arbitrary set of PTMP "proxy" classes as driven by a
+single configuration file.  This allows a complex network topology of
+PTMP actors to be defined in a consistent manner in the configuration
+while making the execution of this topology very simple.
+
+Usage example:
+
+#+BEGIN_EXAMPLE
+  $ ptmper myconfig.json
+#+END_EXAMPLE
+
+* Generating Configuration with Jsonnet
+
+The JSON schema is described below.  A JSON file may be hand-crafted
+but in practice this is tedious and error prone.  Instead, it is
+recommended that a configuration is described in the [[https://jsonnet.org][Jsonnet]] language
+and then compiled to JSON.  Any Jsonnet compiler (such as ~jsonnet~ or
+[[https://github.com/google/go-jsonnet][go-jsonnet]] may be used) and PTMP provides a Python program called
+~ptmperpy~ which can be used.
+
+#+BEGIN_EXAMPLE
+  $ ptmperpy gencfg --help
+#+END_EXAMPLE
+
+Noted in the output, the ~INPUT_STREAMS~ non-option arguments are
+converted into a JSON array and available to the Jsonnet via
+~std.extVar('input')~.  This can be used to bake in input files or
+zeromq transport addresses as shown in the examples below.
+
+* Provided Jsonnet
+
+PTMP provides some prefabricated Jsonnet files that may be used to
+generate JSON for some common patterns of running ~ptmper~.  The Jsonnet
+files are distributed with the Python and are located automatically if
+not provided in the current working directory or given as absolute paths.
+
+An example to produce configuration to run PTMP *window* and *zipper*:
+
+#+BEGIN_EXAMPLE
+  $ ptmperpy gencfg \
+    -o mycfg.json \
+    -j winzip.jsonnet \
+    -V 'output=tcp://127.0.0.1:8000' \
+    -V 'detid=1234' \
+    tcp://127.0.0.1:{7000..7009}
+#+END_EXAMPLE
+
+Notes on this example:
+
+- the Jsonnet is parameterized by ~output~ and ~detid~.  These must be given.
+- this example relies on Bash brace expansion to enumerate the ten input stream addresses.   If your shell does not provide this then you may exhaustively list all addresses
+
+The resulting JSON file can then be used simply:
+
+#+BEGIN_EXAMPLE
+  $ ptmper mycfg.json
+#+END_EXAMPLE
+
+The prefabricated Jsonnet files provided are:
+
+- winzip :: an N-input, 1-output topology.  Each input stream has
+            "windowing" applied.  Each windowed stream is "zipped"
+            into one output stream. Input sockets are of type SUB and
+            will ~connect()~ to the given addresses. Parameters:
+  - detid :: specify the detector ID number which is then put in to
+             TPSets.  Set to ~-1~ if the source correctly provides
+             detector IDs
+  - output :: a zeromq transport address for output socket which is of
+              type PUB which will ~bind()~.
+
+* Writing your own Jsonnet.
+
+T.B.D. but for now, look at ~winzip.jsonnet~ and ~ptmp.jsonnet~ that it
+uses.  There are also tests under [[../test/]].
+
+* JSON schema
+
+Regardless of how the JSON configuration file is produced it must
+follow a particular schema.  At top level the JSON should represent a
+single object with these attributes:
+
+- [ptmper options] :: described below
+- ~proxies~ :: a list of JSON objects, each identifying and configuring one PTMP "proxy" class configuration
+
+** ~ptmper~ options
+
+- pause :: number of seconds to wait before creating any proxy instances
+- reprieve :: number of seconds to wait after destroying all proxy instances before ~ptmper~ exits
+- ttl :: number of second to continue executing
+- snooze :: number of millisecond to sleep between checking if the time to live has expired
+
+** Proxy configuration
+
+Each proxy configuration object has three attributes
+
+- name :: some unique, human-oriented identifier
+- type :: label the proxy type (C++ type or its alias)
+- data :: proxy-specific configuration as documented elsewhere
+

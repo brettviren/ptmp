@@ -6,7 +6,7 @@ from waflib.Utils import to_list
 sys.path.append('waftools')
 
 
-pkg_deps = ['libzmq','czmq','protobuf']
+pkg_deps = ['libzmq','libczmq','protobuf','dynamo']
 
 
 def options(opt):
@@ -28,7 +28,8 @@ def configure(cfg):
     #cfg.check(header_name="dlfcn.h", uselib_store='DYNAMO',
     #          lib=['dl'], mandatory=True)
 
-    cfg.env.CXXFLAGS += ['-std=c++11']
+    #cfg.env.LDFLAGS += ['-pg']
+    #cfg.env.CXXFLAGS += ['-pg']
     cfg.env.CXXFLAGS += to_list(cfg.options.cxxflags)
 
 def build(bld):
@@ -41,7 +42,7 @@ def build(bld):
         if p: rpath += p
 
     src = bld.path.ant_glob("src/*.cc")
-    pbs = bld.path.ant_glob("src/*.proto")
+    pbs = bld.path.ant_glob("src/ptmp.proto")
     pb_headers = list()
     for pb in pbs:
         bname = 'src/' + pb.name.replace('.proto','.pb')
@@ -51,7 +52,7 @@ def build(bld):
               rpath = rpath,
               source=pbs+src, target='ptmp', use=uses)
     bld.install_files('${PREFIX}/include', 'inc/CLI11.hpp inc/json.hpp')
-    bld.install_files('${PREFIX}/include/ptmp', pb_headers)
+    #bld.install_files('${PREFIX}/include/ptmp', pb_headers)
     bld.install_files('${PREFIX}/include/ptmp', bld.path.ant_glob("inc/ptmp/*.h"))
 
 

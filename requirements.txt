@@ -2,3 +2,5 @@ pyzmq
 protobuf
 matplotlib
 click
+jsonnet
+pandas

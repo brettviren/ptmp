@@ -108,16 +108,16 @@ int main(int argc, char* argv[])
         zclock_sleep(begwait);
     }
 
-    int64_t t1 = zclock_usecs();
-
+    // zclock_usecs() is okay to use for relative times but it does
+    // not give proper absolute times.
+    auto t1 = zclock_usecs();
     for (int count = 0 ; count < number; ++count) {
         zsock_send(sopt.sock, "m", msg);
         if (loop_delay) {
             zclock_sleep(loop_delay);
         }
     }
-    
-    int64_t t2 = zclock_usecs();
+    auto t2 = zclock_usecs();
 
     if (endwait) {
         zclock_sleep(endwait);

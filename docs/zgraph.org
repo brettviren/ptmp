@@ -1,0 +1,183 @@
+#+title: zgraph
+
+PTMP's Python package provides a command line program ~zgraph~ which accepts and processes graphs described in JSON or Jsonnet format which represent a network of PTMP components (ie, programs).
+This network description may be translated into a visual form in order to help validate its correctness.  It may then be translated into an executable form.  Several example description files are included, such as [[../test/test-replay.jsonnet]].
+
+* Installation
+
+The PTMP Python package installs in the usual Python ways.  My favorite:
+
+#+begin_example
+  $ python3 -m venv venv
+  $ source venv/bin/activiate
+  $ python setup.py develop
+#+end_example
+
+* Network Visualization
+
+The graph can rendered to GraphViz ~dot~ for visualization and debugging
+
+#+begin_src sh :results none
+  zgraph dotify -o test-replay.dot ../test/test-replay.jsonnet
+  dot -Tsvg -o test-replay.svg test-replay.dot
+#+end_src
+
+[[file:test-replay.svg]]
+
+* Network Execution
+
+A ~Procfile~ is a simple way to list a number of processes to execute as one overall job.  A number of methods exist to "run" a ~Procfile~, most notably [[http://blog.daviddollar.org/2011/05/06/introducing-foreman.html][Foreman]].  If a PTMP network graph description is properly formed it can be rendered to a Procfile with the ~zgraph procfile~ command.
+
+#+begin_example
+  $ zgraph procfile -o foo.procfile foo.jsonnet
+#+end_example
+
+In addition to the original Foreman there are many re-implementations that will operate on a Procfile.  For a Python-based implementation:
+
+#+begin_example
+  $ pip install honcho
+  $ honcho -f foo.procfile start
+#+end_example
+
+But, see the next section.
+
+* Monitoring
+
+A [[https://github.com/brettviren/shoreman][modified version of shoreman]], the [[https://www.chrismytton.uk/shoreman/][shell implementation of Foreman]], can be used to execute a Procfile and capture system monitoring information from Linux ~/proc/<pid>/~ file system about the programs and their threads.
+
+#+BEGIN_EXAMPLE
+  $ wget https://raw.githubusercontent.com/brettviren/shoreman/master/shoreman.sh
+  $ chmod +x shoreman.sh
+  $ echo 'PATH+=build:build/test:build/apps' > envfile
+  $ ./shoreman.sh procfile envfile mon.log > top.log 2>&1
+#+END_EXAMPLE
+
+The produced ~mon.log~ may then be processed to analyze the behavior of the programs and their threads.  Note, this log prepends the time and the process ID to each sampled line from ~/proc/<pid>/task/<taskid>/stat~.  That is, when column 1 matches column 2, the line corresponds to the "main" thread, when they differ the line corresponds to a "sub-thread".  The meaning of the columns starting from 2 are described in ~proc(5)~.  One must add one to ~proc(5)~ numbers to get file column numbers or better yet use ~ptmp.procplot~ Python module.
+
+The ~top.log~ contains all ~stdout/stderr~ from the individual processes with their Procfile name prepended to each line.
+
+Killing the ~shoreman.sh~ process should also kill any processes that it started via the Procfile.
+
+** Visualizing
+
+The PTMP Python package provides processing and visualizing of a monitoring file as created above.
+
+This is highly subject to change but here's an initial example:
+
+#+BEGIN_EXAMPLE
+  $ procplot kitchen-sink -o test-replay-jobs.svg log.test-replay-jobs 
+#+END_EXAMPLE
+
+
+[[file:test-replay-jobs.svg]]
+
+
+* Worked example
+
+We have some per-FELIX-link dump files:
+
+#+BEGIN_EXAMPLE
+$ cd /data/fast/bviren/ptmp-dumps/2019-06-10/
+$ ls -l FELIX_BR_6*.dump
+-rw-r--r-- 1 bviren bviren 387975495 Jun 10 06:44 FELIX_BR_601.dump
+-rw-r--r-- 1 bviren bviren   4073613 Jun 10 06:44 FELIX_BR_602.dump
+-rw-r--r-- 1 bviren bviren 368567925 Jun 10 06:44 FELIX_BR_603.dump
+-rw-r--r-- 1 bviren bviren   3882380 Jun 10 06:44 FELIX_BR_604.dump
+-rw-r--r-- 1 bviren bviren 367664874 Jun 10 06:45 FELIX_BR_605.dump
+-rw-r--r-- 1 bviren bviren   3707414 Jun 10 06:45 FELIX_BR_606.dump
+-rw-r--r-- 1 bviren bviren 843361310 Jun 10 06:45 FELIX_BR_607.dump
+-rw-r--r-- 1 bviren bviren   4372948 Jun 10 06:45 FELIX_BR_608.dump
+-rw-r--r-- 1 bviren bviren 372069912 Jun 10 06:45 FELIX_BR_609.dump
+-rw-r--r-- 1 bviren bviren   3843427 Jun 10 06:45 FELIX_BR_610.dump
+#+END_EXAMPLE
+
+To replay these and form a stream which is the precursor to running a
+Candidate Level Trigger ("TC finder") a network consisting of these
+layers is needed:
+
+1. file source (~czmqat~)
+2. paced reply (~check_replay~)
+3. windowing (~check_window~)
+4. synchronizing streams (~check_sorted~)
+5. a sink (~check_recv~)
+
+The first 3 layers are spanned by one pipeline per input file (ie,
+1->2->3 for each file).  These N pipelines are synchronized by step 4
+to one stream.  Its output stream is then simply terminated in the
+sink of 5.
+
+The network topology is described in
+[[../test/test-file-replay-window-sorted.jsonnet]].  This description is
+partially generic in that it is parameterized by a list of input files
+as well as the number of message to sink (so that ~check_recv~ will
+eventually terminate).  Where it lacks generalization is in:
+
+ - the socket patterns used.  Use of PUSH/PULL is hard-wired.  This
+   means the network may block.
+
+ - transport.  ~tcp://~ on the loopback device is used throughout.
+
+The file list is input into the Jsonnet as a string representing a
+JSON array.  Some shell fiddling is done to generate that string.
+Otherwise, the command to operate on a PTMP network graph model is
+straight forward.  Here is an example to generate a GraphViz ~dot~ file:
+
+#+BEGIN_EXAMPLE
+  $ zgraph dotify \
+    -V nmsgs=1000 \
+    -C "input=["$(printf '"%s"\n' /data/fast/bviren/ptmp-dumps/2019-06-10/FELIX_BR_60[13579].dump | paste -sd, )"]" \
+    -o docs/test-file-replay-window-sorted-graph.dot \
+    test/test-file-replay-window-sorted.jsonnet 
+  $ dot -Tsvg -o docs/test-file-replay-window-sorted-graph.svg \
+    docs/test-file-replay-window-sorted-graph.dot 
+#+END_EXAMPLE
+
+We only include the "odd" files to keep the graph relatively small.
+Note, the "even" files hold data from channels lacking signal.  The
+resulting graph is:
+
+[[file:test-file-replay-window-sorted-graph.svg]]
+
+As the ~.jsonnet~ file was developed, several bugs were easily found by
+looking at visualizations like this.  After fixing, a Procfile can be
+generated simply by changing the ~zgraph~ sub-command name and the
+output file name.
+
+#+BEGIN_EXAMPLE
+$ zgraph procfile \
+  -V nmsgs=1000 \
+  -C "input=["$(printf '"%s"\n' /data/fast/bviren/ptmp-dumps/2019-06-10/FELIX_BR_60[13579].dump | paste -sd, )"]" \
+   -o Procfile.test-file-replay-window-sorted \
+  test/test-file-replay-window-sorted.jsonnet 
+#+END_EXAMPLE
+
+An example result is [[./Procfile.test-file-replay-window-sorted]].  
+
+Using ~shoreman.sh~ downloaded as described above, such a Procfile can be "run" like:
+
+#+BEGIN_EXAMPLE
+$ shoreman.sh Procfile.test-file-replay-window-sorted envfile \
+  test-file-replay-window-sorted.monlog > test-file-replay-window-sorted.toplog
+#+END_EXAMPLE
+
+Depending on how much data are in the files, the value of the ~nmsgs~
+external variable value, how long the "countdowns" were set for the
+autonomous components, it is likely some components will finish early
+and some will continue to run, waiting forever (especially due to
+using PUSH/PULL and blocking).  The ~shoreman.sh~ can be killed (~Ctrl-C~)
+and that should cause all remaining processes to be reaped.
+
+#+BEGIN_EXAMPLE
+$ ps -ef|egrep 'test_|check_|czmqat'
+bviren    2424  3780  0 15:15 pts/31   00:00:00 grep -E test_|check_|czmqat
+#+END_EXAMPLE
+
+Then, make some plots
+
+#+BEGIN_EXAMPLE
+$ procplot kitchen-sink \
+  -o docs/test-file-replay-window-sorted-plots.svg \
+   test-file-replay-window-sorted.monlog
+#+END_EXAMPLE
+
+[[file:test-file-replay-window-sorted-plots.svg]]

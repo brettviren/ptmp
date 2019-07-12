@@ -25,8 +25,11 @@ int main(int argc, char* argv[])
 
     int countdown = -1;         // forever
     app.add_option("-c,--count", countdown,
-                   "Number of seconds to count down before exiting, simulating real app work");
-    
+                   "Number of snoozes before exiting");
+    int snooze = 5000;         // ms
+    app.add_option("-z,--snooze", snooze,
+                   "Number of ms to snoze");
+
     CLI::App* isocks = app.add_subcommand("input", "Input socket specification");
     CLI::App* osocks = app.add_subcommand("output", "Output socket specification");
     app.require_subcommand(2);
@@ -51,12 +54,11 @@ int main(int argc, char* argv[])
     {
         ptmp::TPWindow proxy(cfgstr);
 
-        int snooze = 1000;
         while (countdown != 0) {
             -- countdown;
-            int64_t t1 = zclock_usecs ();
+            auto t1 = ptmp::data::now();
             zclock_sleep(snooze);
-            int64_t t2 = zclock_usecs ();
+            auto t2 = ptmp::data::now();
             if (std::abs((t2-t1)/1000-snooze) > 10) {
                 std::stringstream ss;
                 ss << "check_window: sleep interrupted, "

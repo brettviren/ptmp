@@ -12,20 +12,14 @@ Here's a check list of work needed (or done).
 - [X] define configuration schema
 - [X] test programs spanning transports and supported socket types
 - [X] test that demonstrates multiple subs
-- [ ] application settable HWM
+- [X] application settable HWM
 - [X] tests which emulate expected TP finders in terms of specifying
   mean and variance of some rates.
 
-- [ ] move abs ~datatime~ into ~TrigPrim~
-- [ ] change ~chanspan~ to ~chanbeg~ and ~chanend~ in ~TPSet~
+- [X] move abs ~datatime~ into ~TrigPrim~
+- [X] change ~chanspan~ to ~chanbeg~ and ~chanend~ in ~TPSet~
 
-* Discussion and Decisions Needed
+- [X] clear up time stamps, use ~std::chrono::system_time()~ converted to microseconds for ~TPSet.created~.
 
-- Decide on the [[../ptmp/ptmp.proto][message schema]].
-
-
-
-* Extended functionality
-
-See discussion on the broader ~dexnet~ elsewhere.
-
+- [ ] define new TC message schema
+- [ ] define new TD message schema

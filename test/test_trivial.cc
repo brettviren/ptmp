@@ -21,14 +21,14 @@ int main()
     ptmp::data::TPSet tps;
     ptmp::testing::init(tps);
 
-    auto tbeg = zclock_usecs();
+    auto tbeg = ptmp::data::now();
     const int count = 1000000;
     for (int ind=0; ind<count; ++ind) {
         ptmp::testing::set_count_clock(tps);
         send(tps);
         recv(tps);
     }
-    auto tend = zclock_usecs();
+    auto tend = ptmp::data::now();
 
     const double dt = (tend-tbeg)*1e-6;
     const double khz = 0.001*count/dt;

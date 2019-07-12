@@ -1,39 +1,49 @@
 #+title: PTMP
 
-Prototype Trigger Message Passing aka Pretty Temporary
+Prototype Trigger Message Passing for (proto)DUNE DAQ
 
 * Introduction 
 
-This package provides trigger messages transport for the protoDUNE DAQ
-prototyping development toward full DUNE Far Detector DAQ.
+This package provides trigger message transport for the protoDUNE DAQ
+prototype development toward full DUNE Far Detector DAQ.
 
 A simple API is provided which hides details of the transport
-mechanism.  The application simply sees a sink or a source of trigger
-messages.  Driven by user configuration, an intervening network may be
-defined.  This can be a simple sink-to-source pipeline or may be
-structured into a rich data flow network which may include redundant
-flow paths and intervening filtering/processing with redundancy and
-load balancing.  The sink/source applications need not be complicated
-by this richness.
+mechanism.  The application simply sees sinks and/or sources of
+trigger messages.  There are also autonomous "proxy" or "actor"
+classes that provide low-level message handling functions.  Driven by
+user configuration, a network components may be defined.  This network
+comprise a simple source-to-sink pipeline or may be structured into a
+rich data flow network which may include redundant flow paths and
+intervening filtering/processing with redundancy and load balancing,
+etc.  The nodes comprising this network need not be complicated by
+this richness.
 
 Message transport is based on ZeroMQ which provides robustness and
 performance (see the section on throughput performance in the [[./docs/tuning.org][tuning]]
 document).  Thus, the PTMP network may exist over a mix of transports
 (inter-thread, inter-process and inter-computer) as determined by the
 configuration.  The payload message frames are currently serialized
-using protobuf ([[./ptmp/ptmp.proto][schema]]).
+using ProtoBuffer ([[./ptmp/ptmp.proto][schema]]).  
+
+As PTMP transport is based on "standard" ZeroMQ and ProtoBuffers nodes
+may participate in the network which have been developed outside of
+PTMP proper and in languages of a developers choosing.  PTMP directly
+includes some examples developed in [[python/ptmp][Python]].
 
 
 * Status
 
-This package has basic functionality.  See [[./docs/todo.org][To Do]] document for checklist
-and notes on future development. 
+This package now has basic functionality and in use at protoDUNE.
+Somewhat formal [[https://github.com/brettviren/ptmp/releases][releases]] are now made, so please use them and refer to
+a release when/if reporting problems.  PTMP is being built as a binary
+UPS "product" ~ptmp~ and is deployed in this way at the protoDUNE DAQ.
+See below for installing from source.
 
-This button determines if recent builds and tests pass on Travis-CI:
+See [[./docs/todo.org][To Do]] document for checklist and notes on future development and
+also any [[https://github.com/brettviren/ptmp/issues][issues]].
 
-[[https://travis-ci.org/brettviren/ptmp][file:https://travis-ci.org/brettviren/ptmp.svg]]
+[[https://travis-ci.org/brettviren/ptmp][https://travis-ci.org/brettviren/ptmp.svg?branch=master]]
 
-Note, a failure here is not necessarily indicative of a real problem.
 
 * Installation 
 
@@ -43,20 +53,27 @@ dependencies are:
 
 - libzmq
 - CZMQ
-- protobuf (v3)
+- protobuf 
 
-See the [[./.travis.yml][Travis-CI file]] for an ~apt~ installation line.  There is also a
-[[./installdeps.sh][script]] to assist building the dependencies from source.  With
-prerequisites available, issue:
+On Debian-like systems you can supply the prerequisites with:
+
+#+BEGIN_EXAMPLE
+  $ sudo apt-get install -y \
+         uuid-dev libsystemd-dev liblz4-dev libcurl4-nss-dev \
+         libzmq5-dev libczmq-dev protobuf-compiler libprotobuf-dev
+#+END_EXAMPLE
+
+There is also a [[./installdeps.sh][script]] that may assist building the dependencies from
+their sources.  With prerequisites available, issue:
 
 #+BEGIN_EXAMPLE
   $ ./waf --prefix=<path> configure build install
   $ ls <path>/{lib,include,bin}/
 #+END_EXAMPLE 
 
-Replace ~<path>~ with a into which you want the software to install.  If
-you want to just test it locally you may omit ~--prefix~ and the ~install~
-command.
+Replace ~<path>~ with the directory into which you want the software to
+install.  If you want to just test it locally you may omit ~--prefix~
+and the ~install~ arguments.
 
 The default build will run the tests.  To avoid that, for example,
 while developing, you may do:
@@ -64,7 +81,6 @@ while developing, you may do:
 #+BEGIN_EXAMPLE
   $ ./waf --notests [install]
 #+END_EXAMPLE 
-
 
 See [[./docs/ups.org]] for special support for building in the UPS
 ecosystem.
@@ -75,16 +91,23 @@ the [[./docs/tuning.org][tuning]] document for some details on these tests.
 * Application Development
 
 PTMP provides a very specific and almost trivial API through a number
-of classes which provide *synchronous* methods:
+of classes which provide *synchronous* methods.  There are two
+categories of PTMP classes:
 
-- ~TPSender~ :: a callable to send a ~TPSet~ object out its socket.
+Low level abstractions of ZeroMQ sockets:
+
+- ~TPSender~ :: a callable to send a ~TPSet~ object out its socket.  See
+                [[./docs/tpsender.org]] for more info.
 
 - ~TPReceiver~ :: a callable to receive a ~TPSet~ object from its socket.
                   Can block or be given a timeout to wait for one.
 
+High level "proxy" classes:
+
 - ~TPReplay~ :: a free-running agent which accept an input ~TPSet~ stream
                 and attempt to produce an output stream at a pace
-                indicated by the original ~TPSet::tstart~ value.
+                indicated by the original ~TPSet::tstart~ value.  More
+                info in [[./docs/tpreplay.org]].
 
 - ~TPSorted~ :: a free-running agent which takes in N asynchronous ~TPSet~
                 streams and emits one merged, ordered stream.  See
@@ -93,41 +116,39 @@ of classes which provide *synchronous* methods:
 - ~TPWindow~ :: a free-running agent which accepts one ~TPSet~ stream and
                 emits on ~TPSet~ stream.  Input is ordered and buffered
                 over a given minimum time span and then output in
-                ~TPSets~ spanning fixed windows.
+                ~TPSets~ spanning fixed windows.  More info in
+                [[./docs/tpwindow.org]].
 
-Each class is given a /configuration string/ in JSON format to provide
-information about the sockets to use and other info.  This allows
-applications to gain automatic flexibility in terms of socket patterns
-and transport.  
 
-Instances of these classes should be long-lived in the application and
-as they hold a ZeroMQ socket must be used from the thread in which
-they were constructed.  Some provide /callable/ objects.  Eg, a sender
-object will be called on a ~const TPSet&~ and send it out the object's
-socket(s) as a single message and the receiver takes a non-const
-~TPSet&~ to be filled when a message arrives.  The receiver also takes
-an optional second argument which is a timeout in msec.  If no message
-arrives w/in that time the call will return the value ~false~.  The
-receiver may ~throw std::runtime_error~ if a message is received which
-can not be deserialized into the ~TPSet~ object.  Finally, the ~TPsorted~
-acts as a proxy.  Once created, application code merely needs to keep
-it in scope and it will service its input and output sockets.  
-
-The application, via PTMP configuration, needs to assure these classes
-receive proper configuration to allow their sockets to properly bind
-and connect.  The socket type (PUB, SUB, PUSH, PULL, PAIR) and
-transport (~tcp://~, ~inproc://~, ~ipc://~) and endpoint addresses are all
-user configurable.  See ~zmq_socket(3)~ for a discussion of the options.
+The sender/receiver classes may be used to allow arbitrary application
+code to directly participate in the PTMP network.  The "proxy" classes
+are essentially stand-alone programs that an application instantiates
+and holds on to with little or not further action.
 
 ** Message Schema
 
 See [[./docs/message-schema.org]].
 
+** Applications
+
+PTMP provides some end-user applications in addition to ~libptmp~ for
+application development.
+
+- ~czmqat~ :: This a ZeroMQ ~netcat~ like program.  It can read/write
+            from/to both files and ZeroMQ sockets.  It is blind to
+            PTMP message schema so can be used with arbitrary ZeroMQ
+            sockets (although not all socket types are supported).
+
+- ~tpset-tap~ :: This uses a ~TPSet~ aware CZMQ ~zproxy~ in order to "tap
+                 in" to a stream of ~TPSet~ messages.  It may be
+                 inserted between two peers in order to "spy" on the
+                 messages they exchange.
 
 ** Reference applications and tests
 
-The following applications provide reference applications.  Running
-them without command line arguments will give a usage message.
+The following are some reference applications.  They and others not
+listed can be found under [[./test/]].  Running them without command line
+arguments will give a brief usage message.
 
 - [[./test/check_send.cc][check_send]] :: send empty ~TPSet~ via ~ipc~ or ~tcp~ in a simple manner.
 - [[./test/check_send.cc][check_send_rates]] :: a more sophisticated version of the above which
@@ -156,31 +177,13 @@ following attributes:
 - type :: a ZeroMQ socket type name ("PAIR", "PUB", "SUB", etc)
 - bind :: an array of addresses in canonical ZeroMQ form that the socket should bind
 - connect :: an array of addresses in canonical ZeroMQ form that the socket should connect
+- hwm :: optional high-water mark which sets how many messages may be buffered (default is 1000) before socket enter's "mute" state.  
 
-An example configuration string for a sender might look like:
-
-#+BEGIN_SRC json
-{ 
-  "type": "PUB",
-  "bind": [ "tcp://127.0.0.1:12345" ]
-}
-#+END_SRC
-
-An example configuration string for a receiver connecting to two
-senders might look like:
-
-#+BEGIN_SRC json
-{
-  "type": "SUB",
-  "connect": [ "tcp://127.0.0.1:12345", "tcp://127.0.0.1:12346" ]
-}
-#+END_SRC
+Example configuration strings are given in the individual "tp*.org" files in [[./docs/]].
 
 What follows is some discussion on how selecting a configuration for
-the PTMP API classes.  In short, the recommendation is:
-
-- ~TPSender~ :: use type PUB and bind
-- ~TPRecevier~ :: use type SUB and connect
+the PTMP API classes.  Deveopers and expert users are strongly urged
+to read [[http://api.zeromq.org/4-2:zmq-socket][zmq_socket(3)]] man page.  
 
 ** Attachment mode
 

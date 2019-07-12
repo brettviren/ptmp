@@ -1,0 +1,3 @@
+[submodule "waftools"]
+	path = waftools
+	url = git@github.com:brettviren/waftools.git

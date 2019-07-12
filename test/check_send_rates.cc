@@ -103,19 +103,19 @@ int main(int argc, char* argv[])
     ptmp::data::TPSet tps;
     ptmp::testing::init(tps);
 
-    int64_t tbeg = zclock_usecs();
+    ptmp::data::real_time_t tbeg = ptmp::data::now();
     for (int ind=0; ind<ntpsets; ++ind) {
         sleepy_time();
         make_tps(tps);
         tps.set_detid(detid);
         tps.set_count(ind);
-        tps.set_created(zclock_usecs());
+        tps.set_created(ptmp::data::now());
         const int delta_ms = (tps.created()-tbeg)/1000;
         zsys_debug("send %d/%d since start: %d ms",
                    ind, ntpsets, delta_ms);
         send(tps);
     }
-    auto tend = zclock_usecs();
+    auto tend = ptmp::data::now();
 
     const double dt = (tend-tbeg)*1e-6;
     const double khz = 0.001*ntpsets/dt;

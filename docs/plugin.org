@@ -1,0 +1,38 @@
+#+title: PTMP plugins
+
+PTMP supports shared library plugins.  This allows decoupled
+development of PTMP components in different packages.
+
+* How to use
+
+PTMP plugins are located via ~LD_LIBRARY_PATH~.  A [[factory.org][factory method]] is
+used in the C++ to locate, load and use plugins.
+
+The [[ptmper.org][ptmper]] program can be given a top-level configuration attribute
+~plugins~ which should be an array of plugin names.  A plugin name is
+simply the shared library file name with the prefix ~lib~ and file
+extension removed.
+
+* Existing plugins
+
+Currently these plugins are known to exist
+
+- ptmp :: the library provided by PTMP is itself a PTMP plugin library
+- ptmp-tcs :: trigger candidate finders part of [[https://github.com/brettviren/ptmp-tcs][a package of the same name]].
+
+* Example
+
+A prefabricated [[ptmper.org][ptmper]] Jsonnet configuration file will build a
+configuration for a job that makes use of the ~ptmp-tcs~ plugin.
+
+#+BEGIN_EXAMPLE
+  $ ptmperpy gencfg \
+    -j tcfinder.jsonnet \
+    -o mycfg.json \
+    -V 'output=tcp://127.0.0.1:7100' \
+    -V detid=1234 \
+    tcp://127.0.0.1:{7000..7009}
+  $ ptmper mycfg.json
+#+END_EXAMPLE
+
+

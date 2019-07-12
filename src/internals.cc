@@ -6,10 +6,22 @@
 #include <iostream>             // debug
 #include <algorithm>
 #include <unordered_map>
+#include <unistd.h>
+#include <ctime>
 
 using json = nlohmann::json;
 
 using namespace ptmp::internals;
+
+void ptmp::internals::microsleep(ptmp::data::real_time_t microseconds)
+{
+    usleep(microseconds);
+    
+    // struct timespec req = {0};
+    // req.tv_sec = microseconds / 1000000;
+    // req.tv_nsec = 1000*(microseconds % 1000000);
+    // nanosleep(&req, (struct timespec *)NULL);    
+}
 
 int ptmp::internals::socket_type(std::string name)
 {
@@ -29,7 +41,7 @@ int ptmp::internals::socket_type(std::string name)
         {"stream", 11}
     };
     int n = zmqtypes[name];
-    zsys_info("socket type \"%s\" %d", name.c_str(), n);
+    // zsys_info("socket type \"%s\" %d", name.c_str(), n);
     return n;
 }
 
@@ -38,6 +50,9 @@ zsock_t* ptmp::internals::endpoint(const std::string& config)
 {
     auto jcfg = json::parse(config);
     auto jsock = jcfg["socket"];
+    if (jsock.is_null() or jsock.empty()) {
+        return NULL;
+    }
     std::string stype = jsock["type"];
     int hwm = 1000;
     if (jsock["hwm"].is_number()) {
@@ -49,8 +64,6 @@ zsock_t* ptmp::internals::endpoint(const std::string& config)
         zsys_error("failed to make socket of type %s #%d", stype.c_str(), socktype);
         return sock;
     }
-    zsys_info("endpoint of type %s #%d, hwm:%d",
-              stype.c_str(), socktype, hwm);
 
     zsock_set_rcvhwm(sock, hwm);
     if (socktype == 2) {        // fixme: support topics?
@@ -59,7 +72,7 @@ zsock_t* ptmp::internals::endpoint(const std::string& config)
 
     for (auto jaddr : jsock["bind"]) {
         std::string addr = jaddr;
-        zsys_info("binding \"%s\"", addr.c_str());
+        zsys_info("%s %s bind", stype.c_str(), addr.c_str());
         int port = zsock_bind(sock, addr.c_str(), NULL);
         if (port<0) {
             zsys_error(zmq_strerror (errno));
@@ -68,7 +81,7 @@ zsock_t* ptmp::internals::endpoint(const std::string& config)
     }
     for (auto jaddr : jsock["connect"]) {
         std::string addr = jaddr;
-        zsys_info("connecting \"%s\"", addr.c_str());
+        zsys_info("%s %s connect", stype.c_str(), addr.c_str());
         int rc = zsock_connect(sock, addr.c_str(), NULL);
         if (rc<0) {
             zsys_error(zmq_strerror (errno));
@@ -77,6 +90,31 @@ zsock_t* ptmp::internals::endpoint(const std::string& config)
     }
     return sock;
 }
+
+
+// Most sockets are meant to allow for multiple endpoints to
+// bind/connect.  Some uses require one socket per endpoint.  This
+// function is like endpoint() but provides a per-endpoint socket interpretation.
+std::vector<zsock_t*> ptmp::internals::perendpoint(const std::string& config)
+{
+    auto jcfg = json::parse(config)["socket"];
+    const std::vector<std::string> bcs{"bind","connect"};
+    std::vector<zsock_t*> ret;
+    for (auto bc : bcs) {
+        for (auto jaddr : jcfg[bc]) {
+            json cfg = {
+                { "socket", {
+                        { "type", jcfg["type"] },
+                        { "hwm", jcfg["hwm"] },
+                        { bc, jaddr } } } };
+            std::string cfgstr = cfg.dump();
+            zsock_t* sock = endpoint(cfgstr);
+            ret.push_back(sock);
+        }
+    }
+    return ret;
+}
+
 
 ptmp::internals::Socket::Socket(const std::string& config)
     : m_sock(endpoint(config))
@@ -165,3 +203,29 @@ void ptmp::internals::send(zsock_t* sock, const ptmp::data::TPSet& tps)
     
 }
 
+zmsg_t* ptmp::internals::read(FILE* fp)
+{
+    size_t size=0;
+    int nread = fread(&size, sizeof(size_t), 1, fp);
+    if (nread != 1) {
+        return NULL;
+    }
+    zchunk_t* chunk = zchunk_read(fp, size);
+    zframe_t* frame = zchunk_pack(chunk);
+    zchunk_destroy(&chunk);
+    zmsg_t* msg = zmsg_decode(frame);
+    zframe_destroy(&frame);
+    return msg;
+}
+
+int ptmp::internals::write(FILE* fp, zmsg_t* msg)
+{
+    zframe_t* frame = zmsg_encode(msg);
+    zchunk_t* chunk = zchunk_unpack(frame);
+    zframe_destroy(&frame);
+    size_t size = zchunk_size(chunk);
+    fwrite(&size, sizeof(size_t), 1, fp);
+    int rc = zchunk_write(chunk, fp);
+    zchunk_destroy(&chunk);
+    return rc;
+}

@@ -2,26 +2,18 @@
 
 * Schema description
 
-PTMP messages are ZeroMQ messages.  
+PTMP messages are multi-frame ZeroMQ messages.  The first frame of any
+PTMP message holds a 4 byte integer that identifies the schema
+describing the remaining frames.  This integer may be referred to as
+the message ID or the message schema version.  The supported messages
+are described in the remainder of this document.
 
-Currently a message consists of two ZeroMQ frames:
+* Schema version 0
 
-1. an "ID" frame, essentially unused currently except that it holds a
-   ~0~ value and serves as a PUB/SUB "topic".  Its existence is
-   currently not exposed to PTMP client code.
-2. a serialized representation of a ~TPSet~ object.  Serialization is
-   performed by protobuf according to the schema held [[../ptmp/ptmp.proto][here]].
-
-* ~TPSet~
-
-The main payload message type in PTMP is the ~TPSet~ and is defined in
-[[./ptmp/ptmp.proto]] which is in "protobuf" description language.  This
-is used to generate class implementations which are available to the
-application with
-
-#+BEGIN_SRC c++
-#include "ptmp/data.h"
-#+END_SRC
+A *v0* message consists of one additional ZeroMQ frame holding a a
+serialized representation of a ~TPSet~ object.  Serialization is
+performed by protocol buffers according to the schema defined [[../ptmp/ptmp.proto][here]].
+See the comments in that file and subsections below for details.
 
 ** Time values
 
@@ -35,9 +27,11 @@ attributes:
   hardware clock.
 
 - an absolute *wall clock* time (~created~) which represents the number of
-  microseconds from the Unix epoch.  The function ~zclock_usecs()~
-  should be used in setting it.
+  microseconds from the Unix epoch.  The function ~ptmp::data::now()~
+  should be used to set it.  Note, ~zclock_usecs()~ is *not* appropriate.
 
+The check program ~test/check_clock.cc~ can be used to exercise some of
+the possible clocks.
 
 ** Message content requirements
 
@@ -64,9 +58,10 @@ requirements (using [[https://www.ietf.org/rfc/rfc2119.txt][rfc 2119]] "may/shal
 
 - The ~created~ value shall hold the number of microseconds since the
   Unix epoch at which the ~TPSet~ was formed just prior to sending.  It
-  should be set with from the value returned by ~zclock_usecs()~.  Host
-  systems should synchronize system clocks with PTP or at least NTP.
-  The ~created~ value may be used for monitoring real time latency.
+  should be set with from the value returned by ~ptmp::data::now()~
+  (note ~zclock_usecs()~ is *not* appropriate).  Host systems should
+  synchronize system clocks with PTP or at least NTP.  The ~created~
+  value may be used for monitoring real time latency.
 
 - The ~count~ shall be incremented by one for each subsequently emitted
   ~TPSet~ from a source.  It may be used for detection of lost ~TPSets~.
@@ -74,149 +69,111 @@ requirements (using [[https://www.ietf.org/rfc/rfc2119.txt][rfc 2119]] "may/shal
 - The ~detid~ should be set to a number uniquely identifying the portion
   of detector from which the ~TPSet~ was derived.  
 
-* Schema evolution
 
-It is of course critical for all PTMP endpoints to know what schema is
-followed by the messages they consume.  This can be accomplished by
-assuring consisted software versions of all active endpoints.  In a
-mixed software environment, it can be accomplished by asserting version strings
-in the messages themselves and having version-specific message
-handling code.  This handling may simply be to reject any messages
-with unexpected versions.
+* Schema version 1 (in draft)
 
-Currently, PTMP messages are not explicitly versioned.  The first
-evolution of schema must contend with this.  The initial frame
-(holding a ~0~ now) of a message may modified to indicate new and
-subsequent schema.
+A new schema is needed to go beyond ~TPSet~'s "bag of TPs".  
 
-*** Frame level 
+** Requirements
 
-Although protobuf serialization is rather fast, there are some
-operations that need only partial serialization (eg, ~TPSorted~ only
-needs ~tstart~).  A select few values could be identified for this kind
-of fast routing and placed/copied outside the ~TPSet~ and either
-serialized in a new, small protobuf object or directly into a ~zframe~.
-In either case, they would reside in a frame prior to the frame
-holding the full ~TPSet~.
+*** Meta requirements
 
-*** ~TPSet~ 
+1. Minimize the number of top level message types.
 
-A ~TPSet~ represents a set of trigger primitives (~TrigPrim~) collected
-together to avoid transmitting many individual ~TrigPrim~ and to retain
-some context of their production.  For example, the Hit Finder emits
-all TPs found in some time period together as a ~TPSet~.  A trigger
-candidate (TC) finder produces a result that is also well suited to
-being represented as a ~TPSet~.  As understanding of the information
-that a TC must contain, the ~TPSet~ may evolve to accommodate that.  If
-indeed the evolution is too great, then a new object type may be
-crated.  
+2. Support partial message deserialization to access common attributes.
 
-These suggestions are under consideration for extension to ~TPSet~.
+3. Differing concepts should not share identical names regardless of scope.
 
-- ~type~ :: (~int~?) identify the source of a ~TPSet~.  This may be needed
-            for ~TPSet~ consumers which subscribe to multiple sources
-            and require source-dependent behavior to be applied to a
-            ~TPSet~.
-            
-- ~tag~ :: (~int~? ~string~?) semantically categorize a ~TPSet~.  This may be
-           required to convey summary information about a ~TPSet~ that
-           is not otherwise derivable from current attributes.
+*** Header requirements
 
-These suggestions have been considered and rejected for the given reasons.
+All messages provide a "header" object with attributes common to all
+possible types of "payload" object which the message may also hold.  A
+header object may be serialized independently from the payload.
 
-- config ID :: such values are constant by construction throughout a
-               DAQ "run" and thus may be specified through DAQ
-               configuration
+Header object have attributes that shall be set to allow:
 
-- APA ID :: this is redundant with channel and not undefined if a
-            ~TPSet~ spans an APA.  It is also detector module specific.
+1. Detection of lost packets.
 
-- APA plane ID :: ibid.
+2. Measurement of latency of transport.
 
-- TP count :: implicitly held in the "~TPSet.tps~" attribute.
+3. Identification of the "source" of the message payload in terms of:
 
-- first/last channels :: already supported and redundant with info in the collection of ~TrigPrims~.
+   - identifier of the message producer algorithm or process .
 
-- first/last channel time :: may be derived from collection of ~TrigPrims~.
+   - the portion of the detector from which the message was derived.
 
-- first/last time :: may be derived from collection of ~TrigPrims~.
+   - the time span of detector data that was examined in deriving the message.
 
-** New messages
+4. Determination of which DAQ instance or "partition" the message is part of.
 
-Possibly a TC may require representation different than ~TPSet~.
-Certainly a trigger decision (TD) will.  As new object types are added
-some care in factoring is needed in both the message schema and the
-PTMP message handling code if existing functionality is to be
-leveraged.
+*** Payload requirements 
 
-As an example, the ~TPSorted~ proxy strictly operates on ~TPSet~ but it
-only requires its ~tstart~ value.  If a TC uses a novel object then
-another ~TPSorted~ must be developed to handle this new type.  
+The "payload" message contains essentially all other required
+information not in the "header".
 
-A better approach would be to factor ~tstart~ and possibly other values
-in ~TPSet~ into its own object, serialize that to frame 1, and put the
-remainder as frame 2.  Likewise, the TC would split into a generic
-header in frame 1 and its payload in frame 2.  This would allow
-~TPSorted~ to be refactored to be generic to both types of messages.
+Payload objects shall satisfy these requirements:
 
-** Trigger Decision
+1. Distinguish which types of information is provided prior to accessing that information
 
-The pinnacle object in the trigger system is a Trigger Decision (TD).
-It is meant to describe a command which is executed by reading out a
-portion of buffered data from one FD module.  The TD may be consumed
-by entities external to the detector module.
+2. Provide information about three tiers of trigger info: TPs, TCs or TDs.
 
-The TD schema substantially differ from that of ~TPSet~ for at least
-these reasons:
+3. Allow a single or a combination of tiers to be populated in one message.
 
-1. it may lack any constituent ~TrigPrim~ as a TD may not even derive from TPs thus the bulk of ~TPSet~ would in general be vestigial.
-2. it must address portions of the upstream DAQ buffers in order to readout some subset of the detector for a particular range of time.  ~TPSet~ has no attributes that may represent this information.
+**** Trigger Primitive (TP)
 
-What follow are proposed attributes of a TD with explanation.  
+The trigger primitive (TP) object represents TPC activity localized in
+time and to one channel.  The object:
 
-- count :: (~uint32~) monotonically increasing count of the TDs from a given source.
+1. shall describe the extent of a contiguous time span and its
+   association with a channel.
+2. may summarize the ADC content sampled during that span.
 
-- partid :: (~uint32~) identify from which DAQ partition the TD derives
+**** Trigger Candidate (TC)
 
-- sources :: (~uint32~ enough?) a bitfield marking what "sources"
-             ("types"?) of TC were used to form this TD.  Eg, bits
-             indiciating contribution from "tpc self trigger", "beam",
-             "random", ...
+The trigger candidate (TC) object represents a potential and partial
+reason to read the detector and is derived from a number of TPs.  The
+object:
 
-- tstart :: (~uint64~) the start of the commanded readout of the
-            detector measured in the hardware clock "data time".
+1. shall summarize a "rectangular" region spanning a contiguous space of
+   time and channel.
+2. shall summarize the set of detector sub-components covered by this
+   span.
+3. may refer to a collection of TP objects from which the span was
+   derived.
 
-- tspan :: (~uint64~) the duration of the commanded readout of the
-           detector measured in the hardware clock "data time".  Note,
-           unlike ~TPSet~ or ~TrigPrim~ ~tspan~ this is 64 bits in order
-           span 100s anticipated for describing a SNB dump.
+**** Trigger Decision (TD)
 
-- modid :: (~int32~) identify the FD module from which the TD *applies*.
-           The value of *zero* is reserved.
+The trigger decision (TD) represents a portion of buffered data that
+shall be read out.  It expresses the portion in terms of channels and
+digitization sampling time.  It may be derived from TC objects or
+produced by other means.
 
-- submodids :: (repeated ~int32~) a sequence of submodule IDs from which
-               data over the time span shall be readout.  The
-               submodids shall be interpreted in a manner depending on
-               the value of modid.  Additional interpretation rules
-               may include: empty sequence implies the readout of all
-               possible submodules.
+1. shall describe the data to be read out in terms of a contiguous
+   time span and a subset of a pre-defined set of detector components.
 
-- flag :: a bitfield representing anomalous conditions.  Depending on
-          the bits set the other attributes may be interpreted
-          differently.
+2. shall indicate a semantic category of origin (eg, to distinguish
+   between a self-trigger decision derived from TCs from one derived
+   from a source external from the detector data).
+
+3. shall provide a priority value based on a predefined metric. 
+
+4. may refer to TC and TP information from which it was derived.
+
+*** Frame level
+
+At the ZeroMQ message level, the *v1* PTMP message shall have three frames:
 
 
-These are proposed but rejected
 
-- trig ID :: instead of explicitly giving the ~tspan~ to readout, have
-             predefined IDs which imply the readout time span
-             ("nominal" 5ms vs "snb" 100s).  This needlessly reduces
-             flexibility without providing benefit.  One example: an
-             accidental coincidence of cosmic muons require a longer
-             than normal readout or two shorter than normal readouts
-             in either case to avoid commanding overlapping readout.
+| frame   | notes                                |
+|---------+--------------------------------------|
+| Version | identifies the version of the schema |
+|---------+--------------------------------------|
+| Header  | payload-independent info             |
+|---------+--------------------------------------|
+| Payload | payload-specific info                |
+|---------+--------------------------------------|
 
-- trig ID config :: see arguments above for changes to TPSet involving
-                    config
-
+The Version is a 4 byte integer and equal to ~1~ for v1 schema.
+The schema covering Header and Payload is in [[../src/ptmpv1.proto]].
 

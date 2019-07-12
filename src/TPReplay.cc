@@ -1,34 +1,23 @@
 #include "ptmp/api.h"
+#include "ptmp/factory.h"
 
 #include "json.hpp"
 
+PTMP_AGENT(ptmp::TPReplay, replay)
+
 using json = nlohmann::json;
 
-// fixme: this is duplicated from TPSorted.  And, better to have
-// header outside of protobuf object.  This needs refactoring.
-struct msg_header_t {
-    uint32_t count, detid;
-    uint64_t tstart;
-    int ntps;
-};
-static msg_header_t msg_header(zmsg_t* msg)
-{
-    zmsg_first(msg);            // msg id
-    zframe_t* pay = zmsg_next(msg);
-    ptmp::data::TPSet tps;
-    tps.ParseFromArray(zframe_data(pay), zframe_size(pay));
-    return msg_header_t{tps.count(), tps.detid(), tps.tstart(), tps.tps_size()};
-}
-
 static
-void dump_header(const char* label, msg_header_t& head)
+void dump_header(const char* label, ptmp::data::TPSet& tpset)
 {
     zsys_debug("replay: %s 0x%x #%d %4d %ld",
-               label, head.detid, head.count, head.ntps, head.tstart);
+               label, tpset.detid(), tpset.count(),
+               tpset.tps_size(), tpset.tstart());
 }
 
 
 // The actor function
+static
 void tpreplay_proxy(zsock_t* pipe, void* vargs)
 {
     auto config = json::parse((const char*) vargs);
@@ -42,83 +31,121 @@ void tpreplay_proxy(zsock_t* pipe, void* vargs)
     if (config["speed"].is_number()) {
         speed = config["speed"];
     }
+    int rewrite_count = 0;
+    if (config["rewrite_count"].is_number()) {
+        rewrite_count = config["rewrite_count"];
+    }
 
     zsock_signal(pipe, 0);      // signal ready
 
-    zpoller_t* pipe_poller = zpoller_new(pipe, isock, NULL);
+    zpoller_t* poller = zpoller_new(pipe, isock, NULL);
 
     int wait_time_ms = -1;
 
-    int64_t last_send_time = 0;
-    int64_t last_mesg_time = 0;
+    ptmp::data::real_time_t first_created = 0, last_created = 0;
+    ptmp::data::data_time_t first_tstart = 0, last_tstart = 0;
 
+    int count = 0;
+    bool got_quit = false;
     while (!zsys_interrupted) {
 
-        void* which = zpoller_wait(pipe_poller, wait_time_ms);
+        // zsys_debug("replay: waiting");
+
+        void* which = zpoller_wait(poller, wait_time_ms);
         if (!which) {
-            zsys_info("TPReplay proxy interrupted");
+            zsys_info("replay: interrupted in poll");
             break;
         }
         if (which == pipe) {
-            zsys_info("TPReplay proxy got quit");
-            break;
+            zsys_info("replay: got quit");
+            got_quit = true;
+            goto cleanup;
         }
-
+        
         // got input
 
         zmsg_t* msg = zmsg_recv(isock);
         if (!msg) {
-            zsys_info("TPReplay proxy interrupted");
+            zsys_info("replay: interrupted in recv");
             break;
         }
-        auto header = msg_header(msg);
 
-        if (header.tstart == 0xffffffffffffffff) {
-            dump_header("kill", header);
-            zmsg_destroy(&msg);
-            continue;
-        }
-        
-        if (last_send_time == 0) { // first message
-            last_send_time = zclock_usecs();
-            last_mesg_time = header.tstart;
-            int rc = zmsg_send(&msg, osock);
-            if (rc  != 0) {
-                zsys_error("send failed");
-                break;
+        // unpack message to get timing
+        ptmp::data::TPSet tpset;
+        ptmp::internals::recv(msg, tpset);
+        const ptmp::data::data_time_t tstart = tpset.tstart();
+
+        if (last_created == 0) { // first message
+            first_created = last_created = ptmp::data::now();
+            first_tstart = last_tstart = tstart;
+
+            tpset.set_created(last_created);
+            if (rewrite_count) {
+                tpset.set_count(count);
             }
+
+            // fixme: kludge to avoid output block stopping shutdown
+            while (! (zsock_events(osock) & ZMQ_POLLOUT)) {
+                if (zsock_events(pipe) & ZMQ_POLLIN) {
+                    got_quit = true;
+                    goto cleanup;
+                }
+                zclock_sleep(1); // ms
+            }
+
+            ptmp::internals::send(osock, tpset);
+            ++count;
             zsys_debug("replay: first");
             continue;
         }
 
-        // dump_header("send", header);
+        if (tstart < last_tstart) {
+            // tardy
+            zsys_debug("replay: tardy %d", tpset.count());
+            continue;
+        }
 
-        int64_t delta_tau = header.tstart - last_mesg_time;
-        int64_t t_now = zclock_usecs();
-        int64_t delta_t = last_send_time + delta_tau/speed - t_now;
-        if (delta_t < 0) {
-            // tardy!
-            delta_t = 0;
+        const ptmp::data::real_time_t delta_tau = (tstart - first_tstart)/speed;
+        const ptmp::data::real_time_t t_now = ptmp::data::now();
+        const ptmp::data::real_time_t delta_t = t_now - first_created;
+        const ptmp::data::real_time_t to_sleep = delta_tau - delta_t;
+        last_tstart = tstart;
+        last_created = t_now;
+        if (to_sleep > 0) {
+            ptmp::internals::microsleep(to_sleep);
         }
-        if (delta_t > 0 ) {
-            int zzz_ms = delta_t / 1000;
-            // zsys_debug("replay: sleep %d ms after t=%ld/dt=%d, tau=%ld/dtau=%d",
-            //           zzz_ms, last_send_time, delta_t, last_mesg_time, delta_tau);
-            zclock_sleep(zzz_ms);
-            last_mesg_time = header.tstart;
-        }
-        last_send_time = zclock_usecs();
-        int rc = zmsg_send(&msg, osock);
-        if (rc  != 0) {
-            zsys_error("send failed");
-            break;
+        {
+            tpset.set_created(ptmp::data::now());
+            if (rewrite_count) {
+                tpset.set_count(count);
+            }
+
+            // fixme: kludge to avoid output block stopping shutdown
+            while (! (zsock_events(osock) & ZMQ_POLLOUT)) {
+                if (zsock_events(pipe) & ZMQ_POLLIN) {
+                    got_quit = true;
+                    goto cleanup;
+                }
+                zclock_sleep(1); // ms
+            }
+
+            ptmp::internals::send(osock, tpset);
+            ++count;
         }
     }
 
-    zpoller_destroy(&pipe_poller);
+  cleanup:
+    zsys_debug("replay: finished after %d", count);
+
+    zpoller_destroy(&poller);
     zsock_destroy(&isock);
     zsock_destroy(&osock);
     
+    if (got_quit) {
+        return;
+    }
+    zsys_debug("replay: waiting for quit");
+    zsock_wait(pipe);
 }
 
 

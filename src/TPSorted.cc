@@ -1,4 +1,6 @@
 #include "ptmp/api.h"
+#include "ptmp/internals.h"
+#include "ptmp/factory.h"
 
 #include <czmq.h>
 #include <json.hpp>
@@ -7,31 +9,10 @@
 #include <vector>
 #include <unordered_map>
 
+PTMP_AGENT(ptmp::TPSorted, sorted)
 
 using json = nlohmann::json;
 
-// TPSorted interprets the list of endpoints as being for individual
-// sockets while normally, one socket may have many endpoints.  So, we
-// do a little private jostling of the config into many confgs.
-static
-std::vector<zsock_t*> make_sockets(json jcfg)
-{
-    const std::vector<std::string> bcs{"bind","connect"};
-    std::vector<zsock_t*> ret;
-    for (auto bc : bcs) {
-        for (auto jaddr : jcfg[bc]) {
-            json cfg = {
-                { "socket", {
-                        { "type", jcfg["type"] },
-                        { "hwm", jcfg["hwm"] },
-                        { bc, jaddr } } } };
-            std::string cfgstr = cfg.dump();
-            zsock_t* sock = ptmp::internals::endpoint(cfgstr);
-            ret.push_back(sock);
-        }
-    }
-    return ret;
-}
 
 // This is probably a painfully slow function that gets run multiple
 // times on the same message.  The PTMP message coded design is
@@ -45,8 +26,8 @@ std::vector<zsock_t*> make_sockets(json jcfg)
 // this function static to contain the cancer.
 struct msg_header_t {
     uint32_t count, detid;
-    uint64_t tstart;
-    int64_t created;
+    ptmp::data::data_time_t tstart;
+    ptmp::data::real_time_t created;
 };
 static msg_header_t msg_header(zmsg_t* msg)
 {
@@ -59,25 +40,25 @@ static msg_header_t msg_header(zmsg_t* msg)
 
 static void header_dump(std::string s, msg_header_t& h)
 {
-    static uint64_t t0 = h.tstart;
+    // static ptmp::data::data_time_t t0 = h.tstart;
     // zsys_warning("%s: #%d from %d t=%.1f",
     //              s.c_str(), h.count, h.detid, 1e-6*(h.tstart-t0));
-    int64_t now = zclock_usecs();
-    zsys_info("%s: count:%-4d detid:0x%x tstart:%-8ld lat:%d ms",
+    ptmp::data::real_time_t now = ptmp::data::now();
+    zsys_info("sorted: %s: count:%-4d detid:0x%x tstart:%-8ld lat:%d ms",
               s.c_str(), h.count, h.detid, h.tstart,
               (now - h.created)/1000);
 
 }
 
 // keep EOT fitting in a signed int64
-static const uint64_t EOT = 0x7FFFFFFFFFFFFFFF;
+static const ptmp::data::data_time_t EOT = 0x7FFFFFFFFFFFFFFF;
 
 // keep track of state for each input
 struct SockInfo {
     size_t index;
-    zsock_t* sock;     // the socket
+    zsock_t* sock;
     zpoller_t* poller; 
-    int64_t seen_time; // wall clock time when last message arrived
+    ptmp::data::real_time_t seen_time; // wall clock time when last message arrived
     msg_header_t msg_header;
     zmsg_t* msg;       // most recent message popped from input queue or NULL
     uint64_t nrecved;
@@ -86,7 +67,7 @@ struct SockInfo {
 
 // Get the next message.   Return true if successful.
 static
-bool recv_prompt(SockInfo& si, int64_t last_msg_time, bool drop_tardy)
+bool recv_prompt(SockInfo& si, ptmp::data::data_time_t last_msg_time, bool drop_tardy)
 {
     assert(!si.msg);            // we are not allowed to overwrite
     void* which = zpoller_wait(si.poller, 0);
@@ -104,15 +85,20 @@ bool recv_prompt(SockInfo& si, int64_t last_msg_time, bool drop_tardy)
     bool tardy = last_msg_time < EOT and header.tstart < EOT and header.tstart < last_msg_time;
     if (tardy) {
         ++si.ntardy;
-        zsys_debug("tardy: msg=%ld last=%ld %d/%d",
-                   header.tstart, last_msg_time, si.ntardy, si.nrecved); 
+        //zsys_debug("sorted: tardy: msg=%ld last=%ld %d/%d",
+        //           header.tstart, last_msg_time, si.ntardy, si.nrecved); 
     }
     if (drop_tardy and tardy) {
         // Message is tardy and policy is drop.
-        header_dump("tardy", header);
+        // header_dump("tardy", header);
         zmsg_destroy(&msg);
         // next one might be on time
-        return recv_prompt(si, last_msg_time, drop_tardy);
+        // return recv_prompt(si, last_msg_time, drop_tardy);
+        // 
+        // C++ doesn't do tail call optimization!  Can blow out the
+        // stack with many tardies.  Just return and let the loop deal
+        // with it.
+        return false;
     }
     si.msg = msg;
     si.msg_header = header;
@@ -121,12 +107,13 @@ bool recv_prompt(SockInfo& si, int64_t last_msg_time, bool drop_tardy)
 }
 
 // The actor function
+static
 void tpsorted_proxy(zsock_t* pipe, void* vargs)
 {
 
     auto config = json::parse((const char*) vargs);
-    auto input = make_sockets(config["input"]["socket"]);
-    auto output = make_sockets(config["output"]["socket"]);
+    auto input = ptmp::internals::perendpoint(config["input"].dump());
+    auto output = ptmp::internals::perendpoint(config["output"].dump());
 
     auto tardy_policy = config["tardy_policy"];
     bool drop_tardy = true;
@@ -136,6 +123,11 @@ void tpsorted_proxy(zsock_t* pipe, void* vargs)
 
     const size_t ninputs = input.size();
 
+    if (config["tardy"].is_null()) {
+        std::string dump = config.dump(4);
+        zsys_error("sorted: no tardy set.\n%s", dump.c_str());
+        throw std::runtime_error("tpsorted: no tardy value set");
+    }
     // We will wait no more than this long for any new input.  If an
     // input stream fails to provide any input w/in this time, it's
     // subsequent data is at risk of being dropped if other streams
@@ -144,7 +136,7 @@ void tpsorted_proxy(zsock_t* pipe, void* vargs)
 
     zsock_signal(pipe, 0);      // signal ready
 
-    zsys_info("starting tpsorted proxy with tardy policy: %s",
+    zsys_info("sorted: starting with tardy policy: %s",
               (drop_tardy?"drop":"pass"));
         
     // load up control info
@@ -157,20 +149,21 @@ void tpsorted_proxy(zsock_t* pipe, void* vargs)
 
     zpoller_t* pipe_poller = zpoller_new(pipe, NULL);
 
-    uint64_t last_msg_time = EOT;
+    ptmp::data::data_time_t last_msg_time = EOT;
 
     int wait_time_ms = 0;
-
+    bool got_quit = false;
     while (!zsys_interrupted) {
 
 
         void* which = zpoller_wait(pipe_poller, wait_time_ms);
         if (which) {
-            zsys_info("TPSorted proxy got quit");
+            zsys_info("sorted: got quit");
+            got_quit = true;
             break;
         }
 
-        const int64_t now = zclock_usecs();
+        const ptmp::data::real_time_t now = ptmp::data::now();
 
         int nwait = 0;          // how many we lack but need to wait for
 
@@ -179,9 +172,12 @@ void tpsorted_proxy(zsock_t* pipe, void* vargs)
             if (!si.msg) {
                 void* which = zpoller_wait(si.poller, 0);
                 if (which) {
-                    si.seen_time = now;
-                    recv_prompt(si, last_msg_time, drop_tardy);
-                    continue;
+                    // fixme: this is probably broken.
+                    bool ok = recv_prompt(si, last_msg_time, drop_tardy);
+                    if (ok) {
+                        si.seen_time = now;
+                        continue;
+                    }
                 }
                 if (si.seen_time == 0) {
                     continue; // never yet seen
@@ -203,7 +199,7 @@ void tpsorted_proxy(zsock_t* pipe, void* vargs)
         
         if (nwait == ninputs) {
             wait_time_ms = tardy_ms;
-            zsys_debug("all input waiting, wait for %d ms", wait_time_ms);
+            zsys_debug("sorted: all input waiting, wait for %d ms", wait_time_ms);
             continue;
         }
         if (nwait) {
@@ -215,7 +211,7 @@ void tpsorted_proxy(zsock_t* pipe, void* vargs)
         }
 
         // find min time message
-        int64_t min_msg_time = EOT;
+        ptmp::data::data_time_t min_msg_time = EOT;
         size_t min_msg_ind = ninputs;
         for (size_t ind=0; ind<ninputs; ++ind) {
             SockInfo& si = sockinfo[ind];
@@ -283,7 +279,7 @@ void tpsorted_proxy(zsock_t* pipe, void* vargs)
     zpoller_destroy(&pipe_poller);
     for (size_t ind=0; ind < ninputs; ++ind) {
         SockInfo& si = sockinfo[ind];
-        zsys_debug("%d: %d tardy out of %d recved",
+        zsys_debug("sorted: %d: %d tardy out of %d recved",
                    ind, si.ntardy, si.nrecved);
         if (si.msg) {
             zmsg_destroy(&si.msg);
@@ -296,6 +292,11 @@ void tpsorted_proxy(zsock_t* pipe, void* vargs)
     for (auto s : output) {
         zsock_destroy(&s);
     }
+    if (got_quit) {
+        return;
+    }
+    zsys_debug("sorted: waiting for quit");
+    zsock_wait(pipe);
 }
 
 
@@ -307,8 +308,7 @@ ptmp::TPSorted::TPSorted(const std::string& config)
 
 ptmp::TPSorted::~TPSorted()
 {
-    zsys_info("signal actor to quit");
+    zsys_info("sorted: signal actor to quit");
     zsock_signal(zactor_sock(m_actor), 0); // signal quit
-
     zactor_destroy(&m_actor);
 }
