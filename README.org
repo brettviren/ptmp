@@ -47,6 +47,11 @@ also any [[https://github.com/brettviren/ptmp/issues][issues]].
 
 * Installation 
 
+PTMP provides compiled C++ applications and shared library as well as
+a Python module.
+
+** C++
+
 The PTMP package should build with any reasonably up to date C++
 compiler.  GCC 7 is used in development.  Prerequisite software
 dependencies are:
@@ -54,6 +59,10 @@ dependencies are:
 - libzmq
 - CZMQ
 - protobuf 
+
+Optional but very useful for generating [[docs/ptmper.org][ptmper]] configuration files:
+
+- Jsonnet
 
 On Debian-like systems you can supply the prerequisites with:
 
@@ -64,29 +73,47 @@ On Debian-like systems you can supply the prerequisites with:
 #+END_EXAMPLE
 
 There is also a [[./installdeps.sh][script]] that may assist building the dependencies from
-their sources.  With prerequisites available, issue:
+their sources.  
+
+With prerequisites available, issue:
 
 #+BEGIN_EXAMPLE
-  $ ./waf --prefix=<path> configure build install
-  $ ls <path>/{lib,include,bin}/
+  $ alias waf=`pwd`/waftools/waf    # (1)
+  $ waf --prefix=<path> configure   # (2)
+  $ waf build --notests             # (3) 
+  $ ls <path>/{lib,include,bin}/    # (4)
+  $ waf -j1 --alltests              # (5) 
+  $ waf install                     # (6)
 #+END_EXAMPLE 
 
-Replace ~<path>~ with the directory into which you want the software to
-install.  If you want to just test it locally you may omit ~--prefix~
-and the ~install~ arguments.
+Notes:
 
-The default build will run the tests.  To avoid that, for example,
-while developing, you may do:
-
-#+BEGIN_EXAMPLE
-  $ ./waf --notests [install]
-#+END_EXAMPLE 
+1. [[https://waf.io][Waf]] is like ~make~.  It's equivalent to a ~Makefile~ is [[./wscript]].  A copy is included under the [[./waftools/]] directory.
+2. The ~--prefix~ gives an installation directory.  Additional ~--with-*~ options may be needed for configure to find external dependencies.  Issue 
+3. Build with ~--notests~ in order to avoid running tests in parallel.
+4. Result may be immediately used in-place under the ~build/~ directory.
+5. Run tests with ~-j1~ to enforce serial tests.  If run in parallel, some test may try to use the same ports.  Some tests run many minutes depending on the speed and number of CPUs available.  Some may run forever when problems occur.
+6. Installing into the directory given by ~--prefix~.  This will be required if other packages depending on PTMP are to be built (eg [[https://github.com/brettviren/ptmp-tcs][ptmp-tcs]].
 
 See [[./docs/ups.org]] for special support for building in the UPS
 ecosystem.
 
 As part of the build, a number of tests will be built and run.  See
 the [[./docs/tuning.org][tuning]] document for some details on these tests.
+
+** Python
+
+The Python package provides a ~ptmp~ Python module and a number of
+command line programs.  It is not required to use the C++ applications
+and libraries.  It does provide some useful support (eg the ~ptmperpy~
+CLI).  The package may be installed in usual Python ways.  My favorite
+is:
+
+#+begin_example
+  $ python3 -m venv venv
+  $ source venv/bin/activiate
+  $ python setup.py develop
+#+end_example
 
 * Application Development
 
@@ -123,7 +150,9 @@ High level "proxy" classes:
 The sender/receiver classes may be used to allow arbitrary application
 code to directly participate in the PTMP network.  The "proxy" classes
 are essentially stand-alone programs that an application instantiates
-and holds on to with little or not further action.
+and holds on to with little or not further action.  All PTMP proxy
+classes provided directly by PTMP or other libraries that support PTMP
+[[docs/plugin.org][plugin factory]] method may be executed via the [[docs/ptmper.org][ptmper]] application.
 
 ** Message Schema
 
@@ -134,21 +163,22 @@ See [[./docs/message-schema.org]].
 PTMP provides some end-user applications in addition to ~libptmp~ for
 application development.
 
+- ~ptmper~ :: A general purpose application that can execute one or many
+            PTMP "proxy" classes.  It is configured by a simple JSON
+            file.  See [[docs/ptmper.org]] for details.
+
 - ~czmqat~ :: This a ZeroMQ ~netcat~ like program.  It can read/write
             from/to both files and ZeroMQ sockets.  It is blind to
             PTMP message schema so can be used with arbitrary ZeroMQ
             sockets (although not all socket types are supported).
 
-- ~tpset-tap~ :: This uses a ~TPSet~ aware CZMQ ~zproxy~ in order to "tap
-                 in" to a stream of ~TPSet~ messages.  It may be
-                 inserted between two peers in order to "spy" on the
-                 messages they exchange.
 
 ** Reference applications and tests
 
 The following are some reference applications.  They and others not
 listed can be found under [[./test/]].  Running them without command line
-arguments will give a brief usage message.
+arguments will give a brief usage message.  They are not recommended
+for use in any production setting (see instead [[docs/ptmper.org]]).
 
 - [[./test/check_send.cc][check_send]] :: send empty ~TPSet~ via ~ipc~ or ~tcp~ in a simple manner.
 - [[./test/check_send.cc][check_send_rates]] :: a more sophisticated version of the above which
@@ -180,6 +210,11 @@ following attributes:
 - hwm :: optional high-water mark which sets how many messages may be buffered (default is 1000) before socket enter's "mute" state.  
 
 Example configuration strings are given in the individual "tp*.org" files in [[./docs/]].
+
+Larger scale configuration for aggregation of multiple components in
+~ptmper~ can be built easily with the ~ptmperpy gencfg~ command.  See
+[[docs/ptmper.org]].
+
 
 What follows is some discussion on how selecting a configuration for
 the PTMP API classes.  Deveopers and expert users are strongly urged
