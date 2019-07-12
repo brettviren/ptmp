@@ -26,7 +26,7 @@ To install PTMP as a "normal" (non UPS) source package but in a UPS
 environment, set up your environment as above and then:
 
 #+BEGIN_EXAMPLE
-  $ ./waftools/waf-configure-for-ups.sh [/path/to/ptmp/install]
+  $ ./tools/waf-configure-for-ups.sh [/path/to/ptmp/install]
   $ ./waf install
 #+END_EXAMPLE
 
@@ -38,7 +38,7 @@ installation will go to the ~install/~ directory in the source.
 Set up the environment as above and then:
 
 #+BEGIN_EXAMPLE
-  $ ./upstools/create_ups_product.sh /path/to/products/dir [quals]
+  $ ./tools/create_ups_product.sh /path/to/products/dir [quals]
 #+END_EXAMPLE
 
 The script:
@@ -69,9 +69,10 @@ Some TODO items for this script:
 
  - [ ] is the ~product_deps~ file needed?  I thought that was an MRB thing
 
- - [ ] it would be nice to parameterize dependencies outside of the
+ - [X] it would be nice to parameterize dependencies outside of the
    script so that ~upstools/~ can become a stand-alone repo to be
    included in others (eg, [[https://github.com/brettviren/ptmp-tcs][ptmp-tcs]] like ~waftools/~ is becoming)
+   - consolidate ~upstools~ + ~waftools~ into ~tools~ (still ~waftools~ on github)
 
  - [ ] The ZeroMQ related UPS products have a minor break with
    community naming conventions.  If fixed, the script needs updating

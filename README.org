@@ -78,7 +78,7 @@ their sources.
 With prerequisites available, issue:
 
 #+BEGIN_EXAMPLE
-  $ alias waf=`pwd`/waftools/waf    # (1)
+  $ alias waf=`pwd`/tools/waf       # (1)
   $ waf --prefix=<path> configure   # (2)
   $ waf build --notests             # (3) 
   $ ls <path>/{lib,include,bin}/    # (4)
@@ -88,7 +88,7 @@ With prerequisites available, issue:
 
 Notes:
 
-1. [[https://waf.io][Waf]] is like ~make~.  It's equivalent to a ~Makefile~ is [[./wscript]].  A copy is included under the [[./waftools/]] directory.
+1. [[https://waf.io][Waf]] is like ~make~.  It's equivalent to a ~Makefile~ is [[./wscript]].  A copy is included under the [[./tools/]] directory.
 2. The ~--prefix~ gives an installation directory.  Additional ~--with-*~ options may be needed for configure to find external dependencies.  Issue 
 3. Build with ~--notests~ in order to avoid running tests in parallel.
 4. Result may be immediately used in-place under the ~build/~ directory.

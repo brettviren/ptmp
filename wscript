@@ -3,7 +3,7 @@
 import sys
 from waflib.Utils import to_list
 
-sys.path.append('waftools')
+sys.path.append('tools')
 
 
 pkg_deps = ['libzmq','libczmq','protobuf','dynamo']
