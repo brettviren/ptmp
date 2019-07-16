@@ -20,12 +20,12 @@ def dotify_port(node_name, node_data, io):
     lines.append('"%s" -- "%s"[style=solid]' % (node_name, pn))
     
     # addresses
-    for bc in ["bind", "connect"]:
+    for bc,color in [("bind","blue"), ("connect","red")]:
         if not bc in sock:
             continue
         for addr in sock[bc]:
             lines.append('"%s"[shape=ellipse]' % addr)
-            lines.append('"%s" -- "%s"[style=dotted,label="%s"]' % (pn, addr, bc))
+            lines.append('"%s" -- "%s"[label="%s",color=%s]' % (pn, addr, bc, color))
 
     return lines
 
