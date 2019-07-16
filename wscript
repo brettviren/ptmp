@@ -52,7 +52,7 @@ def build(bld):
               rpath = rpath,
               source=pbs+src, target='ptmp', use=uses)
     bld.install_files('${PREFIX}/include', 'inc/CLI11.hpp inc/json.hpp')
-    #bld.install_files('${PREFIX}/include/ptmp', pb_headers)
+    bld.install_files('${PREFIX}/include/ptmp', pb_headers)
     bld.install_files('${PREFIX}/include/ptmp', bld.path.ant_glob("inc/ptmp/*.h"))
 
 
