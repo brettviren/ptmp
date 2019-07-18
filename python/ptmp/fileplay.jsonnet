@@ -17,15 +17,15 @@ local make_apa = function(apa) {
     local make_czmqat = function(link) ptmp.czmqat(
         "czmqat-apa%d-link%d"%[apa,link],
         osocket = ptmp.socket('bind','push',inproc(link)),
-        cfg = {ifile: params.dumpfiles[apa][link]}
+        cfg = {name:"apa%d-link%d-tps"%[apa,link],ifile: params.infiles[apa][link]}
     ),
     local czmqats = [make_czmqat(link) for link in std.range(0,9)],
 
     local make_replay = function(link) ptmp.replay(
         'replay-apa%d-link%d'%[apa,link],
         isocket = ptmp.socket('connect','pull',inproc(link)),
-        osocket = ptmp.socket('bind','pub', params.addresses.tps[apa][link])
-        // default cfg is used.
+        osocket = ptmp.socket('bind','pub', params.addresses.tps[apa][link]),
+        cfg = {name:"apa%d-link%d-replay"%[apa,link]}+params.cfg
     ),
     local replays = [make_replay(link) for link in std.range(0,9)],
     
@@ -33,7 +33,7 @@ local make_apa = function(apa) {
 }.res;
 
 {
-    ["fileplay-apa%d.json"%apa]: { proxies: make_apa(apa), }
+    ["fileplay-apa%d.json"%apa]: { name: "apa%d-play-files"%apa, proxies: make_apa(apa), }
     for apa in params.apas
 }
 

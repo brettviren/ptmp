@@ -51,19 +51,19 @@ local make_tc = function(apa, inputs, output, params) {
                                  isocket = ptmp.socket('connect', 'sub', inputs[link],
                                                        hwm = params.pubsub_hwm),
                                  osocket = ptmp.socket('bind', 'push', inproc_wz[link]),
-                                 cfg = params.cfg)
+                                 cfg = {name:"tp-window-apa%d-link%02d"%[apa,link]}+params.cfg)
                      for link in iota],
     local inproc_ztc = "inproc://tc-zipper-tcfinder-apa%d" % apa,
     local zipper = ptmp.zipper("tc-zipper-apa%d"%apa,
                                isocket = ptmp.socket('connect','pull', inproc_wz),
                                osocket = ptmp.socket('bind','push', inproc_ztc),
-                               cfg = params.cfg),
+                               cfg = {name:"apa%d-zipper"%apa}+params.cfg),
 
     local tcfinder = ptmp.nodeconfig("filter", "tc-finder-apa%d"%apa,
                                      isocket = ptmp.socket('connect','pull', inproc_ztc),
                                      osocket = ptmp.socket('bind','pub', output,
                                                            hwm = params.pubsub_hwm),
-                                     cfg = {method: "pdune-adjacency-tc"}),
+                                     cfg = {name:"apa%d-adj-tcs"%apa, method: "pdune-adjacency-tc"}),
     components: windows + [zipper, tcfinder],
 }.components;
 
@@ -73,7 +73,7 @@ local make_td = function(inputs, output, params) {
                                isocket = ptmp.socket('connect', 'sub', inputs,
                                                      hwm = params.pubsub_hwm),
                                osocket = ptmp.socket('bind','push', inproc_ztd),
-                               cfg = params.cfg),
+                               cfg = {name:"td-zipper"}+params.cfg),
 
     local tdfinder = ptmp.nodeconfig("filter", "td-finder",
                                      isocket = ptmp.socket('connect','pull', inproc_ztd),
@@ -86,11 +86,13 @@ local make_td = function(inputs, output, params) {
 
 {
     ["%s-tc-apa%d.json"%[context, apa]]: {
+        name: "apa%d-tcs"%apa,
         plugins: ["ptmp-tcs"],
         proxies: make_tc(apa, params.addresses.tps[apa], params.addresses.tc[apa], params)
     } for apa in params.apas
 } + {
     ["%s-td.json"%context]: {
+        name: "tds",
         plugins: ["ptmp-tcs"],
         proxies: make_td([params.addresses.tc[apa] for apa in params.apas],
                          params.addresses.td, params)

@@ -26,20 +26,42 @@ testdir=$(dirname $(realpath $BASH_SOURCE))
 topdir=$(dirname $testdir)
 jdir=$topdir/python/ptmp
 
-jsonnet -m $tmpdir -V 'input=tcp://127.0.0.1:7999' -V "output=$tmpdir/tds.dump" $jdir/filesink.jsonnet
-jsonnet -m $tmpdir -V datadir=$datadir -V apa=$apa -V 'output=tcp://127.0.0.1:7%03d' $jdir/fileplay.jsonnet
-jsonnet -m $tmpdir -V context=test $jdir/adjacency.jsonnet
+jargs="-m $tmpdir -V context=test"
 
-cat <<EOF > $tmpdir/Procfile
-filesink: ptmper fileplay-sink.json
-tcfinder: ptmper test-tc-apa0.json
+set -x
+for cfg in adjacency filesink fileplay
+do
+    jsonnet $jargs $jdir/$cfg.jsonnet || exit -1
+done
+set +x
+
+cat <<EOF > $tmpdir/Procfile.tps
+filesink: ptmper sink-tps.json
+fileplay: ptmper fileplay-apa5.json
+EOF
+
+cat <<EOF > $tmpdir/Procfile.tcs
+filesink: ptmper sink-tcs.json
+tcfinder: ptmper test-tc-apa5.json
+fileplay: ptmper fileplay-apa5.json
+EOF
+
+cat <<EOF > $tmpdir/Procfile.tds
+filesink: ptmper sink-tds.json
+tcfinder: ptmper test-tc-apa5.json
 tdfinder: ptmper test-td.json
 fileplay: ptmper fileplay-apa5.json
 EOF
 
-cd $tmpdir
-jq -s '.[0].proxies + .[1].proxies + .[2].proxies + .[3].proxies | {proxies:.}' *.json > graph.json
-ptmperpy dotify -o graph.dot graph.json 
-dot -Tpdf -o graph.pdf graph.dot
 
-shoreman Procfile
+cd $tmpdir
+if [ -n "$(which ptmperpy)" ] ; then
+    jq -s '.[0].proxies + .[1].proxies + .[2].proxies + .[3].proxies | {proxies:.}' *.json > graph.json
+    ptmperpy dotify -o graph.dot graph.json 
+    dot -Tpdf -o graph.pdf graph.dot
+else
+    echo "No ptmperpy, no graph.  Install and setup PTMP's python package if you want it"
+fi
+
+echo $tmpdir
+
