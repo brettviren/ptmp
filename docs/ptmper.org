@@ -12,71 +12,12 @@ Usage example:
   $ ptmper myconfig.json
 #+END_EXAMPLE
 
-* Generating Configuration with Jsonnet
-
-The JSON schema is described below.  A JSON file may be hand-crafted
-but in practice this is tedious and error prone.  Instead, it is
-recommended that a configuration is described in the [[https://jsonnet.org][Jsonnet]] language
-and then compiled to JSON.  Any Jsonnet compiler (such as ~jsonnet~ or
-[[https://github.com/google/go-jsonnet][go-jsonnet]] may be used) and PTMP provides a Python program called
-~ptmperpy~ which can be used.
-
-#+BEGIN_EXAMPLE
-  $ ptmperpy gencfg --help
-#+END_EXAMPLE
-
-Noted in the output, the ~INPUT_STREAMS~ non-option arguments are
-converted into a JSON array and available to the Jsonnet via
-~std.extVar('input')~.  This can be used to bake in input files or
-zeromq transport addresses as shown in the examples below.
-
-* Provided Jsonnet
-
-PTMP provides some prefabricated Jsonnet files that may be used to
-generate JSON for some common patterns of running ~ptmper~.  The Jsonnet
-files are distributed with the Python and are located automatically if
-not provided in the current working directory or given as absolute paths.
-
-An example to produce configuration to run PTMP *window* and *zipper*:
-
-#+BEGIN_EXAMPLE
-  $ ptmperpy gencfg \
-    -o mycfg.json \
-    -j winzip.jsonnet \
-    -V 'output=tcp://127.0.0.1:8000' \
-    -V 'detid=1234' \
-    tcp://127.0.0.1:{7000..7009}
-#+END_EXAMPLE
-
-Notes on this example:
-
-- the Jsonnet is parameterized by ~output~ and ~detid~.  These must be given.
-- this example relies on Bash brace expansion to enumerate the ten input stream addresses.   If your shell does not provide this then you may exhaustively list all addresses
-
-The resulting JSON file can then be used simply:
-
-#+BEGIN_EXAMPLE
-  $ ptmper mycfg.json
-#+END_EXAMPLE
-
-The prefabricated Jsonnet files provided are:
-
-- winzip :: an N-input, 1-output topology.  Each input stream has
-            "windowing" applied.  Each windowed stream is "zipped"
-            into one output stream. Input sockets are of type SUB and
-            will ~connect()~ to the given addresses. Parameters:
-  - detid :: specify the detector ID number which is then put in to
-             TPSets.  Set to ~-1~ if the source correctly provides
-             detector IDs
-  - output :: a zeromq transport address for output socket which is of
-              type PUB which will ~bind()~.
-
-* Writing your own Jsonnet.
-
-T.B.D. but for now, look at ~winzip.jsonnet~ and ~ptmp.jsonnet~ that it
-uses.  There are also tests under [[../test/]].
-
 * JSON schema
+
+The JSON file may be hand-crafted and its schema is described in this
+section.  Hand-crafting is tedious and error prone and so it is
+recommended that it be generated.  See the next section for how it may
+be generated using Jsonnet. 
 
 Regardless of how the JSON configuration file is produced it must
 follow a particular schema.  At top level the JSON should represent a
@@ -87,6 +28,7 @@ single object with these attributes:
 
 ** ~ptmper~ options
 
+- name :: optional name to use for the main thread
 - pause :: number of seconds to wait before creating any proxy instances
 - reprieve :: number of seconds to wait after destroying all proxy instances before ~ptmper~ exits
 - ttl :: number of second to continue executing
@@ -99,4 +41,161 @@ Each proxy configuration object has three attributes
 - name :: some unique, human-oriented identifier
 - type :: label the proxy type (C++ type or its alias)
 - data :: proxy-specific configuration as documented elsewhere
+
+The ~data~ object may also be given a ~name~ attribute which will be used
+to name the actor thread in which the proxy runs.
+
+
+* Generating JSON Configuration with Jsonnet
+
+It is recommended that configuration is described in the [[https://jsonnet.org][Jsonnet]]
+language and then compiled to JSON.  Besides being a "better JSON",
+Jsonnet lets larger scale configuration be modeled succinctly and in a
+parameterized fashion.
+
+To compile the JSON, any Jsonnet compiler (such as ~jsonnet~ or
+[[https://github.com/google/go-jsonnet][go-jsonnet]] may be used).  PTMP provides a Python based comment line
+interface:
+
+#+BEGIN_EXAMPLE
+  $ ptmperpy jsonnet --help
+#+END_EXAMPLE
+
+* Provided Jsonnet
+
+PTMP provides some prefabricated Jsonnet files that may be used to
+generate JSON for some common patterns of running ~ptmper~.  The Jsonnet
+files are distributed with the Python and are located automatically if
+the ~ptmper jsonnet~ command is used.  
+
+** ProtoDUNE-SP
+
+A configuration for protodune can be generated. 
+
+#+BEGIN_EXAMPLE
+  $ mkdir config
+  $ jsonnet -m config/ -V context=pdsp python/ptmp/adjacency.jsonnet
+  config/pdsp-tc-apa5.json
+  config/pdsp-tc-apa6.json
+  config/pdsp-td.json
+  $ jsonnet -m config/ -V context=pdsp python/ptmp/filesink.jsonnet
+  config/sink-tcs.json
+  config/sink-tds.json
+  config/sink-tps.json
+#+END_EXAMPLE 
+
+As of this writing only 2 APAs are included.  As more are available
+with FELIX, this list will increase.  The JSON files represent many
+possible network topologies.  
+
+An example run might then be:
+
+#+BEGIN_EXAMPLE
+  $ ptmper config/sink-tds.json &
+  $ ptmper config/pdsp-td.json &
+  $ ptmper config/pdsp-tc-apa5.json &
+  $ ptmper config/pdsp-tc-apa6.json &
+#+END_EXAMPLE
+
+Only zero or one of the ~sink-*.json~ configurations should be used.
+They all aggregate all possible streams to a single output file.  The
+~sink-tps.json~ may not keep up given 8kHz/link of TPSet messages at the
+TP level.
+
+** Testing with file replay
+
+Another configuration which is symmetric with the one above but which
+replaces real FELIX BR with replay of files can be generated like:
+
+#+BEGIN_EXAMPLE
+  $ mkdir junk/
+  $ jsonnet -m junk/ -V context=test python/ptmp/filesink.jsonnet
+  junk/sink-tcs.json
+  junk/sink-tds.json
+  junk/sink-tps.json
+  $ jsonnet -m junk/ -V context=test python/ptmp/fileplay.jsonnet
+  junk/fileplay-apa5.json
+  $ jsonnet -m junk/ -V context=test python/ptmp/adjacency.jsonnet
+  junk/test-tc-apa5.json
+  junk/test-td.json
+#+END_EXAMPLE
+
+This uses hard-wired configuration in ~params_test.jsonnet~.  A simple way to run this is:
+
+#+BEGIN_EXAMPLE
+$ ./test/play-pdsp-file.sh
+...
+/tmp/test-pdsp-NH0wx
+$ cd /tmp/test-pdsp-NH0wx
+$ ls -l
+total 120
+-rw-rw-r-- 1 bviren bviren 13064 Jul 18 16:10 fileplay-apa5.json
+-rw-rw-r-- 1 bviren bviren 15987 Jul 18 16:10 graph.dot
+-rw-rw-r-- 1 bviren bviren 14352 Jul 18 16:10 graph.json
+-rw-rw-r-- 1 bviren bviren 32133 Jul 18 16:10 graph.pdf
+-rw-rw-r-- 1 bviren bviren   102 Jul 18 16:10 Procfile.tcs
+-rw-rw-r-- 1 bviren bviren   132 Jul 18 16:10 Procfile.tds
+-rw-rw-r-- 1 bviren bviren    67 Jul 18 16:10 Procfile.tps
+-rw-rw-r-- 1 bviren bviren   690 Jul 18 16:10 sink-tcs.json
+-rw-rw-r-- 1 bviren bviren   465 Jul 18 16:10 sink-tds.json
+-rw-rw-r-- 1 bviren bviren  3120 Jul 18 16:10 sink-tps.json
+-rw-rw-r-- 1 bviren bviren 10451 Jul 18 16:10 test-tc-apa5.json
+-rw-rw-r-- 1 bviren bviren  1513 Jul 18 16:10 test-td.json
+#+END_EXAMPLE 
+
+The ~Procfile.*~ can be used with [[https://github.com/brettviren/shoreman][a modified shoreman]] to run a suite of programs like:
+
+#+BEGIN_EXAMPLE
+  $ cat Procfile.tcs 
+  filesink: ptmper sink-tcs.json
+  tcfinder: ptmper test-tc-apa5.json
+  fileplay: ptmper fileplay-apa5.json
+
+  $ shoreman Procfile.tcs "" monfile.tcs
+  16:14:26 filesink       | 'ptmper sink-tcs.json' started with pid 19922
+  16:14:26 tcfinder       | 'ptmper test-tc-apa5.json' started with pid 19930
+  16:14:26 fileplay       | 'ptmper fileplay-apa5.json' started with pid 19938
+  ...
+  16:14:33 filesink       | I: 19-07-18 16:14:33 tick 6
+  16:14:33 tcfinder       | I: 19-07-18 16:14:33 tick 6
+  16:14:33 fileplay       | I: 19-07-18 16:14:33 tick 6
+  16:14:34 filesink       | I: 19-07-18 16:14:34 tick 7
+  16:14:34 tcfinder       | I: 19-07-18 16:14:34 tick 7
+  16:14:34 fileplay       | I: 19-07-18 16:14:34 tick 7
+  ^CSIGINT received
+  sending SIGTERM to all processes
+
+  $ cat monfile.tcs |awk '{print  $4}' | sort -u
+  (apa5-adj-tcs)
+  (apa5-link0-tps)
+  (apa5-link1-tps)
+  (apa5-link2-tps)
+  (apa5-link3-tps)
+  (apa5-link4-tps)
+  (apa5-link5-tps)
+  (apa5-link6-tps)
+  (apa5-link7-tps)
+  (apa5-link8-tps)
+  (apa5-link9-tps)
+  (apa5-play-files)
+  (apa5-tcs)
+  (apa5-zipper)
+  (bash)
+  procnam
+  (tc-sink)
+  (tc-sink-czmqat)
+  (ZMQbg/0)
+  (ZMQbg/1)
+#+END_EXAMPLE
+
+The produced ~monfile~ can be used to make plots showing the performance of the various processes and threads.
+
+
+* Writing your own PTMP Jsonnet
+
+Writing Jsonnet is easy and simple and can be very elaborately
+powerful as needed.  For the most part, the best way to learn is to
+look through the [[https://jsonnet.org/learning/tutorial.html][online tutorial]] and [[https://jsonnet.org/ref/stdlib.html][stdlib reference]] documentation.
+For PTMP specific support see the [[../python/ptmp/ptmp.jsonnet][ptmp.jsonnet]] library and look
+through Jsonnet files mentioned above.
 

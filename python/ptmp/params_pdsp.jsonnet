@@ -12,8 +12,16 @@
         tardy_policy:"drop",    // anything else destroys output ordering
     },
 
+    outfiles: {
+        tps: "pdsp-tps.dump",
+        tcs: "pdsp-tcs.dump",
+        tds: "pdsp-tds.dump",
+    },
+
+
     // meta parameters
-    apas: std.range(1,6),       // Enumerate APA installation numbers to consider
+    //apas: std.range(1,6),       // Enumerate APA installation numbers to consider
+    apas: [5,6],                // limited to what FELIX is hooked up to
 
     // socket parameters
 
@@ -22,7 +30,7 @@
     // The PUB/SUB socket addresses, indexed by APA installation number (0 is undefined)
     addresses : {
         tps: [
-            null,
+            [null],
             // these are invented
             ["tcp://10.73.136.61:%d" % (15100+ind) for ind in std.range(1,10)], // apa1
             ["tcp://10.73.136.62:%d" % (15110+ind) for ind in std.range(1,10)], // apa2
