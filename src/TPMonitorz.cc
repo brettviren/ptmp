@@ -19,6 +19,17 @@ void tap_proxy(zsock_t* pipe, void* vargs)
 {
     auto config = json::parse((const char*) vargs);
     const uint32_t tapid = config["id"];
+
+    if (config["name"].is_string()) {
+        ptmp::internals::set_thread_name(config["name"].get<std::string>());
+    }
+    else {
+        char* name = zsys_sprintf("montap%05d", tapid);
+        ptmp::internals::set_thread_name(name);
+        freen (name);
+    }
+    
+
     zsock_t* fe_sock = ptmp::internals::endpoint(config["input"].dump());
     zsock_t* be_sock = ptmp::internals::endpoint(config["output"].dump());
     std::string attach = "pushpull";
@@ -63,6 +74,12 @@ static
 void tpmonitorz(zsock_t* pipe, void* vargs)
 {
     auto config = json::parse((const char*) vargs);
+
+    std::string name = "monitor";
+    if (config["name"].is_string()) {
+        name = config["name"];
+    }
+    ptmp::internals::set_thread_name(name);
 
     std::string filename = config["filename"];
     std::string attach = "pushpull";

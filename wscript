@@ -24,10 +24,10 @@ def configure(cfg):
     for pkg in pkg_deps:
         cfg.load(pkg)
 
-    # needed for upif plugin/factory
-    #cfg.check(header_name="dlfcn.h", uselib_store='DYNAMO',
-    #          lib=['dl'], mandatory=True)
-
+    
+    cfg.check_cxx(header_name="pthread.h",
+                  lib=['pthread'], uselib_store='PTHREAD')
+    print (cfg.env)
     #cfg.env.LDFLAGS += ['-pg']
     #cfg.env.CXXFLAGS += ['-pg']
     cfg.env.CXXFLAGS += to_list(cfg.options.cxxflags)

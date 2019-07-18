@@ -19,6 +19,12 @@ void tpcat(zsock_t* pipe, void* vargs)
 
     // std::cerr << config.dump(4) << std::endl;
 
+    std::string name = "czmqat";
+    if (config["name"].is_string()) {
+        name = config["name"];
+    }
+    ptmp::internals::set_thread_name(name);
+
     int number = -1;
     if (config["number"].is_number()) {
         number = config["number"];

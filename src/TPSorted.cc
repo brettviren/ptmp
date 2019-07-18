@@ -1,3 +1,5 @@
+// this is obsolete.  use zipper.
+
 #include "ptmp/api.h"
 #include "ptmp/internals.h"
 #include "ptmp/factory.h"
@@ -110,10 +112,15 @@ bool recv_prompt(SockInfo& si, ptmp::data::data_time_t last_msg_time, bool drop_
 static
 void tpsorted_proxy(zsock_t* pipe, void* vargs)
 {
-
     auto config = json::parse((const char*) vargs);
     auto input = ptmp::internals::perendpoint(config["input"].dump());
     auto output = ptmp::internals::perendpoint(config["output"].dump());
+
+    std::string name = "sorted";
+    if (config["name"].is_string()) {
+        name = config["name"];
+    }
+    ptmp::internals::set_thread_name(name);
 
     auto tardy_policy = config["tardy_policy"];
     bool drop_tardy = true;

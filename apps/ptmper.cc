@@ -52,6 +52,12 @@ int main(int argc, char* argv[])
     json config;
     cfgfile >> config;
 
+    std::string name = "ptmper";
+    if (config["name"].is_string()) {
+        name = config["name"];
+    }
+    ptmp::internals::set_thread_name(name);
+
     ptmp::AgentFactory af;
     for (auto jpi : config["plugins"]) {
         std::string pi = jpi;

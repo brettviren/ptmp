@@ -156,6 +156,12 @@ void tpzipper(zsock_t* pipe, void* vargs)
 {
     auto config = json::parse((const char*) vargs);
 
+    std::string name = "zipper";
+    if (config["name"].is_string()) {
+        name = config["name"];
+    }
+    ptmp::internals::set_thread_name(name);
+
     // - sync time :: Typical network transport latency is 20-50us.
     //     Minimal message processing code incurs <1ms latency.
     //     Maximum variations should be on same order.  Drift time

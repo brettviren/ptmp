@@ -24,6 +24,12 @@ void tpreplay_proxy(zsock_t* pipe, void* vargs)
     zsock_t* isock = ptmp::internals::endpoint(config["input"].dump());
     zsock_t* osock = ptmp::internals::endpoint(config["output"].dump());
 
+    std::string name = "replay";
+    if (config["name"].is_string()) {
+        name = config["name"];
+    }
+    ptmp::internals::set_thread_name(name);
+
     // Note, speed MUST scale HW clock to real time microseconds.  Eg,
     // PDSP's tstart should be counted in 50MHz ticks so speed should
     // be 50.0.
