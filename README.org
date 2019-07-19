@@ -10,34 +10,39 @@ prototype development toward full DUNE Far Detector DAQ.
 A simple API is provided which hides details of the transport
 mechanism.  The application simply sees sinks and/or sources of
 trigger messages.  There are also autonomous "proxy" or "actor"
-classes that provide low-level message handling functions.  Driven by
-user configuration, a network components may be defined.  This network
-comprise a simple source-to-sink pipeline or may be structured into a
-rich data flow network which may include redundant flow paths and
-intervening filtering/processing with redundancy and load balancing,
-etc.  The nodes comprising this network need not be complicated by
-this richness.
+classes that provide low-level message handling functions which can
+run in a background thread.  Driven by user configuration, a network
+components may be defined.  This network may comprise a simple
+source-to-sink pipeline or may be structured into a rich data flow
+topology which may include redundant flow paths and intervening
+filtering/processing with redundancy and load balancing, etc.  The
+individual nodes comprising this network need not themselves be
+complicated by this richness.
 
 Message transport is based on ZeroMQ which provides robustness and
 performance (see the section on throughput performance in the [[./docs/tuning.org][tuning]]
-document).  Thus, the PTMP network may exist over a mix of transports
-(inter-thread, inter-process and inter-computer) as determined by the
-configuration.  The payload message frames are currently serialized
-using ProtoBuffer ([[./ptmp/ptmp.proto][schema]]).  
+document).  ZeroMQ allows the PTMP network to exist over a mix of
+transports (inter-thread, inter-process and inter-computer) as
+determined by the configuration.  The payload message frames are
+currently serialized using ProtoBuffer ([[./ptmp/ptmp.proto][schema]]).
 
 As PTMP transport is based on "standard" ZeroMQ and ProtoBuffers nodes
 may participate in the network which have been developed outside of
-PTMP proper and in languages of a developers choosing.  PTMP directly
-includes some examples developed in [[python/ptmp][Python]].
+PTMP-proper and in programming languages of a developers choosing.
+PTMP directly includes some examples developed in [[python/ptmp][Python]].
 
+See also:
+
+- [[https://github.com/brettviren/ptmp-tcs][ptmp-tcs]] a PTMP wrapper around trigger algorithms from [[https://github.com/dlast44/ProtoDuneTrigger][dlast44/ProtoDuneTrigger]]
+- [[https://github.com/brettviren/shoreman][brettviren/shoreman]] a modified bash implementation of Foreman which adds simple performance profile data collection used in some tests of PTMP
 
 * Status
 
-This package now has basic functionality and in use at protoDUNE.
-Somewhat formal [[https://github.com/brettviren/ptmp/releases][releases]] are now made, so please use them and refer to
-a release when/if reporting problems.  PTMP is being built as a binary
-UPS "product" ~ptmp~ and is deployed in this way at the protoDUNE DAQ.
-See below for installing from source.
+This package now has basic functionality and is in use at protoDUNE.
+Somewhat formal [[https://github.com/brettviren/ptmp/releases][releases]] are now made and should be used for
+"production testing".  PTMP is being built as a binary UPS "product"
+~ptmp~ and is deployed in this way at the protoDUNE DAQ.  See below for
+installing from source.
 
 See [[./docs/todo.org][To Do]] document for checklist and notes on future development and
 also any [[https://github.com/brettviren/ptmp/issues][issues]].
@@ -115,6 +120,7 @@ is:
   $ python setup.py develop
 #+end_example
 
+
 * Application Development
 
 PTMP provides a very specific and almost trivial API through a number
@@ -129,16 +135,15 @@ Low level abstractions of ZeroMQ sockets:
 - ~TPReceiver~ :: a callable to receive a ~TPSet~ object from its socket.
                   Can block or be given a timeout to wait for one.
 
-High level "proxy" classes:
+A number of higher level "proxy" or "actor" classes provide general
+utility algorithms.  They are all "free-running" in a background
+thread and may be constructed in user applications or aggregated and
+executed from the command line via [[docs/ptmper.org][ptmper]].
 
-- ~TPReplay~ :: a free-running agent which accept an input ~TPSet~ stream
-                and attempt to produce an output stream at a pace
-                indicated by the original ~TPSet::tstart~ value.  More
-                info in [[./docs/tpreplay.org]].
-
-- ~TPSorted~ :: a free-running agent which takes in N asynchronous ~TPSet~
-                streams and emits one merged, ordered stream.  See
-                [[./docs/tpsorted.org]].
+- ~TPReplay~ :: accept an input ~TPSet~ stream and attempt to produce an
+                output stream at a pace indicated by the original
+                ~TPSet::tstart~ value.  More info in
+                [[./docs/tpreplay.org]].
 
 - ~TPWindow~ :: a free-running agent which accepts one ~TPSet~ stream and
                 emits on ~TPSet~ stream.  Input is ordered and buffered
@@ -146,11 +151,32 @@ High level "proxy" classes:
                 ~TPSets~ spanning fixed windows.  More info in
                 [[./docs/tpwindow.org]].
 
+- ~TPZipper~ :: accept N asynchronous ~TPSet~ streams, each time ordered
+                by their ~tstart~ and produce one output stream which
+                retains this ordering.  Any ~TPSet~ messages received to
+                late to retain output ordering, after a configurable
+                real time delay, are dropped.  This is an improved
+                re-implementation of ~TPSorted~.
+
+- ~TPSorted~ :: accept N asynchronous ~TPSet~ streams and emits one
+                merged, ordered stream.  See [[./docs/tpsorted.org]].
+                Note this is obsoleted by TPZipper
+
+- ~TPCat~ :: a class version of the functionality available also in
+             [[docs/czmqat.org][czmqat]] command line program.  It marshals messages to and
+             from files and sockets as fast as possible.  Typically a
+             ~TPReplay~ should be placed just downstream of ~TPCat~.
+
+- ~TPMonitor~ :: provides a "T" junction to "tap" into the data flow
+                 that is transmitted between two other sockets.  A
+                 single ~TPMonitor~ may tap into multiple transmissions,
+                 each "tap" runs in its own thread.  The output of the
+                 tap is itself in the form of a socket.
 
 The sender/receiver classes may be used to allow arbitrary application
 code to directly participate in the PTMP network.  The "proxy" classes
-are essentially stand-alone programs that an application instantiates
-and holds on to with little or not further action.  All PTMP proxy
+run stand-alone background threads that an application instantiates
+and holds on to with little or no further action.  All PTMP proxy
 classes provided directly by PTMP or other libraries that support PTMP
 [[docs/plugin.org][plugin factory]] method may be executed via the [[docs/ptmper.org][ptmper]] application.
 
@@ -164,13 +190,15 @@ PTMP provides some end-user applications in addition to ~libptmp~ for
 application development.
 
 - ~ptmper~ :: A general purpose application that can execute one or many
-            PTMP "proxy" classes.  It is configured by a simple JSON
-            file.  See [[docs/ptmper.org]] for details.
+              PTMP "proxy" classes.  It is configured by a simple JSON
+              file.  See [[docs/ptmper.org]] for details.
 
 - ~czmqat~ :: This a ZeroMQ ~netcat~ like program.  It can read/write
-            from/to both files and ZeroMQ sockets.  It is blind to
-            PTMP message schema so can be used with arbitrary ZeroMQ
-            sockets (although not all socket types are supported).
+              from/to both files and ZeroMQ sockets.  It is blind to
+              PTMP message schema so can be used with arbitrary ZeroMQ
+              sockets (although not all socket types are supported).
+              Note, ~czmqat~ can be emulated with ~ptmper~ executing a
+              ~TPCat~ proxy.
 
 
 ** Reference applications and tests
@@ -214,7 +242,6 @@ Example configuration strings are given in the individual "tp*.org" files in [[.
 Larger scale configuration for aggregation of multiple components in
 ~ptmper~ can be built easily with the ~ptmperpy gencfg~ command.  See
 [[docs/ptmper.org]].
-
 
 What follows is some discussion on how selecting a configuration for
 the PTMP API classes.  Deveopers and expert users are strongly urged
