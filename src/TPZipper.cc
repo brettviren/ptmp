@@ -245,10 +245,17 @@ void tpzipper(zsock_t* pipe, void* vargs)
                     }
                     sender(&msg);
                 }
+
+                // Go again if this input has more.
                 if (zsock_events(which) & ZMQ_POLLIN) {
-                    si->recv(); // go again on same input
+                    si->recv(); 
+                    continue;
                 }
+
+                break;
+
             } // loop can leave si empty or populated
+
             if (si->msg) {
                 si_queue.push(si);
                 zpoller_remove(poller, si->sock);
