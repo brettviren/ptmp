@@ -20,6 +20,7 @@
 #include "ptmp/api.h"
 #include "ptmp/internals.h"
 #include "ptmp/factory.h"
+#include "ptmp/actors.h"
 
 #include <json.hpp>
 #include <queue>
@@ -151,8 +152,7 @@ struct sender_t {
 };
 
 // The actor function
-static
-void tpzipper(zsock_t* pipe, void* vargs)
+void ptmp::actor::zipper(zsock_t* pipe, void* vargs)
 {
     auto config = json::parse((const char*) vargs);
 
@@ -327,7 +327,7 @@ void tpzipper(zsock_t* pipe, void* vargs)
 }
 
 ptmp::TPZipper::TPZipper(const std::string& config)
-    : m_actor(zactor_new(tpzipper, (void*)config.c_str()))
+    : m_actor(zactor_new(ptmp::actor::zipper, (void*)config.c_str()))
 {
 
 }

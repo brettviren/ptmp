@@ -84,6 +84,14 @@ A configuration for protodune can be generated.
   config/sink-tps.json
 #+END_EXAMPLE 
 
+Note, the first command can instead be run using the provided Python
+command line program:
+
+#+BEGIN_EXAMPLE
+  $ ptmperpy jsonnet  -m config/ -V context=pdsp adjacency.jsonnet
+#+END_EXAMPLE
+
+
 As of this writing only 2 APAs are included.  As more are available
 with FELIX, this list will increase.  The JSON files represent many
 possible network topologies.  

@@ -4,6 +4,7 @@
 #include "ptmp/data.h"
 #include "ptmp/internals.h"
 #include "ptmp/factory.h"
+#include "ptmp/actors.h"
 
 #include <cstdio>
 
@@ -14,8 +15,7 @@ PTMP_AGENT(ptmp::TPMonitorz, monitor)
 
 
 // An actor function that starts a steerable proxy.  
-static
-void tap_proxy(zsock_t* pipe, void* vargs)
+void ptmp::actor::tap(zsock_t* pipe, void* vargs)
 {
     auto config = json::parse((const char*) vargs);
     const uint32_t tapid = config["id"];
@@ -70,8 +70,7 @@ void tap_proxy(zsock_t* pipe, void* vargs)
 }
 
 
-static
-void tpmonitorz(zsock_t* pipe, void* vargs)
+void ptmp::actor::monitor(zsock_t* pipe, void* vargs)
 {
     auto config = json::parse((const char*) vargs);
 
@@ -122,7 +121,7 @@ void tpmonitorz(zsock_t* pipe, void* vargs)
             throw std::runtime_error("unknown attachement type");
         }
         tapinfo_t ti {
-            zactor_new(tap_proxy, (void*)tapcfg.c_str()),
+            zactor_new(ptmp::actor::tap, (void*)tapcfg.c_str()),
             cap_sock,
             zsock_new_push(con_addr),
             tapid,
@@ -218,7 +217,7 @@ void tpmonitorz(zsock_t* pipe, void* vargs)
 
 
 ptmp::TPMonitorz::TPMonitorz(const std::string& config)
-    : m_actor(zactor_new(tpmonitorz, (void*)config.c_str()))
+    : m_actor(zactor_new(ptmp::actor::monitor, (void*)config.c_str()))
 {
 }
 

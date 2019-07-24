@@ -4,6 +4,7 @@
 #include "ptmp/data.h"
 #include "ptmp/internals.h"
 #include "ptmp/factory.h"
+#include "ptmp/actors.h"
 
 #include <cstdio>
 
@@ -12,8 +13,7 @@ using json = nlohmann::json;
 
 PTMP_AGENT(ptmp::TPComposer, composer)
 
-static
-void composer(zsock_t* pipe, void* vargs)
+void ptmp::actor::composer(zsock_t* pipe, void* vargs)
 {
     auto config = json::parse((const char*) vargs);
 
@@ -67,7 +67,7 @@ void composer(zsock_t* pipe, void* vargs)
 
 
 ptmp::TPComposer::TPComposer(const std::string& config)
-    : m_actor(zactor_new(composer, (void*)config.c_str()))
+    : m_actor(zactor_new(ptmp::actor::composer, (void*)config.c_str()))
 {
 }
 

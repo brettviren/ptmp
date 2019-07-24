@@ -1,0 +1,53 @@
+#+title: PTMP composer
+
+The "composer" provides in a C++ class (~TPComposer~) most of the
+functionality that is available on the command line with the [[ptmper.org][ptmper]]
+program.
+
+* How does it work?
+
+It dynamically constructs an aggregate of other PTMP "proxy" classes
+based on a configuration which largely consists of a collection of
+configuration objects of each proxy being aggregated.
+
+This allows PTMP functionality to be easily added to C++ code while
+preserving the generic end-user interfaced based on configuration
+strings.  
+
+If you already have hand-coded ~TP*~ proxy classes, they may be replaced
+by a single ~TPComposer~.  Construct a composer instance in the same
+location of your code where previously you constructed whatever ~TP*~
+classes.  Your C++ will become much simpler as the inherent complexity
+is now shifted to configuration.  See [[ptmper.org]] for some info about
+how to configure a composer (or ~ptmper~).
+
+* When to use a ~TPComposer~
+
+Like all PTMP "proxy" classes, the composer does not provide the
+application any direct access to any ~TPSet~ stream that it is
+processing.  Such access must be had through a ~TPReceiver~ connecting
+to some PTMP endpoint.  It may incidentally happen that this endpoint
+is provided by a proxy managed by the composer.  (See [[tap.org]] for
+guidance on how your C++ app can "tap" into any ~TPSet~ message stream.)
+
+Because there is (currently) no direct C++ level access beyond
+construction and destruction and because the proxies inherently
+communicate through message transport there may be no reason to even
+include a composer directly in your application.  You may wish to
+include a ~TPComposer~ instance directly in your application when:
+
+- you wish to attach a ~TPReceiver~ in your application to an endpoint
+  of a proxy class via ~inproc://~ (shared memory).
+
+- you wish to manage the life cycle of the composer instance and its
+  proxies via application-level controls.
+
+If there is no identified reason to include a ~TPComposer~ in your
+application C++ code then it may be sufficient and easier to use
+[[ptmper.org][ptmper]] from the command line.  
+
+In either case, the same configuration for ~ptmper~ and a composer
+instance may be identical (although ~ptmper~ extends what the composer
+expects and the composer will ignore this extension).
+
+

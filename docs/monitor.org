@@ -1,0 +1,57 @@
+#+title: PTMP monitor
+
+PTMP provides a pass-through "monitor" proxy with the ~TPMonitorz~
+class.  It will "tap" into any number of ~TPSet~ streams.  These streams
+pass through the monitor unmolested and a summary of each each messages is
+saved to the simple text file.
+
+* Configuration
+
+Like all PTMP proxy classes, a monitor is configured via a string in
+JSON format.  However, the schema for the monitor configuration
+differs substantially from that for other proxies.  The top level
+object attributes are:
+
+- ~name~ :: standard, optional name for the instance, which may reflect in thread names (default is ~monitor~)
+- ~filename~ :: name of file to which the tapped messages will be dumped.
+- ~attach~ :: optionally identify how the taps should connect.  (default is ~pushpull~)
+- ~taps~ :: an array of tap descriptions.
+
+The non-obvious attributes are described in detail.
+
+** ~attach~
+
+The ~attach~ configuration determines the socket pattern used for
+communication between the individual taps and the main thread that
+writes to file.  The ~pushpull~ value is default and will not lead to
+lost messages but can cause the taps to block and thus may block (or
+drop) messages on the tapped sockets.  The ~pubsub~ is the opposite.
+Slow file writing will not lead to any HWM in the tapped sockets but
+may lead to messages being dropped before writing to file.
+
+** ~taps~
+
+The ~taps~ keyword should hold an array value.  Each element describes a
+single tap and is an object with these attributes:
+
+- ~name~ :: a string which may be used to set the thread name that runs
+            the tap.
+- ~id~ :: an integer uniquely identifying this tap.  It is used to form
+          an ~inproc://~ address connecting the tap to the main writing
+          thread.  The ~id~ is also used to identify summary data
+          written to the file.
+
+- ~input~ :: standard input socket description.  see [[configuration.org]]
+- ~output~ :: standard output socket description.  see [[configuration.org]]
+
+* Tapping topology
+
+Each tap runs in its own thread inside the monitor.  It may tap into
+sockets managed in the same application as running the monitor or into
+sockets managed by other other applications.  And the tap sockets may
+~bind~ or ~connect~.  This gives great flexibility into running a monitor
+from the same application, a different application or even a different
+computer as providing the "main" sockets of interest.  Of course, care
+in designing these networks are needed.  Concentrating many streams
+through a single monitor may be detrimental to overall performance.
+Even a single tap may add additional latency which is not acceptable.

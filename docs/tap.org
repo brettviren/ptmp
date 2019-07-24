@@ -1,0 +1,13 @@
+#+title PTMP taps
+
+A PTMP tap (~TPTap~ class) allows one to rewrite a topology so that the
+traffic that previously flowed directly between two endpoints now
+flows through a "T" and allowing a 3rd party to receive the messages
+of that flow.
+
+
+
+* Related
+
+A PTMP [[monitor.org][monitor]] provides for the construction of a number of taps.
+Their tapped messages are aggregated and a sumary is written to file.
