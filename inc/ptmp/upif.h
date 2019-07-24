@@ -73,9 +73,9 @@ namespace upif {
             return pit->second;
         }
         plugin* find(const std::string& symbol_name) {
-            zsys_debug("finding in %ld plugins", m_plugins.size());
+            // zsys_debug("finding in %ld plugins", m_plugins.size());
             for (auto pit : m_plugins) {
-                zsys_debug("checking plugin \"%s\"", pit.first.c_str());
+                // zsys_debug("checking plugin \"%s\"", pit.first.c_str());
                 plugin* maybe = pit.second;
                 if (maybe->rawsym(symbol_name)) {
                     return maybe;

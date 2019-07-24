@@ -17,6 +17,8 @@ namespace ptmp {
         
     };
 
+    AgentFactory& agent_factory();
+
 }
 
 #define PTMP_AGENT(TYPE,ALIAS) \
