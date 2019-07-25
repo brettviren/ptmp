@@ -7,17 +7,18 @@
 #include <thread>
 #include <chrono>
 #include <atomic>
+#include <cmath>
 
 std::atomic<bool> goFlag{false};
 
 // send a TPSet with the given `count` and `tstart` on `sender`, then
 // sleep `sleep_ms` milliseconds
-void send(ptmp::TPSender& sender, int count, uint64_t tstart, int sleep_ms=0)
+void send(ptmp::TPSender& sender, int detid, int count, uint64_t tstart, int sleep_ms=0)
 {
     ptmp::data::TPSet tpset;
     tpset.set_count(count);
-    tpset.set_created(100);
-    tpset.set_detid(1);
+    tpset.set_created(ptmp::data::now());
+    tpset.set_detid(detid);
     tpset.set_tstart(tstart);
     sender(tpset);
     if(sleep_ms) std::this_thread::sleep_for(std::chrono::milliseconds(sleep_ms));
@@ -32,7 +33,7 @@ void send_loop(int index, int n_messages, int window_ms, int late_ms)
     sender_config["socket"]["type"]="PUSH";
     sender_config["socket"]["bind"].push_back(std::string("inproc://sender")+std::to_string(index));
     ptmp::TPSender sender(sender_config.dump());
-
+    const int detid = 100*(1+index);
     int count=0;
 
     while(!goFlag.load()) ; // spin until told to start
@@ -42,8 +43,42 @@ void send_loop(int index, int n_messages, int window_ms, int late_ms)
 
     // Send a message every window_ms milliseconds
     for(int i=0; i<n_messages; ++i){
-        send(sender, count++, i, window_ms);
+        send(sender, detid, count++, i, window_ms);
     }
+}
+
+void recv_loop(int n_messages)
+{
+    struct stat { ptmp::data::real_time_t t2, t, n; };
+    std::unordered_map<int, stat> stats;
+
+    nlohmann::json recver_config;
+    recver_config["socket"]["type"]="SUB";
+    recver_config["socket"]["connect"].push_back(std::string("inproc://zipout"));
+    ptmp::TPReceiver recver(recver_config.dump());
+
+    // don't wait for last message which may stay queued 
+    for (int ind=0; ind<n_messages-1; ++ind) {
+        ptmp::data::TPSet tpset;
+        bool ok = recver(tpset);
+        assert(ok);
+        ptmp::data::real_time_t dt = ptmp::data::now() - tpset.created();
+        
+        int detid = tpset.detid();
+        stats[detid].n += 1;
+        stats[detid].t += dt;
+        stats[detid].t2 += dt*dt;
+    }
+
+    zsys_debug("latency through zipper:");
+    for (auto sit : stats) {
+        auto& s = sit.second;
+        double n = s.n;
+        double mean = s.t/n;
+        double rms = sqrt(s.t2/n - mean*mean);
+        zsys_debug("\t%d: %f +/- %f", sit.first, mean, rms);
+    }
+
 }
 
 int main()
@@ -64,6 +99,7 @@ int main()
     for(size_t i=0; i<N; ++i){
         threads.emplace_back(send_loop, i, n_messages, window_ms, latenesses[i]);
     }
+    threads.emplace_back(recv_loop, n_messages);
 
     // zip together the sender threads with a zipper with a huge sync_time
     nlohmann::json zipper_config;
@@ -73,7 +109,7 @@ int main()
     }
     zipper_config["output"]["socket"]["type"]="PUB";
     zipper_config["output"]["socket"]["bind"].push_back("inproc://zipout");
-    zipper_config["sync_time"]=UINT32_MAX;
+    zipper_config["sync_time"]=10000; // ms
 
     ptmp::TPZipper zipper(zipper_config.dump());
 

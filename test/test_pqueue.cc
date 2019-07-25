@@ -51,6 +51,15 @@ typedef std::priority_queue<int, std::vector<int>, greater_t> queue_t;
 class MyQueue : public queue_t
 {
 public:
+    void chirp_drain() {
+        std::cout << "pqueue:";
+        while (!empty()) {
+            std::cout << " " << top();
+            pop();
+        }
+        std::cout << std::endl;
+    }
+
     void chirp() {
         auto it = c.cbegin();
         auto last = c.cend();
@@ -79,6 +88,7 @@ int main()
     mv.chirp();
     ms.chirp();
     mq.chirp();
+    mq.chirp_drain();
     return 0;
 }
 

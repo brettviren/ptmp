@@ -1,13 +1,17 @@
 /**
-   The zipper (ne' sorted) synchronizes a number of input streams into
-   one output stream.  Each input is assumed to be strictly ordered by
-   their TPSet.tstart data times and ouput stream is likewise so
-   ordered.
+   The zipper synchronizes a number of input streams of TPSet messages
+   into one output stream.  Each input is assumed to be strictly
+   ordered by their TPSet.tstart data times and the ouput stream is
+   likewise so ordered.
 
-   A real-time/system-clock synchronization buffer time is applied in
-   order to allow for variations in the pacing of the input streams.
-   The most recently received message from each input is held for no
-   longer than this sync time before sending out.
+   A real-time/data-time synchronization buffer time (sync time,
+   measured in real time) is applied in order to allow for variations
+   in the pacing of the input streams.
+   
+   Messages should be delayed no longer than this sync time.  A
+   message will only see this maximum latency when at least one source
+   besides the one providig the message has not yet provided a message
+   with a yet later (larger) tstart.
 
    Any input message with a TPSet.tstart data time which is smaller
    than the TPSet.tstart data time of the last output message is
@@ -30,121 +34,39 @@ PTMP_AGENT(ptmp::TPZipper, zipper)
 
 using json = nlohmann::json;
 
-struct source_info_t {
-    size_t index;               // index in vector of sources
-    zsock_t* sock;              // the socket....
 
-    zmsg_t* msg{NULL};          // most recent message
-    ptmp::data::TPSet tpset;    // unpacked payload
-
-    ptmp::data::real_time_t trecv;
-    uint64_t nrecv{0}, ntardy{0};     // stats
-
-    zmsg_t* release() {         // caller takes ownership;
-        zmsg_t* ret = msg;
-        msg = NULL;
-        tpset.Clear();
-        return ret;
-    }
-
-    void recv() {
-        if (msg) {
-            zsys_warning("zipper: source %d discarding message", index);
-            zmsg_destroy(&msg);
-        }
-        msg = zmsg_recv(sock);
-        ++nrecv;
-        trecv = ptmp::data::now();
-        zmsg_first(msg);        // msg id
-        zframe_t* pay = zmsg_next(msg);
-        tpset.ParseFromArray(zframe_data(pay), zframe_size(pay));
-    }
-    ~source_info_t() {
-        if (msg) {
-            zmsg_t* m = release();
-            zmsg_destroy(&m);
-        }
-        if (sock) {
-            zsock_destroy(&sock);
-        }
-    }
-        
-};
-
-// The priority queue has three time related aspects:
-//
-// 1. it is ordered by tstart time.  Smallest tstart has highest priority.
-// 2. it is drained by recved time in priority order such that no remaining entries have tardy trecv values.
-//
-struct si_greater_t {
-    bool operator()(const source_info_t* a, const source_info_t* b) {
-        // give priority to smaller times
-        return a->tpset.tstart() > b->tpset.tstart();
-    }
-};
-
-class ZipperQueue 
-{
-    // the priority queue is kept as a reverse sorted vector.  The
-    // *back* of the vector will have highest priority (smallest
-    // tstart).
-    std::vector<source_info_t*> m_queue;
-public:
-    // return the number of high priority elements counted up to the
-    // least priority element with trecv >= tsel.  That is, if tsel is
-    // "now + tardy" then you should pop and send the this number of
-    // waiting messages.
-    size_t ready_to_go(ptmp::data::real_time_t tsel) const
-    {
-        auto it = m_queue.rbegin();
-        while (it != m_queue.rend()) {
-            if ( (*it)->tpset.tstart() > tsel) {
-                break;
-            }
-            ++it;
-        }
-        return it - m_queue.rbegin();
-    }
-
-    // Return the oldest recved time
-    ptmp::data::real_time_t oldest_trecv() const {
-        ptmp::data::real_time_t tret = -1;
-        for (const auto& si : m_queue) {
-            const ptmp::data::real_time_t t = si->trecv;
-            if (t > tret) tret = t;
-        }
-        return tret;
-    }
-
-    // eumulate queue interface
-    bool empty() {
-        return m_queue.empty();
-    }
-    source_info_t* top() {
-        return m_queue.back();
-    }
-    void pop() {
-        m_queue.pop_back();
-    }
-    void push(source_info_t* si) {
-        m_queue.push_back(si);
-        std::sort(m_queue.begin(), m_queue.end(), si_greater_t());
-    }
-};
-
+// little helper to send out messages on a socket while not getting
+// hung and insensitive to shutdown commands from the actor pipe if
+// the output socket would otherwise want to block.
 struct sender_t {
     std::vector<zsock_t*> outputs;
-    sender_t(std::vector<zsock_t*> outputs) : outputs(outputs) {}
-    // send message to all outputs and destroy it.  
-    void operator()(zmsg_t** msg) {
+    zsock_t* pipe;
+    sender_t(std::vector<zsock_t*> outputs, zsock_t* pipe) : outputs(outputs), pipe(pipe) {}
+
+    // Send message to all outputs, destroying it.  Return 0 if okay,
+    // -1 if we get shutdown while otherwise hung on a HWM'ed socket.
+    int operator()(zmsg_t** msg) {
         for (auto& s : outputs) {
+            while (!(zsock_events(s) & ZMQ_POLLOUT)) {
+                // if we would block, sleep for a bit and check if we
+                // have shutdown command so we avoid hang.
+                zclock_sleep(1); // ms
+                if (zsock_events(pipe) & ZMQ_POLLIN) {
+                    zmsg_destroy(msg);
+                    return -1;
+                }
+                continue;
+            }
+            // safe to send to this socket without wait.
             zmsg_t* tosend = *msg;
             if (s != outputs.back()) {   // dup all but last
                 tosend = zmsg_dup(*msg);
             }
             zmsg_send(&tosend, s); // destroys msg
         }
+        return 0;               // okay
     }
+
     void destroy() {
         for (auto& s : outputs) {
             zsock_destroy(&s);
@@ -152,18 +74,140 @@ struct sender_t {
         outputs.clear();
     }
     ~sender_t() { destroy(); }
+};
 
-    bool blocked() {
-        for (size_t ind=0; ind < outputs.size(); ++ind) {
-            if (! (zsock_events(outputs[ind]) & ZMQ_POLLOUT)) {
-                // zsys_debug("zipper: blocked on output %d", ind);
-                return true;
+// and minimizing buffer time.
+struct meta_msg_t {
+    // index into a vector of source sockets
+    size_t source_index;
+    // the real time at which this message is considered overdue based
+    // on the sync time.
+    ptmp::data::real_time_t toverdue;
+    // The TPSet.tstart of the message
+    ptmp::data::data_time_t tstart;
+    // The message
+    zmsg_t* msg;
+};
+
+// Used to order a vector of meta_msg_t's in increasing tstart.
+struct zq_lesser_t {
+    bool operator()(const meta_msg_t& a, const meta_msg_t& b) {
+        return a.tstart < b.tstart;
+    }
+};
+
+// A helper which receives and collects messages and can process this
+// collection into ordered vectors of tardy, punctual and leftovers.
+struct zipper_queue_t {
+    int sync_ms;
+    std::vector<int> counts;
+    std::vector<meta_msg_t> messages;
+
+    // keep track of highest tstart time of returned punctual
+    // messages.
+    ptmp::data::data_time_t last_tstart{0};
+
+    zipper_queue_t(int ninputs, int sync_ms) : counts(ninputs, 0), sync_ms(sync_ms) {}
+
+    ~zipper_queue_t() {
+        // clean up any leftovers.
+        for (auto& mm : messages) {
+            zmsg_destroy(&mm.msg); 
+        }
+    }
+
+    // Receive a message from the socket and enqueue it.
+    void recv(size_t ind, zsock_t* sock) {
+        const ptmp::data::real_time_t trecv = ptmp::data::now();
+        const ptmp::data::real_time_t tod = trecv + 1000*sync_ms;
+        zmsg_t* msg = zmsg_recv(sock);
+        zmsg_first(msg);        // msg id
+        zframe_t* pay = zmsg_next(msg);
+        ptmp::data::TPSet tpset;
+        tpset.ParseFromArray(zframe_data(pay), zframe_size(pay));
+        ptmp::data::data_time_t tstart = tpset.tstart();
+        meta_msg_t mm = {ind, trecv+1000*sync_ms, tstart, msg};
+        messages.push_back(mm);
+        ++counts[ind];
+    }
+
+    // Return true if there is at least one message from all other
+    // inputs besides the given one.
+    bool have_all_other(size_t given) {
+        const size_t n = counts.size();
+        for (size_t ind=0; ind<n; ++ind) {
+            if (ind == given) { continue; }
+            if (counts[ind] == 0) {
+                return false;
             }
         }
-        return false;
+        return true;
+    }
+
+    // Process pending messages, fill punctual and tardy and keep any leftovers.
+    void process(std::vector<meta_msg_t>& punctual, std::vector<meta_msg_t> tardy) {
+        if (messages.empty()) {
+            return;
+        }
+        ptmp::data::real_time_t now = ptmp::data::now();
+        // Order by increasing tstart.
+        std::sort(messages.begin(), messages.end(), zq_lesser_t());
+        const size_t nmessages = messages.size();
+
+        // partition the ordered vector of messages
+
+        // 1. tardy: any which have tstart < last_tstart
+        std::vector<meta_msg_t>::iterator tardy_end = messages.begin(), mend = messages.end();
+        while (tardy_end != mend and tardy_end->tstart < last_tstart) {
+            --counts[tardy_end->source_index];
+            ++tardy_end;
+        }
+
+        // 2. overdue: highest tstart which is overdue
+        std::vector<meta_msg_t>::iterator overdue_end = mend;
+        while (overdue_end > tardy_end) {
+            --overdue_end;
+            if ( overdue_end->toverdue < now) {
+                //zsys_debug("found overdue dt=%ld", now - overdue_end->toverdue);
+                ++overdue_end;
+                break;
+            }
+        }
+        for (auto it=tardy_end; it!=overdue_end; ++it) {
+            --counts[it->source_index];
+            last_tstart = it->tstart;
+        }
+        //size_t noverdue = std::distance(tardy_end, overdue_end);
+        //zsys_debug("noverdue: %ld", noverdue);
+
+        // 3. ready: from the remaining, we can send addtional output
+        // even if they are not yet overdue but only if there are no
+        // empty inputs so that we know for sure fresh future data
+        // won't have yet earlier tstarts.
+        std::vector<meta_msg_t>::iterator ready_end = overdue_end;
+        while (ready_end != mend) {
+            if (!have_all_other(ready_end->source_index)) {
+                break;
+            }
+            --counts[ready_end->source_index];
+            last_tstart = ready_end->tstart;
+            ++ready_end;
+        }
+        // size_t nready = std::distance(overdue_end, ready_end);
+        // zsys_debug("nready: %ld", nready);
+
+
+        // pack up
+        tardy.insert(tardy.end(), messages.begin(), tardy_end);
+        punctual.insert(punctual.end(), tardy_end, ready_end);
+
+        // erase all but the leftovers for next time 
+        messages.erase(messages.begin(), ready_end);
+        //zsys_debug("nleftover: %ld", messages.size());
     }
 
 };
+
 
 // The actor function
 void ptmp::actor::zipper(zsock_t* pipe, void* vargs)
@@ -187,6 +231,10 @@ void ptmp::actor::zipper(zsock_t* pipe, void* vargs)
     else if (config["sync_time"].is_number()) {
         sync_ms = config["sync_time"];
     }
+    if (sync_ms <= 0) {
+        zsys_error("sync_time must be positive definite number of ms");
+        throw std::runtime_error("sync_time must be positive definite number of ms");
+    }
 
     // - tardy policy :: an option string.  Any message arriving later
     //     than a peer by more than the tardy time is subject to the
@@ -200,136 +248,95 @@ void ptmp::actor::zipper(zsock_t* pipe, void* vargs)
         drop_tardy = false;
     }
 
-    // A source info flip-flops between being polled and being in the queue.
-    ZipperQueue si_queue;
-    zpoller_t* poller = zpoller_new(pipe, NULL);
+    sender_t sender(ptmp::internals::perendpoint(config["output"].dump()), pipe);
 
-    sender_t sender(ptmp::internals::perendpoint(config["output"].dump()));
     auto inputs = ptmp::internals::perendpoint(config["input"].dump());
     const size_t ninputs = inputs.size();
-    std::unordered_map<void*, source_info_t*> source_infos;
-    for (size_t ind=0; ind<ninputs; ++ind) {
-        zsock_t* sock = inputs[ind];
-        source_infos[(void*)sock] = new source_info_t{ind, sock};
-        zpoller_add(poller, sock);
-    }
 
+    // use low level poller to get all available in one go.  The +1 is for the pipe
+    zmq_pollitem_t* pollitems = new zmq_pollitem_t[ninputs+1]; 
+
+    for (size_t ind=0; ind<ninputs; ++ind) {
+        pollitems[ind].socket = zsock_resolve(inputs[ind]);
+        pollitems[ind].events = ZMQ_POLLIN;
+    }
+    pollitems[ninputs].socket = zsock_resolve(pipe);
+    pollitems[ninputs].events = ZMQ_POLLIN;
 
     zsock_signal(pipe, 0);      // signal ready
 
+    zipper_queue_t zq(ninputs, sync_ms);
+    std::vector<size_t> total_counts(ninputs, 0);
+    std::vector<size_t> tardy_counts(ninputs, 0);
 
-    ptmp::data::data_time_t last_tstart = 0;
-    int wait_time_ms = -1;
+    const int happy_to_wait_forever = -1;
     bool got_quit = false;
     while (!zsys_interrupted) {
 
-        void* which = zpoller_wait(poller, wait_time_ms);
+        int rc = zmq_poll(pollitems, ninputs+1, happy_to_wait_forever);
+        //zsys_debug("zipper: poll returns %d", rc);
 
-        if (zpoller_terminated(poller)) {
+        if (rc < 0) {
+            zsys_error("zipper: error on poll: %s", strerror(errno));
             goto cleanup;
         }
-        if (which == pipe) {
-            got_quit = true;
-            goto cleanup;
-        }
 
-
-        if (which) {          // got input
-
-            auto si = source_infos[which];
-            si->recv();
-
-            // dispatch as tardy or enqueue
-
-            while (si->tpset.tstart() < last_tstart) {
-                ++ si->ntardy;
-                zmsg_t* msg = si->release();
-                if (drop_tardy) { // enact correct tardy policy
-                    zmsg_destroy(&msg);
-                }
-                else {          // destroy output time ordering,
-
-                    // fixme: kludge to avoid output block stopping shutdown
-                    while (sender.blocked()) {
-                        if (zsock_events(pipe) & ZMQ_POLLIN) {
-                            got_quit = true;
-                            goto cleanup;
-                        }
-                        zclock_sleep(1); // ms
-                    }
-                    sender(&msg);
-                }
-
-                // Go again if this input has more.
-                if (zsock_events(which) & ZMQ_POLLIN) {
-                    si->recv(); 
-                    continue;
-                }
-
-                break;
-
-            } // loop can leave si empty or populated
-
-            if (si->msg) {
-                si_queue.push(si);
-                zpoller_remove(poller, si->sock);
+        if (rc > 0) {           // got something
+            if (pollitems[ninputs].revents & ZMQ_POLLIN) {
+                //zsys_debug("zipper: got quit on input");
+                got_quit = true;
+                goto cleanup;
             }
 
-        }
-        
-
-        // process queue.
-
-        {
-            const ptmp::data::real_time_t now = ptmp::data::now();
-            const ptmp::data::real_time_t tsel = now + sync_ms*1000;
-            size_t ntopop = si_queue.ready_to_go(tsel);
-            while (ntopop) {
-                --ntopop;
-                auto si = si_queue.top();
-
-                si_queue.pop();
-                zpoller_add(poller, si->sock);
-
-                last_tstart = si->tpset.tstart();
-                zmsg_t* msg = si->release();
-
-                // fixme: kludge to avoid output block stopping shutdown
-                while (sender.blocked()) {
-                    if (zsock_events(pipe) & ZMQ_POLLIN) {
-                        got_quit = true;
-                        goto cleanup;
-                    }
-                    zclock_sleep(1); // ms
+            // slurp in all available
+            for (size_t ind=0; ind<ninputs; ++ind) {
+                if (pollitems[ind].revents & ZMQ_POLLIN) {
+                    //zsys_debug("got input on %d", ind);
+                    zq.recv(ind, inputs[ind]);
                 }
-
-                sender(&msg);
-                si = NULL;
-            }
-
-            if (si_queue.empty()) {
-                wait_time_ms = -1; // wake when we have input
-            }
-            else {
-                // We have queued data so next time sleep no more than
-                // would make the oldest waiting message late.
-                wait_time_ms = sync_ms - (now - si_queue.oldest_trecv())/1000;
             }
         }
 
-        continue;               // back to polling...
+        std::vector<meta_msg_t> punctual, tardy;
+        zq.process(punctual, tardy);
+        //zsys_debug("punctual:%ld, tardy:%ld", punctual.size(), tardy.size());
+
+        // dispatch any tardy messages per policy
+        for (auto& mm : tardy) {
+            ++tardy_counts[mm.source_index];
+            ++total_counts[mm.source_index];
+            if (drop_tardy) {
+                zmsg_destroy(&mm.msg);
+            }
+            else {           // this destroys output ordering contract
+                int rc = sender(&mm.msg);
+                if (rc == -1) {
+                    zsys_debug("zipper: got quit on output");
+                    got_quit = true;
+                    goto cleanup;
+                }
+            }
+        }
+
+        for (auto& mm : punctual) {
+            ++total_counts[mm.source_index];
+            int rc = sender(&mm.msg);
+            if (rc == -1) {
+                zsys_debug("zipper: got quit on output");
+                got_quit = true;
+                goto cleanup;
+            }
+        }
     }
-
 
   cleanup:
 
     zsys_debug("zipper: finishing");
-    zpoller_destroy(&poller);
-    for (auto& siit : source_infos) {
-        auto& si = siit.second;
-        zsys_debug("zipper: %d: %d tardy out of %d recved",
-                   si->index, si->ntardy, si->nrecv);
-        delete si;
+    delete [] pollitems;
+    for (size_t ind=0; ind<ninputs; ++ind) {
+        zsys_debug("zipper: source %ld: %ld tardy out of %ld recved",
+                   ind, tardy_counts[ind], total_counts[ind]);
+        zsock_destroy(&inputs[ind]);
     }
     sender.destroy();
     if (got_quit) {
@@ -337,8 +344,8 @@ void ptmp::actor::zipper(zsock_t* pipe, void* vargs)
     }
     zsys_debug("zipper: waiting for quit");
     zsock_wait(pipe);
-
 }
+
 
 ptmp::TPZipper::TPZipper(const std::string& config)
     : m_actor(zactor_new(ptmp::actor::zipper, (void*)config.c_str()))
