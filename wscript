@@ -6,6 +6,7 @@ from waflib.Utils import to_list
 sys.path.append('tools')
 
 
+# list packages found by tools/*
 pkg_deps = ['libzmq','libczmq','protobuf','dynamo']
 
 
@@ -24,10 +25,11 @@ def configure(cfg):
     for pkg in pkg_deps:
         cfg.load(pkg)
 
-    
+    # we find pthread explictly, it has no tool yet.
     cfg.check_cxx(header_name="pthread.h",
                   lib=['pthread'], uselib_store='PTHREAD')
-    print (cfg.env)
+
+    #print (cfg.env)
     #cfg.env.LDFLAGS += ['-pg']
     #cfg.env.CXXFLAGS += ['-pg']
     cfg.env.CXXFLAGS += to_list(cfg.options.cxxflags)
@@ -35,7 +37,7 @@ def configure(cfg):
 def build(bld):
     bld.load('utests')
 
-    uses = [p.upper() for p in pkg_deps]
+    uses = [p.upper() for p in pkg_deps + ["pthread"]]
     rpath = [bld.env["PREFIX"] + '/lib']
     for u in uses:
         p = bld.env["LIBPATH_%s"%u]

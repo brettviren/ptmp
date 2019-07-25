@@ -23,7 +23,7 @@
 #include "ptmp/actors.h"
 
 #include <json.hpp>
-#include <queue>
+#include <vector>
 
 PTMP_AGENT(ptmp::TPZipper, zipper)
 
@@ -82,9 +82,13 @@ struct si_greater_t {
         return a->tpset.tstart() > b->tpset.tstart();
     }
 };
-typedef std::priority_queue<source_info_t*, std::vector<source_info_t*>, si_greater_t> si_queue_t;
-class ZipperQueue : public si_queue_t
+
+class ZipperQueue 
 {
+    // the priority queue is kept as a reverse sorted vector.  The
+    // *back* of the vector will have highest priority (smallest
+    // tstart).
+    std::vector<source_info_t*> m_queue;
 public:
     // return the number of high priority elements counted up to the
     // least priority element with trecv >= tsel.  That is, if tsel is
@@ -92,29 +96,39 @@ public:
     // waiting messages.
     size_t ready_to_go(ptmp::data::real_time_t tsel) const
     {
-        auto it = this->c.cbegin();
-        auto last = this->c.cend();
-        auto ret = last;
-        while (it != last) {
-            if ((*it)->trecv >= tsel) {
-                ret = it+1;
+        auto it = m_queue.rbegin();
+        while (it != m_queue.rend()) {
+            if ( (*it)->tpset.tstart() > tsel) {
+                break;
             }
             ++it;
         }
-        return ret - this->c.begin();
+        return it - m_queue.rbegin();
     }
 
     // Return the oldest recved time
     ptmp::data::real_time_t oldest_trecv() const {
         ptmp::data::real_time_t tret = -1;
-        auto it = this->c.cbegin();
-        auto last = this->c.cend();
-        while (it != last) {
-            const ptmp::data::real_time_t t = (*it)->trecv;
+        for (const auto& si : m_queue) {
+            const ptmp::data::real_time_t t = si->trecv;
             if (t > tret) tret = t;
-            ++it;
         }
         return tret;
+    }
+
+    // eumulate queue interface
+    bool empty() {
+        return m_queue.empty();
+    }
+    source_info_t* top() {
+        return m_queue.back();
+    }
+    void pop() {
+        m_queue.pop_back();
+    }
+    void push(source_info_t* si) {
+        m_queue.push_back(si);
+        std::sort(m_queue.begin(), m_queue.end(), si_greater_t());
     }
 };
 
