@@ -47,7 +47,7 @@ void send_loop(int index, int n_messages, int window_ms, int late_ms)
     }
 }
 
-void recv_loop(int n_messages)
+void recv_loop(int n_messages, int sync_ms)
 {
     struct stat { ptmp::data::real_time_t t2, t, n; };
     std::unordered_map<int, stat> stats;
@@ -57,8 +57,7 @@ void recv_loop(int n_messages)
     recver_config["socket"]["connect"].push_back(std::string("inproc://zipout"));
     ptmp::TPReceiver recver(recver_config.dump());
 
-    // don't wait for last message which may stay queued 
-    for (int ind=0; ind<n_messages-1; ++ind) {
+    for (int ind=0; ind<n_messages; ++ind) {
         ptmp::data::TPSet tpset;
         bool ok = recver(tpset);
         assert(ok);
@@ -70,18 +69,19 @@ void recv_loop(int n_messages)
         stats[detid].t2 += dt*dt;
     }
 
-    zsys_debug("latency through zipper:");
+    zsys_debug("latency through zipper (sync time %d ms):", sync_ms);
     for (auto sit : stats) {
         auto& s = sit.second;
         double n = s.n;
         double mean = s.t/n;
         double rms = sqrt(s.t2/n - mean*mean);
-        zsys_debug("\t%d: %f +/- %f", sit.first, mean, rms);
+        zsys_debug("\t%d: n:%.0f %.3f +/- %.4f ms",
+                   sit.first, n, mean/1000, rms/1000);
     }
 
 }
 
-int main()
+int main(int argc, char* argv[])
 {
     // avoid:
     // test_tpzipper_lateness: src/zsys.c:213: zsys_init: Assertion `!s_process_ctx' failed.
@@ -94,12 +94,14 @@ int main()
     const int n_messages=20;
     const int window_ms=300;
     const int latenesses[N]={0, window_ms-5, window_ms+5};
+    int sync_ms = 100;
+    if (argc > 1) sync_ms = atoi(argv[1]);
 
     std::vector<std::thread> threads;
     for(size_t i=0; i<N; ++i){
         threads.emplace_back(send_loop, i, n_messages, window_ms, latenesses[i]);
     }
-    threads.emplace_back(recv_loop, n_messages);
+    threads.emplace_back(recv_loop, n_messages*N, sync_ms);
 
     // zip together the sender threads with a zipper with a huge sync_time
     nlohmann::json zipper_config;
@@ -109,7 +111,7 @@ int main()
     }
     zipper_config["output"]["socket"]["type"]="PUB";
     zipper_config["output"]["socket"]["bind"].push_back("inproc://zipout");
-    zipper_config["sync_time"]=10000; // ms
+    zipper_config["sync_time"]=sync_ms;
 
     ptmp::TPZipper zipper(zipper_config.dump());
 
@@ -121,7 +123,9 @@ int main()
 
     for(auto& thread: threads) thread.join();
 
-    // Wait or everything to get to the TPZipper before calling its dtor
-    std::this_thread::sleep_for(std::chrono::milliseconds(300));
+    // Wait for at a sync time to allow for last messages to flush
+    // before causing zipper to shutdown through destruction.
+    std::this_thread::sleep_for(std::chrono::milliseconds(2*sync_ms));
 
+    return 0;
 }

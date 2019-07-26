@@ -144,10 +144,11 @@ struct zipper_queue_t {
         return true;
     }
 
-    // Process pending messages, fill punctual and tardy and keep any leftovers.
-    void process(std::vector<meta_msg_t>& punctual, std::vector<meta_msg_t> tardy) {
+    // Process pending messages, fill punctual and tardy and keep any
+    // leftovers.  Return suggested poll timeout.
+    int process(std::vector<meta_msg_t>& punctual, std::vector<meta_msg_t> tardy) {
         if (messages.empty()) {
-            return;
+            return -1;
         }
         ptmp::data::real_time_t now = ptmp::data::now();
         // Order by increasing tstart.
@@ -204,6 +205,15 @@ struct zipper_queue_t {
         // erase all but the leftovers for next time 
         messages.erase(messages.begin(), ready_end);
         //zsys_debug("nleftover: %ld", messages.size());
+        if (messages.empty()) {
+            return -1;
+        }
+        ptmp::data::real_time_t toverdue=-1;
+        for (size_t ind=0; ind<messages.size(); ++ind) {
+            if (toverdue<0) toverdue = messages[ind].toverdue;
+            else toverdue = std::min(toverdue, messages[ind].toverdue);
+        }
+        return std::max(0, (int)((toverdue - now)/1000));
     }
 
 };
@@ -269,11 +279,11 @@ void ptmp::actor::zipper(zsock_t* pipe, void* vargs)
     std::vector<size_t> total_counts(ninputs, 0);
     std::vector<size_t> tardy_counts(ninputs, 0);
 
-    const int happy_to_wait_forever = -1;
+    int wait_ms = -1;
     bool got_quit = false;
     while (!zsys_interrupted) {
 
-        int rc = zmq_poll(pollitems, ninputs+1, happy_to_wait_forever);
+        int rc = zmq_poll(pollitems, ninputs+1, wait_ms);
         //zsys_debug("zipper: poll returns %d", rc);
 
         if (rc < 0) {
@@ -298,8 +308,9 @@ void ptmp::actor::zipper(zsock_t* pipe, void* vargs)
         }
 
         std::vector<meta_msg_t> punctual, tardy;
-        zq.process(punctual, tardy);
-        //zsys_debug("punctual:%ld, tardy:%ld", punctual.size(), tardy.size());
+        wait_ms = zq.process(punctual, tardy);
+        // zsys_debug("punctual:%ld, tardy:%ld wait:%d",
+        //            punctual.size(), tardy.size(), wait_ms);
 
         // dispatch any tardy messages per policy
         for (auto& mm : tardy) {
