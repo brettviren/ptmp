@@ -10,34 +10,39 @@ prototype development toward full DUNE Far Detector DAQ.
 A simple API is provided which hides details of the transport
 mechanism.  The application simply sees sinks and/or sources of
 trigger messages.  There are also autonomous "proxy" or "actor"
-classes that provide low-level message handling functions.  Driven by
-user configuration, a network components may be defined.  This network
-comprise a simple source-to-sink pipeline or may be structured into a
-rich data flow network which may include redundant flow paths and
-intervening filtering/processing with redundancy and load balancing,
-etc.  The nodes comprising this network need not be complicated by
-this richness.
+classes that provide low-level message handling functions which can
+run in a background thread.  Driven by user configuration, a network
+components may be defined.  This network may comprise a simple
+source-to-sink pipeline or may be structured into a rich data flow
+topology which may include redundant flow paths and intervening
+filtering/processing with redundancy and load balancing, etc.  The
+individual nodes comprising this network need not themselves be
+complicated by this richness.
 
 Message transport is based on ZeroMQ which provides robustness and
 performance (see the section on throughput performance in the [[./docs/tuning.org][tuning]]
-document).  Thus, the PTMP network may exist over a mix of transports
-(inter-thread, inter-process and inter-computer) as determined by the
-configuration.  The payload message frames are currently serialized
-using ProtoBuffer ([[./ptmp/ptmp.proto][schema]]).  
+document).  ZeroMQ allows the PTMP network to exist over a mix of
+transports (inter-thread, inter-process and inter-computer) as
+determined by the configuration.  The payload message frames are
+currently serialized using ProtoBuffer ([[./ptmp/ptmp.proto][schema]]).
 
 As PTMP transport is based on "standard" ZeroMQ and ProtoBuffers nodes
 may participate in the network which have been developed outside of
-PTMP proper and in languages of a developers choosing.  PTMP directly
-includes some examples developed in [[python/ptmp][Python]].
+PTMP-proper and in programming languages of a developers choosing.
+PTMP directly includes some examples developed in [[python/ptmp][Python]].
 
+See also:
+
+- [[https://github.com/brettviren/ptmp-tcs][ptmp-tcs]] a PTMP wrapper around trigger algorithms from [[https://github.com/dlast44/ProtoDuneTrigger][dlast44/ProtoDuneTrigger]]
+- [[https://github.com/brettviren/shoreman][brettviren/shoreman]] a modified bash implementation of Foreman which adds simple performance profile data collection used in some tests of PTMP
 
 * Status
 
-This package now has basic functionality and in use at protoDUNE.
-Somewhat formal [[https://github.com/brettviren/ptmp/releases][releases]] are now made, so please use them and refer to
-a release when/if reporting problems.  PTMP is being built as a binary
-UPS "product" ~ptmp~ and is deployed in this way at the protoDUNE DAQ.
-See below for installing from source.
+This package now has basic functionality and is in use at protoDUNE.
+Somewhat formal [[https://github.com/brettviren/ptmp/releases][releases]] are now made and should be used for
+"production testing".  PTMP is being built as a binary UPS "product"
+~ptmp~ and is deployed in this way at the protoDUNE DAQ.  See below for
+installing from source.
 
 See [[./docs/todo.org][To Do]] document for checklist and notes on future development and
 also any [[https://github.com/brettviren/ptmp/issues][issues]].
@@ -47,6 +52,11 @@ also any [[https://github.com/brettviren/ptmp/issues][issues]].
 
 * Installation 
 
+PTMP provides compiled C++ applications and shared library as well as
+a Python module.
+
+** C++
+
 The PTMP package should build with any reasonably up to date C++
 compiler.  GCC 7 is used in development.  Prerequisite software
 dependencies are:
@@ -54,6 +64,10 @@ dependencies are:
 - libzmq
 - CZMQ
 - protobuf 
+
+Optional but very useful for generating [[docs/ptmper.org][ptmper]] configuration files:
+
+- Jsonnet
 
 On Debian-like systems you can supply the prerequisites with:
 
@@ -64,23 +78,27 @@ On Debian-like systems you can supply the prerequisites with:
 #+END_EXAMPLE
 
 There is also a [[./installdeps.sh][script]] that may assist building the dependencies from
-their sources.  With prerequisites available, issue:
+their sources.  
+
+With prerequisites available, issue:
 
 #+BEGIN_EXAMPLE
-  $ ./waf --prefix=<path> configure build install
-  $ ls <path>/{lib,include,bin}/
+  $ alias waf=`pwd`/tools/waf       # (1)
+  $ waf --prefix=<path> configure   # (2)
+  $ waf build --notests             # (3) 
+  $ ls <path>/{lib,include,bin}/    # (4)
+  $ waf -j1 --alltests              # (5) 
+  $ waf install                     # (6)
 #+END_EXAMPLE 
 
-Replace ~<path>~ with the directory into which you want the software to
-install.  If you want to just test it locally you may omit ~--prefix~
-and the ~install~ arguments.
+Notes:
 
-The default build will run the tests.  To avoid that, for example,
-while developing, you may do:
-
-#+BEGIN_EXAMPLE
-  $ ./waf --notests [install]
-#+END_EXAMPLE 
+1. [[https://waf.io][Waf]] is like ~make~.  It's equivalent to a ~Makefile~ is [[./wscript]].  A copy is included under the [[./tools/]] directory.
+2. The ~--prefix~ gives an installation directory.  Additional ~--with-*~ options may be needed for configure to find external dependencies.  Issue 
+3. Build with ~--notests~ in order to avoid running tests in parallel.
+4. Result may be immediately used in-place under the ~build/~ directory.
+5. Run tests with ~-j1~ to enforce serial tests.  If run in parallel, some test may try to use the same ports.  Some tests run many minutes depending on the speed and number of CPUs available.  Some may run forever when problems occur.
+6. Installing into the directory given by ~--prefix~.  This will be required if other packages depending on PTMP are to be built (eg [[https://github.com/brettviren/ptmp-tcs][ptmp-tcs]].
 
 See [[./docs/ups.org]] for special support for building in the UPS
 ecosystem.
@@ -88,185 +106,25 @@ ecosystem.
 As part of the build, a number of tests will be built and run.  See
 the [[./docs/tuning.org][tuning]] document for some details on these tests.
 
-* Application Development
+** Python
 
-PTMP provides a very specific and almost trivial API through a number
-of classes which provide *synchronous* methods.  There are two
-categories of PTMP classes:
+The Python package provides a ~ptmp~ Python module and a number of
+command line programs.  It is not required to use the C++ applications
+and libraries.  It does provide some useful support (eg the ~ptmperpy~
+CLI).  The package may be installed in usual Python ways.  My favorite
+is:
 
-Low level abstractions of ZeroMQ sockets:
-
-- ~TPSender~ :: a callable to send a ~TPSet~ object out its socket.  See
-                [[./docs/tpsender.org]] for more info.
-
-- ~TPReceiver~ :: a callable to receive a ~TPSet~ object from its socket.
-                  Can block or be given a timeout to wait for one.
-
-High level "proxy" classes:
-
-- ~TPReplay~ :: a free-running agent which accept an input ~TPSet~ stream
-                and attempt to produce an output stream at a pace
-                indicated by the original ~TPSet::tstart~ value.  More
-                info in [[./docs/tpreplay.org]].
-
-- ~TPSorted~ :: a free-running agent which takes in N asynchronous ~TPSet~
-                streams and emits one merged, ordered stream.  See
-                [[./docs/tpsorted.org]].
-
-- ~TPWindow~ :: a free-running agent which accepts one ~TPSet~ stream and
-                emits on ~TPSet~ stream.  Input is ordered and buffered
-                over a given minimum time span and then output in
-                ~TPSets~ spanning fixed windows.  More info in
-                [[./docs/tpwindow.org]].
+#+begin_example
+  $ python3 -m venv venv
+  $ source venv/bin/activiate
+  $ python setup.py develop
+#+end_example
 
 
-The sender/receiver classes may be used to allow arbitrary application
-code to directly participate in the PTMP network.  The "proxy" classes
-are essentially stand-alone programs that an application instantiates
-and holds on to with little or not further action.
+* Documentation
 
-** Message Schema
+More documentation is in [[./docs]].  Some starting points:
 
-See [[./docs/message-schema.org]].
-
-** Applications
-
-PTMP provides some end-user applications in addition to ~libptmp~ for
-application development.
-
-- ~czmqat~ :: This a ZeroMQ ~netcat~ like program.  It can read/write
-            from/to both files and ZeroMQ sockets.  It is blind to
-            PTMP message schema so can be used with arbitrary ZeroMQ
-            sockets (although not all socket types are supported).
-
-- ~tpset-tap~ :: This uses a ~TPSet~ aware CZMQ ~zproxy~ in order to "tap
-                 in" to a stream of ~TPSet~ messages.  It may be
-                 inserted between two peers in order to "spy" on the
-                 messages they exchange.
-
-** Reference applications and tests
-
-The following are some reference applications.  They and others not
-listed can be found under [[./test/]].  Running them without command line
-arguments will give a brief usage message.
-
-- [[./test/check_send.cc][check_send]] :: send empty ~TPSet~ via ~ipc~ or ~tcp~ in a simple manner.
-- [[./test/check_send.cc][check_send_rates]] :: a more sophisticated version of the above which
-     adds a model for inter-message timing variability as well as
-     filling ~TPSet~ with some number of actual TPs.
-- [[./test/check_recv.cc][check_recv]] :: receive messages via ~ipc~ or ~tcp~.  Works with either senders.
-- [[./test/check_sendrecv.cc][check_sendrecv]] :: a self contained sender+receiver that can use
-     ~inproc~ as well as ~ipc~ or ~tcp~.
-
-Some of the unit tests run by CI are:
-
-- [[./test/test_sendrecv.sh]] :: run through all combinations of the supported transport and socket patterns for a 1-to-1 test.
-- [[./test/test_many_senders.sh]] :: run through all supported transports with a many-to-1 test of PUB/SUB.  Note, this pattern is what a "TC finder" will likely follow.
-
-Application programmers (and possibly their users) should also read
-the section [[Configuration]] below.
-
-
-* Configuration
-
-The PTMP API classes are configured through a string in JSON format.
-The JSON object must contain an attribute named ~socket~ which has a
-value that is an object.  The ~socket~ object then may have the
-following attributes:
-
-- type :: a ZeroMQ socket type name ("PAIR", "PUB", "SUB", etc)
-- bind :: an array of addresses in canonical ZeroMQ form that the socket should bind
-- connect :: an array of addresses in canonical ZeroMQ form that the socket should connect
-- hwm :: optional high-water mark which sets how many messages may be buffered (default is 1000) before socket enter's "mute" state.  
-
-Example configuration strings are given in the individual "tp*.org" files in [[./docs/]].
-
-What follows is some discussion on how selecting a configuration for
-the PTMP API classes.  Deveopers and expert users are strongly urged
-to read [[http://api.zeromq.org/4-2:zmq-socket][zmq_socket(3)]] man page.  
-
-** Attachment mode
-
-In principle both ~bind~ and ~connect~ may be given to a single instance
-(ZeroMQ supports this) but in practice it's likely best to designate
-the *upstream* endpoint to ~bind~.  This makes upstream "server-like" and
-downstream "client-like" (although the actual message transmission is
-a linear flow, not request/reply).
-
-** Socket type
-
-Probably the two most important considerations in choosing the socket
-type are
-
-1) multiplicity and routing pattern
-2) behavior when high water mark (HWM) is reached.
-
-*** Multiplicity and Routing Patterns
-
-PAIR sockets form only a 1-to-1 attachment (ZeroMQ 3 needs one
-endpoint to ~bind~ before the other ~connect~. ZeroMQ 4 seems to have
-removed this restriction).  As there is no multiplicity at either
-endpoint there is no routing pattern to consider.  The pair of PAIR
-sockets form a bidirectional pipe.
-
-PUSH follows a round-robin distribution of messages to its PULL
-endpoints.  Each subsequent message will be sent to the "next"
-endpoint in the PUSH's collection.  Only one PULL socket gets any
-particular message.
-
-PUB sends a message to all SUB endpoints which has subscribed to the
-"topic" of the message.  The topic is simply a prefix match against
-the initial bytes of the message.  To receive messages a SUB must
-subscribe to topics individually or to all (the empty topic).
-
-** High Water Mark Behavior
-
-In ZeroMQ like any system that transmits data asynchronously there are
-data buffers that smooth out the spikes in transmission rate.  ZeroMQ
-has both send and receive buffers managed by the sockets.  These
-buffers can become full if they reach their high water mark (HWM).
-
-When the HWM is reached one of only two things must happen:
-
-- block :: transmission must halt and the resume when possible
-- drop :: transmission must skip data until it can be accepted again
-
-This certainly is not specific to ZeroMQ.  When one hits a full queue,
-something's gotta give.  Either you abandon entering the queue or you
-must wait where you are until there is again room in the queue.
-
-Of course, one can make the queue larger or employ faster network or
-computers.  This will minimize the likelihood of hitting the HWM but
-it does not remove the need to design for the eventuality of hitting
-it.  Three is no magic and we can not rely on hope.
-
-Each ZeroMQ socket pattern chooses between *block* and *drop* policy.
-This policy is thus linked to the multiplicity routing policy
-described above.
-
-PUB/SUB will *drop* messages if the HWM is reached.  This is very useful
-if the transmission should avoid forcing back pressure onto the PUB
-side.  This (along with drop detection) makes most sense for trigger
-transmission in protoDUNE and DUNE.  If HWM is reached, we do not want
-to "back up" the data flow all the way to the hardware.  We have to
-deal with it at the source of the problem.
-
-PAIR, again 1-to-1, blocks.  The HWM is actually the sum of the HWM of
-both PAIRs.  Conceptually, it's a pipeline.  If the pipe is full, no
-new messages will be added until room is made.
-
-PUSH/PULL blocks.  Each PULL has its own HWM.  A send to PUSH will
-continue until all PULL sockets have reached HWM and then further
-until the PUSH HWM is reached.
-
-
-
-
-* Tuning and Exception Handling
-
-The document [[./docs/tuning.org][tuning]] collects some information that will help
-understand how the PTMP network behaves, where things can be tuned to
-meet different goals and also some known features of a high
-performance, asynchronous communication network that are best taken
-into account.
-
+- [[docs/apps.org][application development]]
+- [[docs/configuration.org][end-user configuration]]
+- [[./docs/tuning.org][tuning]] 

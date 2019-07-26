@@ -1,6 +1,7 @@
 #include "ptmp/api.h"
 #include "ptmp/internals.h"
 #include "ptmp/factory.h"
+#include "ptmp/actors.h"
 
 #include "json.hpp"
 
@@ -260,10 +261,15 @@ static void test_tpwindower()
 
 
 // The actor function
-static
-void tpwindow_proxy(zsock_t* pipe, void* vargs)
+void ptmp::actor::window(zsock_t* pipe, void* vargs)
 {
     auto config = json::parse((const char*) vargs);
+    std::string name = "window";
+    if (config["name"].is_string()) {
+        name = config["name"];
+    }
+    ptmp::internals::set_thread_name(name);
+
     int detid = -1;
     if (config["detid"].is_number()) {
         detid = config["detid"];
@@ -402,7 +408,7 @@ void tpwindow_proxy(zsock_t* pipe, void* vargs)
 }
 
 ptmp::TPWindow::TPWindow(const std::string& config)
-    : m_actor(zactor_new(tpwindow_proxy, (void*)config.c_str()))
+    : m_actor(zactor_new(ptmp::actor::window, (void*)config.c_str()))
 {
 }
 

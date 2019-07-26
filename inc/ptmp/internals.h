@@ -39,6 +39,13 @@ namespace ptmp {
             zmsg_t* msg(int timeout_msec=-1);
 
         };
+
+
+        // May be called to set current thread name.  May have no
+        // effect.
+        void set_thread_name(const std::string& name);
+
+        
     }
 }
 

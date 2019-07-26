@@ -1,6 +1,7 @@
 #include "ptmp/api.h"
 #include "ptmp/internals.h"
 #include "ptmp/factory.h"
+#include "ptmp/actors.h"
 
 #include <cstdio>
 
@@ -12,12 +13,17 @@ PTMP_AGENT(ptmp::TPCat, czmqat)
 
 using json = nlohmann::json;
 
-static
-void tpcat(zsock_t* pipe, void* vargs)
+void ptmp::actor::cat(zsock_t* pipe, void* vargs)
 {
     auto config = json::parse((const char*) vargs);
 
     // std::cerr << config.dump(4) << std::endl;
+
+    std::string name = "czmqat";
+    if (config["name"].is_string()) {
+        name = config["name"];
+    }
+    ptmp::internals::set_thread_name(name);
 
     int number = -1;
     if (config["number"].is_number()) {
@@ -180,7 +186,7 @@ void tpcat(zsock_t* pipe, void* vargs)
     zsock_wait(pipe);
 }
 ptmp::TPCat::TPCat(const std::string& config)
-    : m_actor(zactor_new(tpcat, (void*)config.c_str()))
+    : m_actor(zactor_new(ptmp::actor::cat, (void*)config.c_str()))
 {
 }
 

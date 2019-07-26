@@ -1,0 +1,35 @@
+#+title: PTMP Factory Method
+
+PTMP provides a dynamic component aggregation based on a factory
+method.  This allows a PTMP component to be constructed given its
+"type".  A type is a simple string, typically evocative of its C++
+type name.  Eg, ~TPZipper~ is of type ~zipper~.
+
+The binding of a type label and a C++ type is done in the
+implementation of the C++ using a top-level call to a CPP macro.  In
+the zipper example:
+
+#+BEGIN_SRC C++
+#include "ptmp/factory.h"
+
+PTMP_AGENT(ptmp::TPZipper, zipper)
+#+END_SRC
+
+Code may then create a factory and construct components like:
+
+#+BEGIN_SRC C++
+  ptmp::AgentFactory af;
+
+  std::string config = ...;       // filled with JSON config
+  ptmp::TPAgent* agent = af.make("zipper", config);
+#+END_SRC
+
+Before making any components, the factory may be loaded with plugins.
+The ~ptmp~ library is itself a plugin and it is loaded by default.
+Others may be loaded, for example as:
+
+#+BEGIN_SRC C++
+  ptmp::AgentFactory af;
+  auto ok = af.plugin_cache().add("ptmp-tcs");
+  assert(ok);                     // or more suitable error handling
+#+END_SRC

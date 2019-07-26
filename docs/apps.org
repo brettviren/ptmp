@@ -1,0 +1,112 @@
+#+title: PTMP Application Development
+
+PTMP provides a very specific and almost trivial API for application
+development.  The API is provided largely by a number of classes which
+provide *synchronous* methods.
+
+* Class API
+
+#+BEGIN_SRC c++
+#include "ptmp/api.h"
+#+END_SRC
+
+There are two categories of PTMP classes:
+
+Low level abstractions of ZeroMQ sockets:
+
+- ~TPSender~ :: a callable to send a ~TPSet~ object out its socket.  See
+                [[tpsender.org]] for more info.
+
+- ~TPReceiver~ :: a callable to receive a ~TPSet~ object from its socket.
+                  Can block or be given a timeout to wait for one.
+
+A number of higher level "proxy" or "actor" classes provide general
+utility algorithms.  They are all "free-running" in a background
+thread and may be constructed in user applications or aggregated and
+executed from the command line via [[ptmper.org][ptmper]].
+
+- ~TPReplay~ :: accept an input ~TPSet~ stream and attempt to produce an
+                output stream at a pace indicated by the original
+                ~TPSet::tstart~ value.  More info in
+                [[tpreplay.org]].
+
+- ~TPWindow~ :: a free-running agent which accepts one ~TPSet~ stream and
+                emits on ~TPSet~ stream.  Input is ordered and buffered
+                over a given minimum time span and then output in
+                ~TPSets~ spanning fixed windows.  More info in
+                [[tpwindow.org]].
+
+- ~TPZipper~ :: accept N asynchronous ~TPSet~ streams, each time ordered
+                by their ~tstart~ and produce one output stream which
+                retains this ordering.  Any ~TPSet~ messages received to
+                late to retain output ordering, after a configurable
+                real time delay, are dropped.  This is an improved
+                re-implementation of ~TPSorted~.
+
+- ~TPSorted~ :: accept N asynchronous ~TPSet~ streams and emits one
+                merged, ordered stream.  See [[tpsorted.org]].
+                Note this is obsoleted by TPZipper
+
+- ~TPCat~ :: a class version of the functionality available also in
+             [[czmqat.org][czmqat]] command line program.  It marshals messages to and
+             from files and sockets as fast as possible.  Typically a
+             ~TPReplay~ should be placed just downstream of ~TPCat~.
+
+- ~TPMonitor~ :: provides a "T" junction to "tap" into the data flow
+                 that is transmitted between two other sockets.  A
+                 single ~TPMonitor~ may tap into multiple transmissions,
+                 each "tap" runs in its own thread.  The output of the
+                 tap is itself in the form of a socket.
+
+The sender/receiver classes may be used to allow arbitrary application
+code to directly participate in the PTMP network.  The "proxy" classes
+run stand-alone background threads that an application instantiates
+and holds on to with little or no further action.  All PTMP proxy
+classes provided directly by PTMP or other libraries that support PTMP
+[[plugin.org][plugin factory]] method may be executed via the [[ptmper.org][ptmper]] application.
+
+** Message Schema
+
+See [[message-schema.org]].
+
+** Applications
+
+PTMP provides some end-user applications in addition to ~libptmp~ for
+application development.
+
+- ~ptmper~ :: A general purpose application that can execute one or many
+              PTMP "proxy" classes.  It is configured by a simple JSON
+              file.  See [[ptmper.org]] for details.
+
+- ~czmqat~ :: This a ZeroMQ ~netcat~ like program.  It can read/write
+              from/to both files and ZeroMQ sockets.  It is blind to
+              PTMP message schema so can be used with arbitrary ZeroMQ
+              sockets (although not all socket types are supported).
+              Note, ~czmqat~ can be emulated with ~ptmper~ executing a
+              ~TPCat~ proxy.
+
+
+** Reference applications and tests
+
+The following are some reference applications.  They and others not
+listed can be found under [[../test/]].  Running them without command line
+arguments will give a brief usage message.  They are not recommended
+for use in any production setting (see instead [[ptmper.org]]).
+
+- [[../test/check_send.cc][check_send]] :: send empty ~TPSet~ via ~ipc~ or ~tcp~ in a simple manner.
+- [[../test/check_send.cc][check_send_rates]] :: a more sophisticated version of the above which
+     adds a model for inter-message timing variability as well as
+     filling ~TPSet~ with some number of actual TPs.
+- [[../test/check_recv.cc][check_recv]] :: receive messages via ~ipc~ or ~tcp~.  Works with either senders.
+- [[../test/check_sendrecv.cc][check_sendrecv]] :: a self contained sender+receiver that can use
+     ~inproc~ as well as ~ipc~ or ~tcp~.
+
+Some of the unit tests run by CI are:
+
+- [[../test/test_sendrecv.sh]] :: run through all combinations of the supported transport and socket patterns for a 1-to-1 test.
+- [[../test/test_many_senders.sh]] :: run through all supported transports with a many-to-1 test of PUB/SUB.  Note, this pattern is what a "TC finder" will likely follow.
+
+Application programmers (and possibly their users) should also read
+the section on [[configuration.org][Configuration]].
+
+

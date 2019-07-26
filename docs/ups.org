@@ -26,7 +26,7 @@ To install PTMP as a "normal" (non UPS) source package but in a UPS
 environment, set up your environment as above and then:
 
 #+BEGIN_EXAMPLE
-  $ ./waftools/waf-configure-for-ups.sh [/path/to/ptmp/install]
+  $ ./tools/waf-configure-for-ups.sh [/path/to/ptmp/install]
   $ ./waf install
 #+END_EXAMPLE
 
@@ -35,43 +35,44 @@ installation will go to the ~install/~ directory in the source.
 
 * Installation as UPS product
 
-Set up the environment as above and then:
-
 #+BEGIN_EXAMPLE
-  $ ./upstools/create_ups_product.sh /path/to/products/dir [quals]
+  $ ./tools/create-ups-product.sh --help
 #+END_EXAMPLE
 
-The script:
+Example to build ptmp: set up the environment as above and then:
 
- - must reside in a sub-dir of the source
+#+BEGIN_EXAMPLE
+  $ cd ptmp/
+  $ ./tools/create-ups-product.sh /wcdo/lib/ups v00_01_00 e15 czmq protobuf
+#+END_EXAMPLE
 
- - will build to a UPS product version based on the current git tag in
-   ~X.Y.Z~ format.
+Example to build ptmp-tcs: 
 
- - requires a minimal UPS environment with a ~PRODUCTS~ variable defined and
-   pointing to UPS products areas that provide the external
-   dependencies.
+#+BEGIN_EXAMPLE
+  $ setup ptmp vXX_YY_ZZ -q qq
+  $ cd ptmp-tcs/
+  $ ./tools/create-ups-product.sh /wcdo/lib/ups vAA_BB_CC qq ptmp  
+#+END_EXAMPLE
 
- - will "prime" the target UPS products dir 
-
- - will not overwrite existing installation, manually remove old
-   installation to redo
-
- - needs modification if dependencies change
+* TODO
 
 Some TODO items for this script:
 
- - [ ] version is taken from git tag, but sometimes UPS product
+ - [X] version is taken from git tag, but sometimes UPS product
    builders need to advance their own version, eg to handle build
    level fixes, apply patches, etc.  This is sometimes done by
    appending a letter.  Currently, there is nothing in the script to
    allow that.
+   - version is now specified on command line
 
- - [ ] is the ~product_deps~ file needed?  I thought that was an MRB thing
+ - [X] is the ~product_deps~ file needed?  I thought that was an MRB thing
+   - it's used to generate the table file
 
- - [ ] it would be nice to parameterize dependencies outside of the
+ - [X] it would be nice to parameterize dependencies outside of the
    script so that ~upstools/~ can become a stand-alone repo to be
    included in others (eg, [[https://github.com/brettviren/ptmp-tcs][ptmp-tcs]] like ~waftools/~ is becoming)
+   - consolidate ~upstools~ + ~waftools~ into ~tools~ (still ~waftools~ on github)
+   - now require ~setup~ of dependencies and listing them on command line
 
  - [ ] The ZeroMQ related UPS products have a minor break with
    community naming conventions.  If fixed, the script needs updating
@@ -79,5 +80,3 @@ Some TODO items for this script:
    - ~libzmq~ :: name of base package and not ~zeromq~ ("ZeroMQ" is the community name).
 
    - ~libczmq~ :: name of high level C API and not ~czmq~
-
-

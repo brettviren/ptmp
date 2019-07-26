@@ -1,0 +1,98 @@
+#+title PTMP Configuration
+
+The PTMP API classes are configured through a string in JSON format.
+The JSON object must contain an attribute named ~socket~ which has a
+value that is an object.  The ~socket~ object then may have the
+following attributes:
+
+- type :: a ZeroMQ socket type name ("PAIR", "PUB", "SUB", etc)
+- bind :: an array of addresses in canonical ZeroMQ form that the socket should bind
+- connect :: an array of addresses in canonical ZeroMQ form that the socket should connect
+- hwm :: optional high-water mark which sets how many messages may be buffered (default is 1000) before socket enter's "mute" state.  
+
+Example configuration strings are given in the individual "tp*.org" files in [[./docs/]].
+
+Larger scale configuration for aggregation of multiple components in
+~ptmper~ can be built easily with the ~ptmperpy gencfg~ command.  See
+[[docs/ptmper.org]].
+
+What follows is some discussion on how selecting a configuration for
+the PTMP API classes.  Deveopers and expert users are strongly urged
+to read [[http://api.zeromq.org/4-2:zmq-socket][zmq_socket(3)]] man page.  
+
+* Attachment mode
+
+In principle both ~bind~ and ~connect~ may be given to a single instance
+(ZeroMQ supports this) but in practice it's likely best to designate
+the *upstream* endpoint to ~bind~.  This makes upstream "server-like" and
+downstream "client-like" (although the actual message transmission is
+a linear flow, not request/reply).
+
+* Socket type
+
+Probably the two most important considerations in choosing the socket
+type are
+
+1) multiplicity and routing pattern
+2) behavior when high water mark (HWM) is reached.
+
+** Multiplicity and Routing Patterns
+
+PAIR sockets form only a 1-to-1 attachment (ZeroMQ 3 needs one
+endpoint to ~bind~ before the other ~connect~. ZeroMQ 4 seems to have
+removed this restriction).  As there is no multiplicity at either
+endpoint there is no routing pattern to consider.  The pair of PAIR
+sockets form a bidirectional pipe.
+
+PUSH follows a round-robin distribution of messages to its PULL
+endpoints.  Each subsequent message will be sent to the "next"
+endpoint in the PUSH's collection.  Only one PULL socket gets any
+particular message.
+
+PUB sends a message to all SUB endpoints which has subscribed to the
+"topic" of the message.  The topic is simply a prefix match against
+the initial bytes of the message.  To receive messages a SUB must
+subscribe to topics individually or to all (the empty topic).
+
+* High Water Mark Behavior
+
+In ZeroMQ like any system that transmits data asynchronously there are
+data buffers that smooth out the spikes in transmission rate.  ZeroMQ
+has both send and receive buffers managed by the sockets.  These
+buffers can become full if they reach their high water mark (HWM).
+
+When the HWM is reached one of only two things must happen:
+
+- block :: transmission must halt and the resume when possible
+- drop :: transmission must skip data until it can be accepted again
+
+This certainly is not specific to ZeroMQ.  When one hits a full queue,
+something's gotta give.  Either you abandon entering the queue or you
+must wait where you are until there is again room in the queue.
+
+Of course, one can make the queue larger or employ faster network or
+computers.  This will minimize the likelihood of hitting the HWM but
+it does not remove the need to design for the eventuality of hitting
+it.  Three is no magic and we can not rely on hope.
+
+Each ZeroMQ socket pattern chooses between *block* and *drop* policy.
+This policy is thus linked to the multiplicity routing policy
+described above.
+
+PUB/SUB will *drop* messages if the HWM is reached.  This is very useful
+if the transmission should avoid forcing back pressure onto the PUB
+side.  This (along with drop detection) makes most sense for trigger
+transmission in protoDUNE and DUNE.  If HWM is reached, we do not want
+to "back up" the data flow all the way to the hardware.  We have to
+deal with it at the source of the problem.
+
+PAIR, again 1-to-1, blocks.  The HWM is actually the sum of the HWM of
+both PAIRs.  Conceptually, it's a pipeline.  If the pipe is full, no
+new messages will be added until room is made.
+
+PUSH/PULL blocks.  Each PULL has its own HWM.  A send to PUSH will
+continue until all PULL sockets have reached HWM and then further
+until the PUSH HWM is reached.
+
+
+

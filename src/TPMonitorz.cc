@@ -4,6 +4,7 @@
 #include "ptmp/data.h"
 #include "ptmp/internals.h"
 #include "ptmp/factory.h"
+#include "ptmp/actors.h"
 
 #include <cstdio>
 
@@ -14,11 +15,21 @@ PTMP_AGENT(ptmp::TPMonitorz, monitor)
 
 
 // An actor function that starts a steerable proxy.  
-static
-void tap_proxy(zsock_t* pipe, void* vargs)
+void ptmp::actor::tap(zsock_t* pipe, void* vargs)
 {
     auto config = json::parse((const char*) vargs);
     const uint32_t tapid = config["id"];
+
+    if (config["name"].is_string()) {
+        ptmp::internals::set_thread_name(config["name"].get<std::string>());
+    }
+    else {
+        char* name = zsys_sprintf("montap%05d", tapid);
+        ptmp::internals::set_thread_name(name);
+        freen (name);
+    }
+    
+
     zsock_t* fe_sock = ptmp::internals::endpoint(config["input"].dump());
     zsock_t* be_sock = ptmp::internals::endpoint(config["output"].dump());
     std::string attach = "pushpull";
@@ -59,10 +70,15 @@ void tap_proxy(zsock_t* pipe, void* vargs)
 }
 
 
-static
-void tpmonitorz(zsock_t* pipe, void* vargs)
+void ptmp::actor::monitor(zsock_t* pipe, void* vargs)
 {
     auto config = json::parse((const char*) vargs);
+
+    std::string name = "monitor";
+    if (config["name"].is_string()) {
+        name = config["name"];
+    }
+    ptmp::internals::set_thread_name(name);
 
     std::string filename = config["filename"];
     std::string attach = "pushpull";
@@ -105,7 +121,7 @@ void tpmonitorz(zsock_t* pipe, void* vargs)
             throw std::runtime_error("unknown attachement type");
         }
         tapinfo_t ti {
-            zactor_new(tap_proxy, (void*)tapcfg.c_str()),
+            zactor_new(ptmp::actor::tap, (void*)tapcfg.c_str()),
             cap_sock,
             zsock_new_push(con_addr),
             tapid,
@@ -201,7 +217,7 @@ void tpmonitorz(zsock_t* pipe, void* vargs)
 
 
 ptmp::TPMonitorz::TPMonitorz(const std::string& config)
-    : m_actor(zactor_new(tpmonitorz, (void*)config.c_str()))
+    : m_actor(zactor_new(ptmp::actor::monitor, (void*)config.c_str()))
 {
 }
 

@@ -9,9 +9,26 @@
 #include <unistd.h>
 #include <ctime>
 
+#ifdef HAVE_PTHREAD_H
+#include <pthread.h>
+void ptmp::internals::set_thread_name(const std::string& name)
+{
+    //zsys_debug("set thread name \"%s\"", name.c_str());
+    // this is just for Linux API...
+    pthread_setname_np(pthread_self(), name.c_str());
+}
+#else
+void ptmp::internals::set_thread_name(const std::string& name)
+{
+    //zsys_debug("can not set name \"%s\", no pthreads", name.c_str());
+}
+#endif
+
 using json = nlohmann::json;
 
 using namespace ptmp::internals;
+
+
 
 void ptmp::internals::microsleep(ptmp::data::real_time_t microseconds)
 {

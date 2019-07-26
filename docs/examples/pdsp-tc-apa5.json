@@ -1,0 +1,384 @@
+{
+   "name": "apa5-tcs",
+   "plugins": [
+      "ptmp-tcs"
+   ],
+   "proxies": [
+      {
+         "data": {
+            "detid": -1,
+            "input": {
+               "socket": {
+                  "connect": [
+                     "tcp://10.73.136.67:15141"
+                  ],
+                  "hwm": 10000,
+                  "type": "SUB"
+               }
+            },
+            "name": "tp-window-apa5-link00",
+            "output": {
+               "socket": {
+                  "bind": [
+                     "inproc://tc-window-zipper-apa5-link00"
+                  ],
+                  "hwm": 1000,
+                  "type": "PUSH"
+               }
+            },
+            "sync_time": 10,
+            "tardy_policy": "drop",
+            "tbuf": 250000,
+            "toffset": 0,
+            "tspan": 2500
+         },
+         "name": "tc-window-apa5-link00",
+         "type": "window"
+      },
+      {
+         "data": {
+            "detid": -1,
+            "input": {
+               "socket": {
+                  "connect": [
+                     "tcp://10.73.136.67:15142"
+                  ],
+                  "hwm": 10000,
+                  "type": "SUB"
+               }
+            },
+            "name": "tp-window-apa5-link01",
+            "output": {
+               "socket": {
+                  "bind": [
+                     "inproc://tc-window-zipper-apa5-link01"
+                  ],
+                  "hwm": 1000,
+                  "type": "PUSH"
+               }
+            },
+            "sync_time": 10,
+            "tardy_policy": "drop",
+            "tbuf": 250000,
+            "toffset": 0,
+            "tspan": 2500
+         },
+         "name": "tc-window-apa5-link01",
+         "type": "window"
+      },
+      {
+         "data": {
+            "detid": -1,
+            "input": {
+               "socket": {
+                  "connect": [
+                     "tcp://10.73.136.67:15143"
+                  ],
+                  "hwm": 10000,
+                  "type": "SUB"
+               }
+            },
+            "name": "tp-window-apa5-link02",
+            "output": {
+               "socket": {
+                  "bind": [
+                     "inproc://tc-window-zipper-apa5-link02"
+                  ],
+                  "hwm": 1000,
+                  "type": "PUSH"
+               }
+            },
+            "sync_time": 10,
+            "tardy_policy": "drop",
+            "tbuf": 250000,
+            "toffset": 0,
+            "tspan": 2500
+         },
+         "name": "tc-window-apa5-link02",
+         "type": "window"
+      },
+      {
+         "data": {
+            "detid": -1,
+            "input": {
+               "socket": {
+                  "connect": [
+                     "tcp://10.73.136.67:15144"
+                  ],
+                  "hwm": 10000,
+                  "type": "SUB"
+               }
+            },
+            "name": "tp-window-apa5-link03",
+            "output": {
+               "socket": {
+                  "bind": [
+                     "inproc://tc-window-zipper-apa5-link03"
+                  ],
+                  "hwm": 1000,
+                  "type": "PUSH"
+               }
+            },
+            "sync_time": 10,
+            "tardy_policy": "drop",
+            "tbuf": 250000,
+            "toffset": 0,
+            "tspan": 2500
+         },
+         "name": "tc-window-apa5-link03",
+         "type": "window"
+      },
+      {
+         "data": {
+            "detid": -1,
+            "input": {
+               "socket": {
+                  "connect": [
+                     "tcp://10.73.136.67:15145"
+                  ],
+                  "hwm": 10000,
+                  "type": "SUB"
+               }
+            },
+            "name": "tp-window-apa5-link04",
+            "output": {
+               "socket": {
+                  "bind": [
+                     "inproc://tc-window-zipper-apa5-link04"
+                  ],
+                  "hwm": 1000,
+                  "type": "PUSH"
+               }
+            },
+            "sync_time": 10,
+            "tardy_policy": "drop",
+            "tbuf": 250000,
+            "toffset": 0,
+            "tspan": 2500
+         },
+         "name": "tc-window-apa5-link04",
+         "type": "window"
+      },
+      {
+         "data": {
+            "detid": -1,
+            "input": {
+               "socket": {
+                  "connect": [
+                     "tcp://10.73.136.67:15146"
+                  ],
+                  "hwm": 10000,
+                  "type": "SUB"
+               }
+            },
+            "name": "tp-window-apa5-link05",
+            "output": {
+               "socket": {
+                  "bind": [
+                     "inproc://tc-window-zipper-apa5-link05"
+                  ],
+                  "hwm": 1000,
+                  "type": "PUSH"
+               }
+            },
+            "sync_time": 10,
+            "tardy_policy": "drop",
+            "tbuf": 250000,
+            "toffset": 0,
+            "tspan": 2500
+         },
+         "name": "tc-window-apa5-link05",
+         "type": "window"
+      },
+      {
+         "data": {
+            "detid": -1,
+            "input": {
+               "socket": {
+                  "connect": [
+                     "tcp://10.73.136.67:15147"
+                  ],
+                  "hwm": 10000,
+                  "type": "SUB"
+               }
+            },
+            "name": "tp-window-apa5-link06",
+            "output": {
+               "socket": {
+                  "bind": [
+                     "inproc://tc-window-zipper-apa5-link06"
+                  ],
+                  "hwm": 1000,
+                  "type": "PUSH"
+               }
+            },
+            "sync_time": 10,
+            "tardy_policy": "drop",
+            "tbuf": 250000,
+            "toffset": 0,
+            "tspan": 2500
+         },
+         "name": "tc-window-apa5-link06",
+         "type": "window"
+      },
+      {
+         "data": {
+            "detid": -1,
+            "input": {
+               "socket": {
+                  "connect": [
+                     "tcp://10.73.136.67:15148"
+                  ],
+                  "hwm": 10000,
+                  "type": "SUB"
+               }
+            },
+            "name": "tp-window-apa5-link07",
+            "output": {
+               "socket": {
+                  "bind": [
+                     "inproc://tc-window-zipper-apa5-link07"
+                  ],
+                  "hwm": 1000,
+                  "type": "PUSH"
+               }
+            },
+            "sync_time": 10,
+            "tardy_policy": "drop",
+            "tbuf": 250000,
+            "toffset": 0,
+            "tspan": 2500
+         },
+         "name": "tc-window-apa5-link07",
+         "type": "window"
+      },
+      {
+         "data": {
+            "detid": -1,
+            "input": {
+               "socket": {
+                  "connect": [
+                     "tcp://10.73.136.67:15149"
+                  ],
+                  "hwm": 10000,
+                  "type": "SUB"
+               }
+            },
+            "name": "tp-window-apa5-link08",
+            "output": {
+               "socket": {
+                  "bind": [
+                     "inproc://tc-window-zipper-apa5-link08"
+                  ],
+                  "hwm": 1000,
+                  "type": "PUSH"
+               }
+            },
+            "sync_time": 10,
+            "tardy_policy": "drop",
+            "tbuf": 250000,
+            "toffset": 0,
+            "tspan": 2500
+         },
+         "name": "tc-window-apa5-link08",
+         "type": "window"
+      },
+      {
+         "data": {
+            "detid": -1,
+            "input": {
+               "socket": {
+                  "connect": [
+                     "tcp://10.73.136.67:15150"
+                  ],
+                  "hwm": 10000,
+                  "type": "SUB"
+               }
+            },
+            "name": "tp-window-apa5-link09",
+            "output": {
+               "socket": {
+                  "bind": [
+                     "inproc://tc-window-zipper-apa5-link09"
+                  ],
+                  "hwm": 1000,
+                  "type": "PUSH"
+               }
+            },
+            "sync_time": 10,
+            "tardy_policy": "drop",
+            "tbuf": 250000,
+            "toffset": 0,
+            "tspan": 2500
+         },
+         "name": "tc-window-apa5-link09",
+         "type": "window"
+      },
+      {
+         "data": {
+            "detid": -1,
+            "input": {
+               "socket": {
+                  "connect": [
+                     "inproc://tc-window-zipper-apa5-link00",
+                     "inproc://tc-window-zipper-apa5-link01",
+                     "inproc://tc-window-zipper-apa5-link02",
+                     "inproc://tc-window-zipper-apa5-link03",
+                     "inproc://tc-window-zipper-apa5-link04",
+                     "inproc://tc-window-zipper-apa5-link05",
+                     "inproc://tc-window-zipper-apa5-link06",
+                     "inproc://tc-window-zipper-apa5-link07",
+                     "inproc://tc-window-zipper-apa5-link08",
+                     "inproc://tc-window-zipper-apa5-link09"
+                  ],
+                  "hwm": 1000,
+                  "type": "PULL"
+               }
+            },
+            "name": "apa5-zipper",
+            "output": {
+               "socket": {
+                  "bind": [
+                     "inproc://tc-zipper-tcfinder-apa5"
+                  ],
+                  "hwm": 1000,
+                  "type": "PUSH"
+               }
+            },
+            "sync_time": 10,
+            "tardy_policy": "drop",
+            "tbuf": 250000,
+            "toffset": 0,
+            "tspan": 2500
+         },
+         "name": "tc-zipper-apa5",
+         "type": "zipper"
+      },
+      {
+         "data": {
+            "input": {
+               "socket": {
+                  "connect": [
+                     "inproc://tc-zipper-tcfinder-apa5"
+                  ],
+                  "hwm": 1000,
+                  "type": "PULL"
+               }
+            },
+            "method": "pdune-adjacency-tc",
+            "name": "apa5-adj-tcs",
+            "output": {
+               "socket": {
+                  "bind": [
+                     "tcp://10.73.136.31:40501"
+                  ],
+                  "hwm": 10000,
+                  "type": "PUB"
+               }
+            }
+         },
+         "name": "tc-finder-apa5",
+         "type": "filter"
+      }
+   ]
+}

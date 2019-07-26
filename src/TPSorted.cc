@@ -1,6 +1,9 @@
+// this is obsolete.  use zipper.
+
 #include "ptmp/api.h"
 #include "ptmp/internals.h"
 #include "ptmp/factory.h"
+#include "ptmp/actors.h"
 
 #include <czmq.h>
 #include <json.hpp>
@@ -107,13 +110,18 @@ bool recv_prompt(SockInfo& si, ptmp::data::data_time_t last_msg_time, bool drop_
 }
 
 // The actor function
-static
-void tpsorted_proxy(zsock_t* pipe, void* vargs)
-{
 
+void ptmp::actor::sorted(zsock_t* pipe, void* vargs)
+{
     auto config = json::parse((const char*) vargs);
     auto input = ptmp::internals::perendpoint(config["input"].dump());
     auto output = ptmp::internals::perendpoint(config["output"].dump());
+
+    std::string name = "sorted";
+    if (config["name"].is_string()) {
+        name = config["name"];
+    }
+    ptmp::internals::set_thread_name(name);
 
     auto tardy_policy = config["tardy_policy"];
     bool drop_tardy = true;
@@ -301,7 +309,7 @@ void tpsorted_proxy(zsock_t* pipe, void* vargs)
 
 
 ptmp::TPSorted::TPSorted(const std::string& config)
-    : m_actor(zactor_new(tpsorted_proxy, (void*)config.c_str()))
+    : m_actor(zactor_new(ptmp::actor::sorted, (void*)config.c_str()))
 {
 
 }

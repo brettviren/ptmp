@@ -1,5 +1,6 @@
 #include "ptmp/api.h"
 #include "ptmp/factory.h"
+#include "ptmp/actors.h"
 
 #include "json.hpp"
 
@@ -17,12 +18,17 @@ void dump_header(const char* label, ptmp::data::TPSet& tpset)
 
 
 // The actor function
-static
-void tpreplay_proxy(zsock_t* pipe, void* vargs)
+void ptmp::actor::replay(zsock_t* pipe, void* vargs)
 {
     auto config = json::parse((const char*) vargs);
     zsock_t* isock = ptmp::internals::endpoint(config["input"].dump());
     zsock_t* osock = ptmp::internals::endpoint(config["output"].dump());
+
+    std::string name = "replay";
+    if (config["name"].is_string()) {
+        name = config["name"];
+    }
+    ptmp::internals::set_thread_name(name);
 
     // Note, speed MUST scale HW clock to real time microseconds.  Eg,
     // PDSP's tstart should be counted in 50MHz ticks so speed should
@@ -150,7 +156,7 @@ void tpreplay_proxy(zsock_t* pipe, void* vargs)
 
 
 ptmp::TPReplay::TPReplay(const std::string& config)
-    : m_actor(zactor_new(tpreplay_proxy, (void*)config.c_str()))
+    : m_actor(zactor_new(ptmp::actor::replay, (void*)config.c_str()))
 {
 }
 

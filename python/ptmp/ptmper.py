@@ -20,12 +20,12 @@ def dotify_port(node_name, node_data, io):
     lines.append('"%s" -- "%s"[style=solid]' % (node_name, pn))
     
     # addresses
-    for bc in ["bind", "connect"]:
+    for bc,color in [("bind","blue"), ("connect","red")]:
         if not bc in sock:
             continue
         for addr in sock[bc]:
             lines.append('"%s"[shape=ellipse]' % addr)
-            lines.append('"%s" -- "%s"[style=dotted,label="%s"]' % (pn, addr, bc))
+            lines.append('"%s" -- "%s"[label="%s",color=%s]' % (pn, addr, bc, color))
 
     return lines
 
@@ -99,6 +99,32 @@ def dotify(output, ext_str, ext_code, infile):
     dat = load_file(infile, ext_str, ext_code)
 
     open(output,"w").write(dot(dat['proxies']))
+
+@cli.command('jsonnet')
+@click.option('-o','--output', default="/dev/stdout",
+              help="Output JSON file (def: stdout)")
+@click.option('-m','--multi',default=None,
+              type=click.Path(exists=True, dir_okay=True, writable=True),
+              help="Output directory for multiple output JSON files")
+@click.option('-V','--ext-str', default=None, type=str,
+              help="Jsonnet external var", multiple=True)
+@click.option('-C','--ext-code', default=None, type=str,
+              help="Jsonnet external code", multiple=True)
+@click.argument('inputfile')
+def jsonnetcli(output, multi, ext_str, ext_code, inputfile):
+    '''
+    A CLI to Jsonnet compiler.
+    '''
+    ext_code = list(ext_code)
+    dat = load_file(inputfile, ext_str, ext_code)
+    if not multi:
+        open(output,"w").write(jsonnet.json.dumps(dat, indent=4))
+        return
+    for k,v in sorted(dat.items()):
+        path=osp.join(multi,k)
+        print (path)
+        open(path, "w").write(jsonnet.json.dumps(v, indent=4))
+
 
 @cli.command('gencfg')
 @click.option('-o','--output', default="/dev/stdout",
