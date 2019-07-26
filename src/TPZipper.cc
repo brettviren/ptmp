@@ -146,7 +146,7 @@ struct zipper_queue_t {
 
     // Process pending messages, fill punctual and tardy and keep any
     // leftovers.  Return suggested poll timeout.
-    int process(std::vector<meta_msg_t>& punctual, std::vector<meta_msg_t> tardy) {
+    int process(std::vector<meta_msg_t>& punctual, std::vector<meta_msg_t>& tardy) {
         if (messages.empty()) {
             return -1;
         }
