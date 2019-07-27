@@ -20,9 +20,9 @@ insock="PULL"
 delay=1
 
 # 25 is long enough to handle 10k * 10 messages on my laptop
-countdown=25
-endwait=10000
-nsend=10000
+countdown=10
+endwait=1000
+nsend=1000
 maxsender=10
 ntotal=$(nproc)
 if (( $ntotal > $maxsender )) ; then

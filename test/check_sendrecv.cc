@@ -178,7 +178,7 @@ int main(int argc, char* argv[])
         jsock_recv["type"] = "PULL";
     }
     else {
-        cerr << "Unknown attchement type: " << at << endl;
+        cerr << "Unknown attachment type: " << at << endl;
         return 1;
     }
     if (bc == "bind") {

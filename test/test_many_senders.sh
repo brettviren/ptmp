@@ -8,13 +8,13 @@ recver="$top/build/test/check_recv"
 
 nsend=1000
 senders="1 2 3 4 5 6 7 8 9"
-
-set -e
+#senders="1"
+#set -e
 #set -x
 
 err_report() {
     echo "Error on line $1"
-    exit -1
+    exit 1
 }
 
 trap 'err_report $LINENO' ERR
@@ -27,7 +27,7 @@ endpoint () {
         ipc) echo "ipc://manysenders${num}.ipc" ;;
         tcp) echo "tcp://127.0.0.1:$(( 5550 + $num ))" ;;
         inproc) echo "inproc://manysenders$num" ;;
-        *) exit -1;;
+        *) exit 2;;
     esac
 }
 
@@ -46,9 +46,11 @@ cmd_sender () {
     local ep="$(endpoint $trans $num)"
     local logf="$(logfile sender $trans $num)"
     
-    cmd="$sender -p PUB -a bind -e $ep -B 1000 -E 200 -n $nsend -N 1000 exponential -t 50"
+    cmd="$sender -p PUSH -a bind -e $ep -E 1000 -n $nsend -N 1000 exponential -t 50"
     echo $cmd
-    $cmd 2>&1 > $logf
+    echo $logf
+    echo $cmd > $logf
+    $cmd >> $logf 2>&1
 }
 
 cmd_recver () {
@@ -61,18 +63,24 @@ cmd_recver () {
         ep="$ep -e $(endpoint $trans $n)"
         expect=$(( $expect + $nsend ))
     done
-    cmd="$recver -p SUB -a connect $ep -T 1000 -n $expect"
+    cmd="$recver -p PULL -a connect $ep -T 1000 -n $expect"
     echo $cmd
-    $cmd 2>&1 > $logf
+    echo $logf
+    echo $cmd > $logf
+    $cmd >> $logf 2>&1
 }
 
-for trans in inproc ipc tcp
+for trans in ipc tcp
 do
+    tokill=""
     for n in $senders
     do
         cmd_sender $trans $n &
+        tokill="$tokill $!"
     done
-    cmd_recver $trans $senders || exit -1
+    cmd_recver $trans $senders || exit 3
+    echo "Waiting for $tokill"
+    wait $tokill
     echo "success: $trans"
 done
 sleep 1
