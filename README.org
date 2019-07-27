@@ -128,3 +128,4 @@ More documentation is in [[./docs]].  Some starting points:
 - [[docs/apps.org][application development]]
 - [[docs/configuration.org][end-user configuration]]
 - [[./docs/tuning.org][tuning]] 
+- [[docs/meta.org][meta]]
