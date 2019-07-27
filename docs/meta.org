@@ -1,0 +1,60 @@
+#+title PTMP meta issues
+
+* Development and contributions
+
+Development is done on ~master~ unless there is some extremely
+disruptive and long developed feature tried in which case a branch
+from ~master~ is used.  The ~master~ branch should always be more or less
+usable by other developers but should *not* in general be used in
+"production" (eg, testing with PDSP DAQ).  Instead, releases should be
+used (see below).
+
+Contributions which are in line with PTMP development plans are very
+welcome via GitHub PRs.  Before starting development for any large
+contributions, please discuss intentions to avoid attempts to take
+PTMP on an unwanted tangent.
+
+* Release management
+
+Releases of PTMP are handled simply.  Tag master with three element
+numerical tag ~<major>.<minor>.<bugfix>~.  Incriminating a major number
+will indicate essentially a sea change that completely breaks
+compatibility.  Incriminating minor number may break some detailed
+backward compatibility or more often add features.
+
+* Repo management
+
+For most people interacting with the repo, there's nothing special to
+know.  It appears like a normal git repo.
+
+There is one wrinkle that is documented here so I don't forget it.
+The [[../tools/][tools/]] subdirectory is manged by ~git subrepo~ (originally via ~git
+submodules~).  This wrinkle only needs ironing when it comes time to
+sync up any development in ~tools/~ that was done through this repo and
+elsewhere.
+
+The directory was first added via
+
+#+BEGIN_EXAMPLE
+  $ git subrepo clone git@github.com:brettviren/waftools.git tools
+#+END_EXAMPLE
+
+To update after external development
+
+#+BEGIN_EXAMPLE
+  $ git subrepo pull tools
+#+END_EXAMPLE
+
+To push after internal development
+
+#+BEGIN_EXAMPLE
+  $ git subrepo pull tools
+#+END_EXAMPLE
+
+Note, existing clones of ~ptmp~ that were created before the change to
+~git subrepo~ must be updated in this manner:
+
+#+BEGIN_EXAMPLE
+  $ rm -r tools
+  $ git pull
+#+END_EXAMPLE
