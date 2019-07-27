@@ -20,7 +20,7 @@ insock="PULL"
 delay=1
 
 # 25 is long enough to handle 10k * 10 messages on my laptop
-countdown=10
+countdown=5
 endwait=1000
 nsend=1000
 maxsender=10

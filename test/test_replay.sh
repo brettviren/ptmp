@@ -31,7 +31,7 @@ cmd_sender () {
 
 cmd_proxy() {
     local logf="$(logfile proxy)"
-    cmd="$proxy -s 1.0 -c15"
+    cmd="$proxy -c10"
     cmd="$cmd  input -p PULL -a connect -e ${url}:$port1"
     cmd="$cmd output -p PUSH -a bind    -e ${url}:$port2"
     echo $cmd

@@ -6,16 +6,7 @@ services:
 before_install:
   - docker pull brettviren/ptmp-testing
 
-git:
-  depth: 3
-  
-install:
-  - python3 ./tools/waf configure --prefix=$HOME \
-
 script:
-  - python3 ./tools/waf --notests install 
-
-  # -  python3 ./tools/waf --alltests -j1 
-  # -  python3 ./tools/waf clean
+  - docker run brettviren/ptmp-testing
 
 
