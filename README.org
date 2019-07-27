@@ -94,7 +94,7 @@ With prerequisites available, issue:
 Notes:
 
 1. [[https://waf.io][Waf]] is like ~make~.  It's equivalent to a ~Makefile~ is [[./wscript]].  A copy is included under the [[./tools/]] directory.
-2. The ~--prefix~ gives an installation directory.  Additional ~--with-*~ options may be needed for configure to find external dependencies.  Issue 
+2. The ~--prefix~ gives an installation directory.  Additional ~--with-*~ options may be needed for configure to find external dependencies.  See ~waf --help~ for a list.
 3. Build with ~--notests~ in order to avoid running tests in parallel.
 4. Result may be immediately used in-place under the ~build/~ directory.
 5. Run tests with ~-j1~ to enforce serial tests.  If run in parallel, some test may try to use the same ports.  Some tests run many minutes depending on the speed and number of CPUs available.  Some may run forever when problems occur.
