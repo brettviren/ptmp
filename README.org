@@ -49,6 +49,7 @@ also any [[https://github.com/brettviren/ptmp/issues][issues]].
 
 [[https://travis-ci.org/brettviren/ptmp][https://travis-ci.org/brettviren/ptmp.svg?branch=master]]
 
+This makes use of [[https://github.com/brettviren/ptmp-docker][ptmp-docker]] which produces [[https://cloud.docker.com/u/brettviren/repository/docker/brettviren/ptmp-testing][ptmp-testing]].
 
 * Installation 
 
