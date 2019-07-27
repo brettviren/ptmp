@@ -1,0 +1,65 @@
+#!/bin/bash
+
+# This script helps do stuff with repos.
+#
+# repo-helper switch-url dev|anon|toggle [remote]
+
+
+me=$(realpath $BASH_SOURCE)
+dev_prefix="git@github.com:"
+anon_prefix="https://github.com/"
+
+toggle-url () {
+    local url="$1" ; shift
+    if [[ $url =~ ^$dev_prefix ]] ; then
+        echo ${url//"$dev_prefix"/"$anon_prefix"}
+        return
+    fi
+    if [[ $url =~ ^$anon_prefix ]] ; then    
+        echo ${url//"$anon_prefix"/"$dev_prefix"}
+        return
+    fi
+    echo $url
+}
+
+new-url () {
+    local url="$1"; shift
+    if [ "$who" = "anon" ] ; then
+        echo ${url//"$dev_prefix"/"$anon_prefix"}
+        return
+    fi
+    if [ "$who" = "dev" ] ; then
+        echo ${url//"$anon_prefix"/"$dev_prefix"}
+        return
+    fi
+    toggle-url $url
+}
+
+do-switch-url () {
+    local who=${1:-anon} ; shift
+    local rem=${1:-origin} ; shift
+    local url=$(git remote get-url $rem)
+    url=$(new-url $url)
+
+    git remote set-url $rem $url
+    git submodule --quiet foreach $me switch-url $who $rem
+}    
+
+do-show-url () {
+    local rem=${1:-origin} ; shift
+    echo -e "$(git remote get-url $rem)\t$(pwd)"
+    git submodule --quiet foreach $me show-url $rem
+}
+
+
+do-dev-push () {
+    do-switch-url dev
+    git submodule --quiet foreach git push origin
+    git push origin
+    do-switch-url anon
+}
+
+
+
+cmd="$1"; shift
+do-$cmd $@

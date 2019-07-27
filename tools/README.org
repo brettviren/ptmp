@@ -1,0 +1,41 @@
+#+title waftools
+
+This area holds some tooling for use of waf and other things.  
+
+It is meant to be included in some other source repository via a git
+submodule as a [[tools/]] sub directory.
+
+* Waf tools
+
+The main content are "waf tools" used for finding and building against
+software dependencies.  In a top-level ~wscript~ file add:
+
+#+BEGIN_SRC python
+sys.path.append('tools')
+#+END_SRC
+
+Then call the provided tools in the usual Waf way.
+
+* Scripts
+
+A number of helper scripts are here.
+
+** Mucking with Git
+
+You can switch the Git URLs between dev (SSH) and anon (HTTPS)
+
+#+BEGIN_EXAMPLE
+  $ ./tools/repo-helper switch-url dev
+  $ ./tools/repo-helper switch-url anon
+#+END_EXAMPLE
+
+** Mucking with UPS
+
+You can build a UPS product
+
+#+BEGIN_EXAMPLE
+  $ # set up ups and dependencies
+  $ ./tools/create-ups-product.sh /wcdo/lib/ups v00_01_00 e15 czmq protobuf
+#+END_EXAMPLE
+
+
