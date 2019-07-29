@@ -204,9 +204,6 @@ namespace ptmp {
         */
         virtual ~TPWindow();
 
-        // a self-test
-        static void test();
-
     private:
         zactor_t* m_actor;
 

@@ -34,10 +34,13 @@ void print_tpset(ptmp::data::TPSet& tpset)
 
 int main(int argc, char** argv)
 {
+    zsys_init();
+
     CLI::App app{"Print dumped TPSets"};
 
-    std::string input_file{"/nfs/sw/work_dirs/phrodrig/hit-dumps/run8567/FELIX_BR_508.dump"};
-    app.add_option("-f", input_file, "Input file", false);
+    // /nfs/sw/work_dirs/phrodrig/hit-dumps/run8567/FELIX_BR_508.dump
+    std::string input_file{""};
+    app.add_option("input file", input_file);
 
     int nsets=1000000;
     app.add_option("-n", nsets, "number of TPSets to print (-1 for no limit)", true);
@@ -49,7 +52,10 @@ int main(int argc, char** argv)
     app.add_option("-w", window_size, "size of TPWindow window in 50MHz ticks", true);
 
     CLI11_PARSE(app, argc, argv);
-    
+    if (input_file.empty()) {
+        zsys_error("usage: [options] <inputfile.dump>");
+        return 0;               // avoid bombing the CI
+    }
 
     // zip together the sender threads with a zipper with a huge sync_time
     nlohmann::json window_config;
@@ -80,6 +86,9 @@ int main(int argc, char** argv)
         });
 
     std::thread sinkthread([](){
+            struct stat { ptmp::data::real_time_t maxt{0}, t2{0}, t{0}, n{0}; };
+            std::unordered_map<int, stat> stats;
+
             nlohmann::json recv_config;
             recv_config["socket"]["type"]="PULL";
             recv_config["socket"]["connect"].push_back("inproc://windowout");
@@ -91,6 +100,13 @@ int main(int argc, char** argv)
             int nprinted=0;
             ptmp::data::TPSet tpset, prev_tpset;
             while(receiver(tpset, 1000)){
+                int detid = tpset.detid();
+                ptmp::data::real_time_t dt = ptmp::data::now() - tpset.created();
+                stats[detid].maxt = std::max(stats[detid].maxt, dt);
+                stats[detid].n += 1;
+                stats[detid].t += dt;
+                stats[detid].t2 += dt*dt;                
+
                 if(nprinted<100 && tpset.tstart()==prev_tpset.tstart()){
                     zsys_debug("Duplicate tstart:");
                     zsys_debug("prev tpset: %d 0x%06x %ld %ld %d", prev_tpset.count(), prev_tpset.detid(), prev_tpset.tstart(), prev_tpset.tspan(), prev_tpset.tps().size());
@@ -103,6 +119,15 @@ int main(int argc, char** argv)
                 ++counter;
             }
             zsys_debug("sinkthread finished after %ld", counter);
+            zsys_debug("latency through window");
+            for (auto sit : stats) {
+                auto& s = sit.second;
+                double n = s.n;
+                double mean = s.t/n;
+                double rms = sqrt(s.t2/n - mean*mean);
+                zsys_debug("\t%d: n: %.0f avg: %.3f +/- %.4f ms, max: %.3f ms",
+                           sit.first, n, mean/1000, rms/1000, s.maxt/1000);
+            }
         });
 
     readthread.join();
