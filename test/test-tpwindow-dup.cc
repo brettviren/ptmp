@@ -27,7 +27,8 @@ zmsg_t* read_msg(FILE* fp)
 void print_tpset(ptmp::data::TPSet& tpset)
 {
     for(auto const& tp: tpset.tps()){
-        zsys_debug("    ch: %d t: %ld span: %d", tp.channel(), tp.tstart(), tp.tspan());
+        zsys_debug("    ch: %d t: %ld (+%ld) span: %d",
+                   tp.channel(), tp.tstart(), tp.tstart()-tpset.tstart(), tp.tspan());
     }
 }
 
@@ -92,9 +93,9 @@ int main(int argc, char** argv)
             while(receiver(tpset, 1000)){
                 if(nprinted<100 && tpset.tstart()==prev_tpset.tstart()){
                     zsys_debug("Duplicate tstart:");
-                    zsys_debug("prev tpset: %d 0x%06x %ld %d", prev_tpset.count(), prev_tpset.detid(), prev_tpset.tstart(), prev_tpset.tps().size());
-                    // print_tpset(prev_tpset);
-                    zsys_debug("this tpset: %d 0x%06x %ld %d", tpset.count(), tpset.detid(), tpset.tstart(), tpset.tps().size());
+                    zsys_debug("prev tpset: %d 0x%06x %ld %ld %d", prev_tpset.count(), prev_tpset.detid(), prev_tpset.tstart(), prev_tpset.tspan(), prev_tpset.tps().size());
+                    print_tpset(prev_tpset);
+                    zsys_debug("this tpset: %d 0x%06x %ld %ld %d", tpset.count(), tpset.detid(), tpset.tstart(), tpset.tspan(), tpset.tps().size());
                     print_tpset(tpset);
                     ++nprinted;
                 }

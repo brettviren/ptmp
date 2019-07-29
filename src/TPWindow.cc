@@ -50,6 +50,10 @@ struct time_window_t {
     void set_bytime(ptmp::data::data_time_t t) {
         wind = (t-toff) / tspan;
     }
+    void advance() {
+        ++wind;
+    }
+
 };
 
 struct tp_greater_t {
@@ -108,28 +112,6 @@ static void dump_tpset(const ptmp::data::TPSet& tps, std::string msg="")
     }
 }
 
-static void test_time_window()
-{
-    const ptmp::data::data_time_t tspan = 300, toff=53;
-
-    time_window_t tw(tspan, toff);
-    assert(tw.wind == 0);
-    assert(toff == tw.tbegin());
-    assert(tw.in(toff));
-    zsys_debug("cmp: %d" , tw.cmp(tspan+toff-1));
-    assert(tw.in(tspan+toff-1));
-    assert(!tw.in(toff-1));
-    assert(!tw.in(tspan+toff));
-    dump_window(tw);
-
-    tw.set_bytime(tspan + toff + 1);
-    //zsys_debug("wind: %ld", tw.wind);
-    assert(tw.wind == 1L);
-    assert(tw.tbegin() == tspan + toff);
-    tw.wind = 1000;
-    assert(tw.tbegin() == 1000*tspan + toff);
-    dump_window(tw);
-}
     
 struct TPWindower {
     zsock_t* osock;
@@ -177,6 +159,7 @@ struct TPWindower {
             }
             if (osock) {                       // allow null for testing
                 ptmp::internals::send(osock, tpset); // fixme: can throw
+                window.advance();
             }
             else {
                 zsys_debug("window: testing mode, not actually sending a TPSet");
@@ -203,61 +186,6 @@ struct TPWindower {
         return window;
     }
 };
-
-static void test_tpwindower()
-{
-    ptmp::data::data_time_t tspan=300, toff=53, tbuf=0;
-    TPWindower tpw(nullptr, tspan, toff, tbuf, 1234);
-    dump_window(tpw.window);
-    const auto& tw = tpw.reset(tspan+toff);
-    assert(tw.wind == 1);
-    assert(tw.in(tspan+toff));
-    assert(tw.in(tspan+2*toff-1));
-
-    ptmp::data::TrigPrim tp;
-
-    tp.set_tstart(tspan+toff);  // next window
-    tp.set_channel(42);
-    bool ok = tpw.maybe_add(tp);
-    assert(ok);
-    zsys_debug("buffered %d tpsets over time span %ld, tbuf=%ld",
-               (int)tpw.buffer.size(), tpw.buffer.span(), tpw.tbuf);
-    zsys_debug("tstart=%ld, w.tbeg=%ld w.toff=%ld w.tspan=%ld",
-               tpw.buffer.top().tstart(), tpw.window.tbegin(), tpw.window.toff, tpw.window.tspan);
-    zsys_debug("window in %d", tpw.window.in(tpw.buffer.top().tstart()));
-    assert(tpw.buffer.size() == 1);
-    dump_window(tpw.window);
-
-    tp.set_tstart(tp.tstart() + 1);
-    tp.set_channel(43);    
-    ok = tpw.maybe_add(tp);
-    assert(ok);
-    zsys_debug("buffered %d tpsets over time span %ld", (int)tpw.buffer.size(), tpw.buffer.span());
-    assert(tpw.buffer.size() == 2);
-    dump_window(tpw.window);
-    
-    tp.set_tstart(toff);
-    ok = tpw.maybe_add(tp);
-    assert(!ok);
-    zsys_debug("buffered %d tpsets over time span %ld", (int)tpw.buffer.size(), tpw.buffer.span());
-    assert(tpw.buffer.size() == 2);
-    dump_window(tpw.window);
-
-    zsys_debug("advancing window");
-    tp.set_tstart(toff+2*tspan); // in next window
-    ok = tpw.maybe_add(tp);
-    assert(ok);
-    dump_window(tpw.window);
-    zsys_debug("buffered %d tpsets over time span %ld", (int)tpw.buffer.size(), tpw.buffer.span());
-    assert(tpw.buffer.size() == 1);
-
-    tp.set_tstart(tp.tstart() + 1);
-    ok = tpw.maybe_add(tp);
-    assert(ok);
-    zsys_debug("buffered %d tpsets over time span %ld", (int)tpw.buffer.size(), tpw.buffer.span());
-    assert(tpw.buffer.size() == 2);
-    dump_window(tpw.window);
-}
 
 
 // The actor function
@@ -418,6 +346,97 @@ ptmp::TPWindow::~TPWindow()
     zsock_signal(zactor_sock(m_actor), 0); // signal quit
     zactor_destroy(&m_actor);
     zsys_debug("window: destroying");
+}
+
+
+
+
+
+
+
+
+
+
+// testing code below
+
+
+static void test_tpwindower()
+{
+    ptmp::data::data_time_t tspan=300, toff=53, tbuf=0;
+    TPWindower tpw(nullptr, tspan, toff, tbuf, 1234);
+    dump_window(tpw.window);
+    const auto& tw = tpw.reset(tspan+toff);
+    assert(tw.wind == 1);
+    assert(tw.in(tspan+toff));
+    assert(tw.in(tspan+2*toff-1));
+
+    ptmp::data::TrigPrim tp;
+
+    tp.set_tstart(tspan+toff);  // next window
+    tp.set_channel(42);
+    bool ok = tpw.maybe_add(tp);
+    assert(ok);
+    zsys_debug("buffered %d tpsets over time span %ld, tbuf=%ld",
+               (int)tpw.buffer.size(), tpw.buffer.span(), tpw.tbuf);
+    zsys_debug("tstart=%ld, w.tbeg=%ld w.toff=%ld w.tspan=%ld",
+               tpw.buffer.top().tstart(), tpw.window.tbegin(), tpw.window.toff, tpw.window.tspan);
+    zsys_debug("window in %d", tpw.window.in(tpw.buffer.top().tstart()));
+    assert(tpw.buffer.size() == 1);
+    dump_window(tpw.window);
+
+    tp.set_tstart(tp.tstart() + 1);
+    tp.set_channel(43);    
+    ok = tpw.maybe_add(tp);
+    assert(ok);
+    zsys_debug("buffered %d tpsets over time span %ld", (int)tpw.buffer.size(), tpw.buffer.span());
+    assert(tpw.buffer.size() == 2);
+    dump_window(tpw.window);
+    
+    tp.set_tstart(toff);
+    ok = tpw.maybe_add(tp);
+    assert(!ok);
+    zsys_debug("buffered %d tpsets over time span %ld", (int)tpw.buffer.size(), tpw.buffer.span());
+    assert(tpw.buffer.size() == 2);
+    dump_window(tpw.window);
+
+    zsys_debug("advancing window");
+    tp.set_tstart(toff+2*tspan); // in next window
+    ok = tpw.maybe_add(tp);
+    assert(ok);
+    dump_window(tpw.window);
+    zsys_debug("buffered %d tpsets over time span %ld", (int)tpw.buffer.size(), tpw.buffer.span());
+    assert(tpw.buffer.size() == 1);
+
+    tp.set_tstart(tp.tstart() + 1);
+    ok = tpw.maybe_add(tp);
+    assert(ok);
+    zsys_debug("buffered %d tpsets over time span %ld", (int)tpw.buffer.size(), tpw.buffer.span());
+    assert(tpw.buffer.size() == 2);
+    dump_window(tpw.window);
+}
+
+
+static void test_time_window()
+{
+    const ptmp::data::data_time_t tspan = 300, toff=53;
+
+    time_window_t tw(tspan, toff);
+    assert(tw.wind == 0);
+    assert(toff == tw.tbegin());
+    assert(tw.in(toff));
+    zsys_debug("cmp: %d" , tw.cmp(tspan+toff-1));
+    assert(tw.in(tspan+toff-1));
+    assert(!tw.in(toff-1));
+    assert(!tw.in(tspan+toff));
+    dump_window(tw);
+
+    tw.set_bytime(tspan + toff + 1);
+    //zsys_debug("wind: %ld", tw.wind);
+    assert(tw.wind == 1L);
+    assert(tw.tbegin() == tspan + toff);
+    tw.wind = 1000;
+    assert(tw.tbegin() == 1000*tspan + toff);
+    dump_window(tw);
 }
 
 void ptmp::TPWindow::test()
