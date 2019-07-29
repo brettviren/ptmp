@@ -26,7 +26,7 @@ pdsp_params {
     addresses : {
         tps: [[null]] + [
             ["tcp://127.0.0.1:%d" % (7000+100*apa+link) for link in std.range(0,9)]
-                       for apa in std.range(1,6)],
+                         for apa in std.range(1,6)],
         
         tc: ["tcp://127.0.0.1:%d" %(7700 + apa) for apa in std.range(1,6)],
         td: "tcp://127.0.0.1:7999",

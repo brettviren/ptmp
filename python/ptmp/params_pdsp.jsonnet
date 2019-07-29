@@ -30,7 +30,7 @@
     // The PUB/SUB socket addresses, indexed by APA installation number (0 is undefined)
     addresses : {
         tps: [
-            [null],
+            [null],             // index by APA number.  There is no APA 0
             // these are invented
             ["tcp://10.73.136.61:%d" % (15100+ind) for ind in std.range(1,10)], // apa1
             ["tcp://10.73.136.62:%d" % (15110+ind) for ind in std.range(1,10)], // apa2
@@ -42,7 +42,7 @@
             ["tcp://10.73.136.60:%d" % (15150+ind) for ind in std.range(1,10)], // apa6
         ],
         tc: [
-            null,
+            null,           // index by APA number.  There is no APA 0
             // fixme: these are all invented
             "tcp://10.73.136.51:7771", // apa1:
             "tcp://10.73.136.52:7772", // apa2:
