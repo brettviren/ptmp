@@ -125,8 +125,9 @@ int main(int argc, char** argv)
                 double n = s.n;
                 double mean = s.t/n;
                 double rms = sqrt(s.t2/n - mean*mean);
+                double maxt = s.maxt;
                 zsys_debug("\t%d: n: %.0f avg: %.3f +/- %.4f ms, max: %.3f ms",
-                           sit.first, n, mean/1000, rms/1000, s.maxt/1000);
+                           sit.first, n, mean/1000, rms/1000, maxt/1000);
             }
         });
 
