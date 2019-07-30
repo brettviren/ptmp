@@ -1,37 +1,68 @@
 #+title: TPWindow
 
-TPWindow is a PTMP "proxy" or "actor" class that applies time windows on a stream of ~TrigPrim~ objects provided by an input stream of ~TPSet~ message and produced on an output stream of the same.
+~TPWindow~ is a PTMP "proxy" or "actor" class that applies time windows
+on a stream of ~TrigPrim~ objects as provided by an input stream of
+~TPSet~ message and outputs ~TPSet~ message, each spanning the fixed
+window time.
 
 * TPWindow times
 
-TPWindow has two configurable *time durations* over which ~TrigPrim~ objects are:
+~TPWindow~ operates solely using the /data time/ of its input.  It does
+not perform any operation based on any real time.  There are two data
+time durations that govern the algorithm:
 
- - window :: chunked on output
- - buffer :: held before chunked
+ - window :: data time spanned by an output ~TPSet~
+ - buffer :: data beyond the current window which must be observed before the corresponding ~TPSet~ is ouput.
 
-Both *window* and *buffer* time durations are measured in units of the 64
-bit hardware clock (50 MHz clock at PDSP).  These durations are
-compared against the ~tstart~ value of the ~TrigPrim~ objects.
+Both **window** and **buffer** time periods are measured in units of the
+64 bit hardware clock (50 MHz clock at PDSP).  They are used in
+comparison only to the ~tstart~ value of the ~TrigPrim~ objects.  That is,
+the ~tspan~ of a ~TrigPrim~ is not considered.
 
 * Pipeline
 
 ~TPWindow~ implements the following ~TrigPrim~ pipeline:
 
-1. An input ~TPSet~ has its ~TrigPrim~ objects placed in a *priority queue*.
-2. The queue is sorted by ~TrigPrim.tstart~ value.
-3. The "front" element in the queue exits only when its ~tstart~ is less than the "back" element's ~tstart~ by at least the *buffer time duration*.
-4. Once out of the queue, a ~TrigPrim~ is placed in an output ~TPSet~.
-5. Once the output ~TPSet~ contains all available ~TrigPrim~ objects with their ~tstart~ in a fixed *window time duration* it is sent to the output socket.
-6. Any input ~TrigPrim~ with a ~tstart~ falling in a window that has already been sent is dropped.
+1. All time is discretely partitioned modulo the window duration (~tspan~) with optional offset (~toff~).
+
+2. The current window is identified by an absolute index into the partitions with the convention that window with index zero begins at ~toff~.
+
+3. If no ~TrigPrim~ objects are yet buffered, the ~tstart~ of the first initializes the window index.
+
+4. This and subsequent ~TrigPrim~ objects in the just received ~TPSet~ are added to the buffer if they after the start of the current window, else they are discarded as /tardy/.
+
+5. After each input ~TPSet~ is processed, it is discarded and the buffer is examined.
+
+6. While the buffer contains ~TrigPrim~ with ~tstart~ values that spans at least a time period ~tbuf~ past the end of the current window then the earliest ~TrigPrim~ objects with ~tstart~ in the current window are popped from the buffer and sent out as a ~TPSet~.
+
+7. New ~TPSet~ is received and the pipeline loops until termination.
 
 * Windowing
 
-The windowing is performed on the ~TrigPrim.tstart~ value, which again
-holds the hardware clock "data time".  Windowing is applied in an
-*absolute* manner such that the same windowing may be asserted to many
-independent streams and the results will be synchronous.  This is done
-simply by having window boundaries occur on hardware clock times that
-satisify: ~tstart % twindow == toffset~.
+The windowing is performed on the ~TrigPrim.tstart~ value measuring /data
+time/.  It is an absolute partitioning of time so that the same window
+may be formed in unrelated code and the results will be synchronized
+(assuming the hardware clock / /data time/ is synchronized).  Window
+boundaries are at times $t_i = i * t_{span} + t_{off}$ where $i$ is the window index.
+
+* Backwards ~TPSet~ messages and tardy ~TrigPrim~ objects
+
+~TPWindow~ produces output ~TPSet~ messages based purely on the ~tstart~
+time of the constituent ~TrigPrim~ objects.  That is, all ~TrigPrim~
+objects will start inside the window that the output ~TPSet~ spans.  A
+constituent ~TrigPrim~ may end outside the window.  The ~tspan~ of the
+~TPSet~ represents the window and *not* the union-span of the constituent
+~TrigPrim~ objects.  Consumers of the output of ~TPWindow~ must take this
+into consideration.
+
+The input to ~TPWindow~ may be provided by a source which builds
+"backwards" ~TPSet~ messages which hold ~TrigPrim~ objects based on the
+*end* time (~tstart+tspan~).  The buffering of ~TPWindow~ will correctly
+"turn around" these ~TrigPrim~ objects if it is chosen larger than any
+of their ~tspan~ values.  If one of these "backwards" ~TrigPrim~ have a
+~tspan~ value which is larger than the buffer's ~tbuf~ then they *will* be
+dropped as their window will already have been sent out before they
+were seen.  The user must configure ~TPWindow~ with this in mind.
 
 * Configuration
 
@@ -72,3 +103,48 @@ Which displays:
       "tspan": 150000
   }
 #+END_SRC
+
+* Tests
+
+The ~check-tpwindow-dup~ test will torture ~TPWindow~ using a ~TPSet~ dump file (eg as produced by [[czmqat.org][czmqat]]).
+
+#+BEGIN_EXAMPLE
+  $ ./build/test/check-tpwindow-dup \
+       -i tcp://127.0.0.1:5678 \
+       -o tcp://127.0.0.1:5679 \
+       -n 1000000 \
+        FELIX_BR_506.dump
+#+END_EXAMPLE
+
+It will display any ~TrigPrim~ objects either dropped as tardy or held
+as dregs in the buffer at ~TPWindow~ shutdown.  These should show up as
+"missing".  It also provides a measure of the *throughput* and *latency*
+through ~TPWindow~.  Note, these are not reciprocal of each other.
+Example output on an E5-2630 machine:
+
+#+BEGIN_EXAMPLE
+I: 19-07-30 14:07:42 PULL tcp://127.0.0.1:5678 connect
+I: 19-07-30 14:07:42 PUSH tcp://127.0.0.1:5679 bind
+I: 19-07-30 14:07:42 PULL tcp://127.0.0.1:5679 connect
+D: 19-07-30 14:07:42 window: channel 4751 tardy TP at -70 + 675 data time ticks
+D: 19-07-30 14:07:43 window: channel 4778 tardy TP at -20 + 675 data time ticks
+D: 19-07-30 14:08:01 readthread finished after 942801
+D: 19-07-30 14:08:02 sinkthread in 19.575 s received 1727781 TPSets (88.3 kHz) 3753322 TPs (191.7 kHz)
+D: 19-07-30 14:08:02 window: signaling done
+I: 19-07-30 14:08:02 window: got quit after 942801
+D: 19-07-30 14:08:02 window: finishing with 942801 in, 1727781 out and 4 still in the buffer
+D: 19-07-30 14:08:02 window:     channel 4750, tstart 78177664315602205
+D: 19-07-30 14:08:02 window:     channel 4750, tstart 78177664315602630
+D: 19-07-30 14:08:02 window:     channel 4750, tstart 78177664315606080
+D: 19-07-30 14:08:02 window:     channel 4750, tstart 78177664315606455
+D: 19-07-30 14:08:02 window: destroying
+D: 19-07-30 14:08:02 recv - send start time: -0.678 ms
+D: 19-07-30 14:08:02 stats for 94 channels sent, 94 channels recv
+D: 19-07-30 14:08:02 chan 4778 missing TP 78177657303227480
+D: 19-07-30 14:08:02 chan 4750 missing TP 78177664315606080
+D: 19-07-30 14:08:02 chan 4750 missing TP 78177664315602630
+D: 19-07-30 14:08:02 chan 4750 missing TP 78177664315602205
+D: 19-07-30 14:08:02 chan 4750 missing TP 78177664315606455
+D: 19-07-30 14:08:02 chan 4751 missing TP 78177655813547430
+I: 19-07-30 14:08:02 throughput: 191.713 kHz, latency (ms): 3.215 +/- 18.6336 [0.100, 227.372]
+#+END_EXAMPLE
