@@ -26,9 +26,11 @@ argify_list () {
  
 datadir=$1
 if [ -z "$datadir" ] ; then
-    datadir=/data/fast/bviren/ptmp-dumps/2019-07-05
+    context="test"
+    datadir=/data/fast/bviren/ptmp-dumps/2019-07-19
     jargs="$jargs -V context=test"
 else
+    context="extvar"
     apas=()
     infiles=("null")
     for apa in {1..6} ; do
@@ -79,30 +81,45 @@ set +x
 cd $tmpdir
 
 echo 'filesink: ptmper sink-tps.json' > Procfile.tps
+tps_json=("sink-tps.json")
 echo 'filesink: ptmper sink-tcs.json' > Procfile.tcs
+tcs_json=("sink-tcs.json")
 echo 'filesink: ptmper sink-tds.json' > Procfile.tds
-
-echo 'tdfinder: ptmper test-td.json' > Procfile.tds
+echo "tdfinder: ptmper ${context}-td.json" >> Procfile.tds
+tds_json=("sink-tds.json" "${context}-td.json")
 
 for tc in *-tc-apa?.json
 do
     echo "tcfinder: ptmper $tc" >> Procfile.tcs
+    tcs_json+=("$tc")
     echo "tcfinder: ptmper $tc" >> Procfile.tds
+    tds_json+=("$tc")
 done
 
 for fp in fileplay-apa?.json
 do
     echo "fileplay: ptmper $fp" >> Procfile.tps
+    tps_json+=("$fp")
     echo "fileplay: ptmper $fp" >> Procfile.tcs
+    tcs_json+=("$fp")
     echo "fileplay: ptmper $fp" >> Procfile.tds
+    tds_json+=("$fp")
 done
 
 
 cd $tmpdir
 if [ -n "$(which ptmperpy)" ] ; then
-    jq -s '.[0].proxies + .[1].proxies + .[2].proxies + .[3].proxies | {proxies:.}' *.json > graph.json
-    ptmperpy dotify -o graph.dot graph.json 
-    dot -Tpdf -o graph.pdf graph.dot
+    jq -s '.[0].proxies + .[1].proxies + .[2].proxies + .[3].proxies | {proxies:.}' ${tps_json[*]} > tps-graph.json
+    jq -s '.[0].proxies + .[1].proxies + .[2].proxies + .[3].proxies | {proxies:.}' ${tcs_json[*]} > tcs-graph.json
+    jq -s '.[0].proxies + .[1].proxies + .[2].proxies + .[3].proxies | {proxies:.}' ${tds_json[*]} > tds-graph.json
+
+    ptmperpy dotify -o tps-graph.dot tps-graph.json 
+    ptmperpy dotify -o tcs-graph.dot tcs-graph.json 
+    ptmperpy dotify -o tds-graph.dot tds-graph.json 
+
+    dot -Tpdf       -o tps-graph.pdf tps-graph.dot
+    dot -Tpdf       -o tcs-graph.pdf tcs-graph.dot
+    dot -Tpdf       -o tds-graph.pdf tds-graph.dot
 else
     echo "No ptmperpy, no graph.  Install and setup PTMP's python package if you want it"
 fi
