@@ -21,7 +21,7 @@ int main(int argc, char** argv)
 {
     zsys_init();
 
-    CLI::App app{"Print dumped TPSets"};
+    CLI::App app{"Check TPWindow"};
 
     // /nfs/sw/work_dirs/phrodrig/hit-dumps/run8567/FELIX_BR_508.dump
     std::string input_file{""};

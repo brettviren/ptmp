@@ -229,6 +229,10 @@ void ptmp::actor::zipper(zsock_t* pipe, void* vargs)
         name = config["name"];
     }
     ptmp::internals::set_thread_name(name);
+    int verbose = 0;
+    if (config["verbose"].is_number()) {
+        verbose = config["verbose"];
+    }
 
     // - sync time :: Typical network transport latency is 20-50us.
     //     Minimal message processing code incurs <1ms latency.
@@ -309,9 +313,12 @@ void ptmp::actor::zipper(zsock_t* pipe, void* vargs)
 
         std::vector<meta_msg_t> punctual, tardy;
         wait_ms = zq.process(punctual, tardy);
-        // zsys_debug("punctual:%ld, tardy:%ld wait:%d",
-        //            punctual.size(), tardy.size(), wait_ms);
-
+        if (verbose) {
+            if (punctual.size() or tardy.size()) {
+                zsys_debug("punctual:%ld, tardy:%ld wait:%d ms",
+                           punctual.size(), tardy.size(), wait_ms);
+            }
+        }
         // dispatch any tardy messages per policy
         for (auto& mm : tardy) {
             ++tardy_counts[mm.source_index];
