@@ -36,6 +36,11 @@ int main(int argc, char** argv)
     size_t window_size=2500; // 50us in 50MHz-ticks
     app.add_option("-w", window_size, "size of TPWindow window in 50MHz ticks", true);
 
+    std::string input_address = "inproc://input";
+    app.add_option("-i", input_address, "address for input to TPWindow", true);
+    std::string output_address = "inproc://output";
+    app.add_option("-o", output_address, "address for output from TPWindow", true);
+
     CLI11_PARSE(app, argc, argv);
     if (input_file.empty()) {
         zsys_error("usage: [options] <inputfile.dump>");
@@ -45,9 +50,9 @@ int main(int argc, char** argv)
     // zip together the sender threads with a zipper with a huge sync_time
     nlohmann::json window_config;
     window_config["input"]["socket"]["type"]="PULL";
-    window_config["input"]["socket"]["connect"].push_back("inproc://sets");
+    window_config["input"]["socket"]["connect"].push_back(input_address);
     window_config["output"]["socket"]["type"]="PUSH";
-    window_config["output"]["socket"]["bind"].push_back("inproc://windowout");
+    window_config["output"]["socket"]["bind"].push_back(output_address);
     window_config["toffset"]=0;
     window_config["tspan"]=window_size; 
     window_config["tbuf"]=buffer;
@@ -69,9 +74,9 @@ int main(int argc, char** argv)
     // only read after readthread has completed
     tstats_t tstats_send;
 
-    std::thread readthread([&input_file, &tstats_send, nsets](){
+    std::thread readthread([&input_address, &input_file, &tstats_send, nsets](){
             zsock_t* sender=zsock_new(ZMQ_PUSH);
-            zsock_bind(sender, "inproc://sets");
+            zsock_bind(sender, "%s", input_address.c_str());
 
             FILE* fp=fopen(input_file.c_str(), "r");
             zmsg_t* msg=NULL;
@@ -98,12 +103,12 @@ int main(int argc, char** argv)
 
     // only read after sinkthread has completed
     tstats_t tstats_recv;
-    std::thread sinkthread([&tstats_recv](){
+    std::thread sinkthread([&output_address, &tstats_recv](){
             const ptmp::data::real_time_t trecv_beg = ptmp::data::now();
 
             nlohmann::json recv_config;
             recv_config["socket"]["type"]="PULL";
-            recv_config["socket"]["connect"].push_back("inproc://windowout");
+            recv_config["socket"]["connect"].push_back(output_address);
 
             ptmp::TPReceiver receiver(recv_config.dump());
             
