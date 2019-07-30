@@ -172,7 +172,7 @@ void ptmp::actor::monitor(zsock_t* pipe, void* vargs)
 
         ptmp::data::TPSet tpset;
         zmsg_t* msg = zmsg_recv(ti.cap);
-        ptmp::internals::recv(msg, tpset);
+        ptmp::internals::recv(&msg, tpset);
         int64_t now = ptmp::data::now();
         ++nrecv_tot;
         ++ti.nrecv;

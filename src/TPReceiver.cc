@@ -19,7 +19,7 @@ bool ptmp::TPReceiver::operator()(ptmp::data::TPSet& tps, int toms)
     if (!msg) {
         return false;
     }
-    ptmp::internals::recv(msg, tps);
+    ptmp::internals::recv(&msg, tps);
     return true;
 }
 

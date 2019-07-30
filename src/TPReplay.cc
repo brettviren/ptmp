@@ -78,7 +78,7 @@ void ptmp::actor::replay(zsock_t* pipe, void* vargs)
 
         // unpack message to get timing
         ptmp::data::TPSet tpset;
-        ptmp::internals::recv(msg, tpset);
+        ptmp::internals::recv(&msg, tpset);
         const ptmp::data::data_time_t tstart = tpset.tstart();
 
         if (last_created == 0) { // first message

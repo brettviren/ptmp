@@ -8,4 +8,6 @@ if [ -z "$filename" ] ; then
     exit 1
 fi
 echo $filename
-check-tpwindow-dup -n 10000 $filename
+set -x
+check-tpwindow-dup -n 1000000 $filename
+

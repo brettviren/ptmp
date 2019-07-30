@@ -141,7 +141,7 @@ ptmp::internals::Socket::Socket(const std::string& config)
 
 ptmp::internals::Socket::~Socket()
 {
-    std::cerr << "Socket destroy " << zsock_endpoint(m_sock) << std::endl;
+    //std::cerr << "Socket destroy " << zsock_endpoint(m_sock) << std::endl;
     zpoller_destroy(&m_poller);
     zsock_destroy(&m_sock);
 
@@ -158,8 +158,12 @@ zmsg_t* ptmp::internals::Socket::msg(int timeout_msec)
 // frames:
 // [1] a message type ID (only ID 0 currently supported).
 // [2] the payload as serialized TPSet
-
-void ptmp::internals::recv(zmsg_t* &msg, ptmp::data::TPSet& tps)
+void ptmp::internals::recv(zmsg_t** msg, ptmp::data::TPSet& tps)
+{
+    recv(*msg, tps);
+    zmsg_destroy(msg);
+}
+void ptmp::internals::recv(zmsg_t* msg, ptmp::data::TPSet& tps)
 {
     zframe_t* fid = zmsg_first(msg);
     if (!fid) {
@@ -178,8 +182,6 @@ void ptmp::internals::recv(zmsg_t* &msg, ptmp::data::TPSet& tps)
         zsys_error("failed to parse TPSet");
         throw std::runtime_error("failed to parse TPSet");
     }
-
-    zmsg_destroy(&msg);
 }
 
 void ptmp::internals::send(zsock_t* sock, const ptmp::data::TPSet& tps)

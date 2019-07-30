@@ -111,6 +111,11 @@ void ptmp::actor::window(zsock_t* pipe, void* vargs)
     }
     ptmp::internals::set_thread_name(name);
 
+    int verbose=0;              // fixme, add log level support in internals.
+    if (config["verbose"].is_number()) {
+        verbose = config["verbose"];
+    }
+
     int detid = -1;
     if (config["detid"].is_number()) {
         detid = config["detid"];
@@ -173,27 +178,37 @@ void ptmp::actor::window(zsock_t* pipe, void* vargs)
         }
         ++count_in;
 
-        ptmp::data::TPSet tpset;
-        ptmp::internals::recv(msg, tpset); // throws
-
-        if (detid < 0) {        // forward if user doesn't provide
-            detid = tpset.detid();
-        }            
-
-        // first time through, buffer takes precedence and sets window.
-        if (window.wind == 0) { 
-            for (const auto& tp : tpset.tps()) {
-                buffer.add(tp);
+        {                       // input handling
+            ptmp::data::TPSet tpset;
+            ptmp::internals::recv(&msg, tpset); // throws
+            if (tpset.tps_size() == 0) {
+                zsys_error("receive empty TPSet from det #0x%x", tpset.detid());
+                continue;
             }
-            window.set_bytime(buffer.top().tstart());
-        }
-        else {
-            for (const auto& tp : tpset.tps()) {
-                if (window.cmp(tp.tstart()) < 0) {
-                    // tardy
-                    continue;
+
+            if (detid < 0) {        // forward if user doesn't provide
+                detid = tpset.detid();
+            }            
+
+            // If we don't know when wer are, buffer takes precedence and sets window.
+            if (window.wind == 0) { 
+                for (const auto& tp : tpset.tps()) {
+                    buffer.add(tp);
                 }
-                buffer.add(tp);
+                window.set_bytime(buffer.top().tstart());
+            }
+            else {
+                for (const auto& tp : tpset.tps()) {
+                    if (window.cmp(tp.tstart()) < 0) {
+                        if (verbose) {
+                            zsys_debug("window: channel %d tardy TP at -%ld + %ld data time ticks",
+                                       tp.channel(), window.tbegin()-tp.tstart(), tp.tspan());
+                        }
+                        // tardy
+                        continue;
+                    }
+                    buffer.add(tp);
+                }
             }
         }
 
@@ -228,13 +243,19 @@ void ptmp::actor::window(zsock_t* pipe, void* vargs)
                 }
                 first = false;
             }
-            window.advance();
+            if (buffer.empty() or tpset.tps_size() == 0) {
+                zsys_error("window: logic error, buffer or tpset empty, should not happen");
+                assert(tpset.tps_size() > 0); // logic error, should not happen
+            }
+            window.set_bytime(buffer.top().tstart());
             
             // send carefully in case we are blocked we still want to be able to get shutdown
             while (! (zsock_events(osock) & ZMQ_POLLOUT)) {
                 if (zsock_events(pipe) & ZMQ_POLLIN) {
                     got_quit = true;
-                    zsys_debug("window: got quit while waiting to output");
+                    if (verbose) {
+                        zsys_debug("window: got quit while waiting to output");
+                    }
                     goto cleanup;
                 }
                 zclock_sleep(1); // ms
@@ -247,8 +268,14 @@ void ptmp::actor::window(zsock_t* pipe, void* vargs)
 
   cleanup:
 
-    zsys_debug("window: finishing with %ld in, %ld out and %ld still in the buffer",
-               count_in, count_out, buffer.size());
+    if (verbose) {
+        zsys_debug("window: finishing with %ld in, %ld out and %ld still in the buffer",
+                   count_in, count_out, buffer.size());
+        while (buffer.size() > 0) {
+            auto tp = buffer.top(); buffer.pop();
+            zsys_debug("window:\t channel %d, tstart %ld", tp.channel(), tp.tstart());
+        }
+    }
     zpoller_destroy(&poller);
     zsock_destroy(&isock);
     zsock_destroy(&osock);
@@ -256,7 +283,9 @@ void ptmp::actor::window(zsock_t* pipe, void* vargs)
     if (got_quit) {
         return;
     }
-    zsys_debug("window: waiting for quit");
+    if (verbose) {
+        zsys_debug("window: waiting for quit");
+    }
     zsock_wait(pipe);
 }
 

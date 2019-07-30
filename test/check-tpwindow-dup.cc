@@ -1,4 +1,5 @@
 #include "ptmp/api.h"
+#include "ptmp/internals.h"
 #include "czmq.h"
 
 #include "json.hpp"
@@ -7,22 +8,6 @@
 
 #include <thread>
 
-// Every message data is assumed to be prefixed by a 64 bit unsigned
-// int holding the size of the message data in bytes.
-zmsg_t* read_msg(FILE* fp)
-{
-    size_t size=0;
-    int nread = fread(&size, sizeof(size_t), 1, fp);
-    if (nread != 1) {
-        return NULL;
-    }
-    zchunk_t* chunk = zchunk_read(fp, size);
-    zframe_t* frame = zchunk_pack(chunk);
-    zchunk_destroy(&chunk);
-    zmsg_t* msg = zmsg_decode(frame);
-    zframe_destroy(&frame);
-    return msg;
-}
 
 void print_tpset(ptmp::data::TPSet& tpset)
 {
@@ -66,18 +51,44 @@ int main(int argc, char** argv)
     window_config["toffset"]=0;
     window_config["tspan"]=window_size; 
     window_config["tbuf"]=buffer;
+    window_config["verbose"] = 1;
 
-    ptmp::TPWindow window(window_config.dump());
+
+    ptmp::data::real_time_t proc_start = ptmp::data::now();
+
+    // make on heap so we can destroy at will
+    ptmp::TPWindow* window = new ptmp::TPWindow(window_config.dump());
     
-    std::thread readthread([&input_file, nsets](){
+    // crazy data structure to hold map of channel to map of data to
+    // real time at sending.  This could get rather big depending on
+    // how long this test runs.
+    typedef std::unordered_map<int,
+                               std::unordered_map<ptmp::data::data_time_t,
+                                                  ptmp::data::real_time_t> > tstats_t;
+
+    // only read after readthread has completed
+    tstats_t tstats_send;
+
+    std::thread readthread([&input_file, &tstats_send, nsets](){
             zsock_t* sender=zsock_new(ZMQ_PUSH);
             zsock_bind(sender, "inproc://sets");
 
             FILE* fp=fopen(input_file.c_str(), "r");
             zmsg_t* msg=NULL;
             int counter=0;
-            while((msg = read_msg(fp))){
-                zsock_send(sender, "m", msg);
+            while((msg = ptmp::internals::read(fp))){
+                ptmp::data::real_time_t now = ptmp::data::now();
+                ptmp::data::TPSet tpset;
+                ptmp::internals::recv(&msg, tpset);
+                if (tpset.tps_size() == 0) {
+                    zsys_error("read empty TPSet after %d", counter);
+                    assert(tpset.tps_size() > 0);
+                }
+                tpset.set_created(now); // just for the hell of it
+                for (auto& tp : tpset.tps()) {
+                    tstats_send[tp.channel()][tp.tstart()] = now;
+                }
+                ptmp::internals::send(sender, tpset);
                 ++counter;
                 if(nsets>0 && counter>nsets) break;
             }
@@ -85,9 +96,10 @@ int main(int argc, char** argv)
             zsock_destroy(&sender);
         });
 
-    std::thread sinkthread([](){
-            struct stat { ptmp::data::real_time_t maxt{0}, t2{0}, t{0}, n{0}; };
-            std::unordered_map<int, stat> stats;
+    // only read after sinkthread has completed
+    tstats_t tstats_recv;
+    std::thread sinkthread([&tstats_recv](){
+            const ptmp::data::real_time_t trecv_beg = ptmp::data::now();
 
             nlohmann::json recv_config;
             recv_config["socket"]["type"]="PULL";
@@ -95,17 +107,23 @@ int main(int argc, char** argv)
 
             ptmp::TPReceiver receiver(recv_config.dump());
             
-            uint64_t prev_tstart=0;
+            uint64_t prev_tstart=0, ntps_total = 0;
             size_t counter=0;
             int nprinted=0;
             ptmp::data::TPSet tpset, prev_tpset;
             while(receiver(tpset, 1000)){
                 int detid = tpset.detid();
-                ptmp::data::real_time_t dt = ptmp::data::now() - tpset.created();
-                stats[detid].maxt = std::max(stats[detid].maxt, dt);
-                stats[detid].n += 1;
-                stats[detid].t += dt;
-                stats[detid].t2 += dt*dt;                
+                auto ntps = tpset.tps_size();
+                if (ntps == 0) {
+                    zsys_error("received TPSet det:%d after %d", detid, counter);
+                    assert(ntps > 0);
+                    continue;
+                }
+                ntps_total += ntps;
+                ptmp::data::real_time_t now = ptmp::data::now();
+                for (auto& tp : tpset.tps()) {
+                    tstats_recv[tp.channel()][tp.tstart()] = now;
+                }
 
                 if(nprinted<100 && tpset.tstart()==prev_tpset.tstart()){
                     zsys_debug("Duplicate tstart:");
@@ -115,22 +133,74 @@ int main(int argc, char** argv)
                     print_tpset(tpset);
                     ++nprinted;
                 }
+                assert (tpset.tstart() > prev_tpset.tstart());
                 prev_tpset=tpset;
                 ++counter;
             }
-            zsys_debug("sinkthread finished after %ld", counter);
-            zsys_debug("latency through window");
-            for (auto sit : stats) {
-                auto& s = sit.second;
-                double n = s.n;
-                double mean = s.t/n;
-                double rms = sqrt(s.t2/n - mean*mean);
-                double maxt = s.maxt;
-                zsys_debug("\t%d: n: %.0f avg: %.3f +/- %.4f ms, max: %.3f ms",
-                           sit.first, n, mean/1000, rms/1000, maxt/1000);
-            }
+            const ptmp::data::real_time_t trecv_dt = ptmp::data::now() - trecv_beg;
+            const double trecv_dt_ms = trecv_dt / 1000.0;
+            zsys_debug("sinkthread in %.3f s received %ld TPSets (%.1f kHz) %ld TPs (%.1f kHz)",
+                       trecv_dt_ms/1000.0, counter, counter/trecv_dt_ms, ntps_total, ntps_total/trecv_dt_ms);
+            // fixme add similar chirp at send end.......
         });
 
     readthread.join();
     sinkthread.join();
+    delete window; window=nullptr;
+
+    { // for throughput 
+        double proc_time_ms = (ptmp::data::now() - proc_start) / 1000.0;
+        assert(proc_time_ms > 0);
+
+        double n=0, t_ms=0, t2_ms=0, mint_ms=-1, maxt_ms=-1;
+        zsys_debug("stats for %ld channels sent, %ld channels recv",
+                   tstats_send.size(), tstats_recv.size());
+        assert(tstats_recv.size() > 0);
+        assert(tstats_send.size() > 0);
+        for (auto& tss : tstats_send) {
+            int chan = tss.first;
+            auto& ts = tss.second;
+            auto& tr = tstats_recv[chan];
+            assert (ts.size() > 0);
+            assert (tr.size() > 0);
+
+            for (auto& stt : ts) {
+                auto send_time = stt.second;
+                if (send_time == 0) {
+                    zsys_debug("chan %d recv TP that wasn't sent", chan);
+                }
+                assert (send_time > 0);
+                    
+                auto recv_time = tr[stt.first];
+                if (recv_time == 0) {
+                    zsys_debug("chan %d missing TP %ld", chan, stt.first);
+                    continue;
+                }
+
+                double dt_ms = (recv_time - send_time)/1000.0;
+                if (dt_ms < 0 ) {
+                    zsys_debug("chan %d violates causality: dt_ms = %f ms", chan, dt_ms);
+                }
+                assert(dt_ms >= 0);
+
+                if (mint_ms <0 ) {
+                    mint_ms = maxt_ms = dt_ms;
+                }
+                else {
+                    mint_ms = std::min(mint_ms, dt_ms);
+                    maxt_ms = std::max(maxt_ms, dt_ms);
+                }
+                n += 1;
+                t_ms += dt_ms;
+                t2_ms += dt_ms*dt_ms;
+            }
+        }
+        double mean_ms = t_ms/n;
+        double rms_ms = sqrt(t2_ms/n - mean_ms*mean_ms);
+
+        zsys_info("throughput: %.3f kHz, latency (ms): %.3f +/- %.4f [%.3f, %.3f]",
+                  n/proc_time_ms,
+                  mean_ms, rms_ms, mint_ms, maxt_ms);
+    }
+    return 0;
 }

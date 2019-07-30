@@ -81,7 +81,7 @@ int main(int argc, char* argv[])
         }
 
         ptmp::data::TPSet tps;
-        ptmp::internals::recv(msg, tps); // throws
+        ptmp::internals::recv(&msg, tps); // throws
         int64_t latency = zclock_usecs() - tps.created();
 
         ptmp::data::dump(tps,"");

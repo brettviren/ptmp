@@ -15,7 +15,10 @@ namespace ptmp {
         zsock_t* endpoint(const std::string& config);
         std::vector<zsock_t*> perendpoint(const std::string& config);
 
-        void recv(zmsg_t* &msg, ptmp::data::TPSet& tps);
+        // Receive contents of a message by setting the TPSet.  Destroys the message.
+        void recv(zmsg_t** msg, ptmp::data::TPSet& tps);
+        // as above but does not destroy.
+        void recv(zmsg_t* msg, ptmp::data::TPSet& tps);
         void send(zsock_t* sock, const ptmp::data::TPSet& tps);
 
         void microsleep(ptmp::data::real_time_t microseconds);
