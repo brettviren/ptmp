@@ -10,4 +10,4 @@ fi
 echo $filename
 set -x
 check-tpwindow-dup -i tcp://127.0.0.1:5678 -o tcp://127.0.0.1:5679 -n 1000000 $filename
-
+#check-tpwindow-dup -n 1000000 $filename
