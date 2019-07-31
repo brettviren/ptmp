@@ -5,8 +5,6 @@
 
 #include <cstdio>
 
-#include <iostream>
-
 #include "json.hpp"
 
 PTMP_AGENT(ptmp::TPCat, czmqat)
@@ -16,8 +14,6 @@ using json = nlohmann::json;
 void ptmp::actor::cat(zsock_t* pipe, void* vargs)
 {
     auto config = json::parse((const char*) vargs);
-
-    // std::cerr << config.dump(4) << std::endl;
 
     std::string name = "czmqat";
     if (config["name"].is_string()) {
@@ -46,8 +42,8 @@ void ptmp::actor::cat(zsock_t* pipe, void* vargs)
     if (!config["output"].is_null()) {
         std::string cfg = config["output"].dump();
         osock = ptmp::internals::endpoint(cfg);
-        if (isock) {
-            zsys_info("czmqat: isock: %s", cfg.c_str());
+        if (osock) {
+            zsys_info("czmqat: osock: %s", cfg.c_str());
         }
     }
     FILE* ifp = NULL;

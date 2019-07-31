@@ -253,6 +253,15 @@ namespace ptmp {
 
     };
 
+    class TPStats : public TPAgent {
+    public:
+        TPStats(const std::string& config);
+        virtual ~TPStats();
+
+    private:
+        zactor_t* m_actor;
+    };
+
     /** Compose a number of other TPAgents.  See also the ptmper command line program */
     class TPComposer : public TPAgent {
     public:
