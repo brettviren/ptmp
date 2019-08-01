@@ -68,6 +68,10 @@
     czmqat(name, isocket=null, osocket=null, cfg={ifile:null, ofile:null, number:-1, delayus:-1})
     :: $.nodeconfig('czmqat', name, isocket, osocket, cfg),
 
+    // Create a configuration for TPStats
+    stats(name, isocket=null, osocket=null, cfg={integration_time:1000, tick_per_us:50, tick_per_off:0})
+    :: $.nodeconfig('stats', name, isocket, osocket, cfg),
+
     // Create a configuration for TPMonitor.  It doesn't quite fit the nodeconfig() pattern
     monitorz(name, filename=null, taps=[], tap_attach="pushpull", cfg={}) :: {
         name: name,

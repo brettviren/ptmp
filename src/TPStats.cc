@@ -7,10 +7,11 @@ PTMP_AGENT(ptmp::TPStats, stats)
 
 using json = nlohmann::json;
 
-const int message_type = 0x4a534f4e;
+// fixme: internalize this
+const int json_message_type = 0x4a534f4e; // 1246973774 in decimal
 
 struct stream_stats_t {
-    int ntpsets{0}, ntps{0};
+    uint32_t ntpsets{0}, ntps{0};
     uint32_t total_adcsum{0}, total_adcpeak{0};
     uint64_t tstart{0}, tstart_span{0}, total_tp_tspan{0};
     int64_t tcreated{0}, tcreated_span{0};
@@ -20,6 +21,28 @@ struct stream_stats_t {
     // sum of (trecieved-tstart)^2, (tcreated-tstart)^2.
     int64_t dtr_sum2{0}, dtc_sum2{0};           
 };
+static
+void to_json(json& j, const stream_stats_t& ss)
+{
+    j = json{
+        {"ntpsets", ss.ntpsets},
+        {"ntps", ss.ntps},
+        {"total_adcsum", ss.total_adcsum},
+        {"total_adcpeak", ss.total_adcpeak},
+        {"tstart", ss.tstart},
+        {"tstart_span", ss.tstart_span},
+        {"total_tp_tspan", ss.total_tp_tspan},
+        {"tcreated", ss.tcreated},
+        {"tcreated_span", ss.tcreated_span},
+        {"treceived", ss.treceived},
+        {"treceived_span", ss.treceived_span},
+        {"dtr_sum", ss.dtr_sum},
+        {"dtc_sum", ss.dtc_sum},
+        {"dtr_sum2", ss.dtr_sum2},
+        {"dtc_sum2", ss.dtc_sum2}
+    };
+
+}
 
 struct app_data_t {
     zsock_t* isock{NULL}, *osock{NULL};
@@ -45,6 +68,11 @@ struct app_data_t {
 
         int64_t dtr = trecv - tstart;
         int64_t dtc = tcreat - tstart;
+
+        // zsys_debug("0x%x ntpsets: %ld, tstart: %ld, tstart_span: %ld, dtr:%ld, dct:%ld",
+        //            tpset.detid(),
+        //            s.ntpsets, s.tstart, s.tstart_span, dtr, dtc);
+
         s.dtr_sum += dtr;
         s.dtc_sum += dtc;
         s.dtr_sum2 += dtr*dtr;
@@ -64,8 +92,8 @@ struct app_data_t {
 static
 int handle_pipe(zloop_t* loop, zsock_t* sock, void* varg)
 {
-    app_data_t* ad = (app_data_t*)varg;
-
+    //app_data_t* ad = (app_data_t*)varg;
+    // message on pipe means "shutdown"
     return -1;
 }
 
@@ -84,13 +112,30 @@ int handle_input(zloop_t* loop, zsock_t* sock, void* varg)
 static
 int handle_timer(zloop_t* loop, int timer_id, void* varg)
 {
+    // when we are in here, input is piling up!  be brief.
+
     app_data_t* ad = (app_data_t*)varg;
 
-    // todo:
-    // 1. convert to JSON
-    // 2. send output
-    // 3. clear data
+    json jdat;
+    for (const auto& sit : ad->stats) {
+        const stream_stats_t ss = sit.second;
+        json jss = ss; // magic
+        jss["seqno"]=ad->sequence;
 
+        int detid = sit.first;
+        char sdetid[32];
+        snprintf(sdetid, 32, "0x%x", detid);
+
+        //zsys_debug("%s: %d", sdetid, jss["ntpsets"].get<int>());
+
+        jdat[sdetid] = jss;
+    }
+    std::string sdat = jdat.dump();
+    // zsys_debug("%s", sdat.c_str());
+
+    zsock_send(ad->osock, "is", json_message_type, sdat.c_str());
+    ad->stats.clear();
+    ++ ad->sequence;
     return 0;
 }
 
@@ -120,6 +165,9 @@ void stats(zsock_t* pipe, void* vargs)
     if (config["tick_off_us"].is_number()) {
         tick_off_us = config["tick_off_us"];
     }
+    zsys_debug("stats: every %d ms, tick/us: %d, tick offset: %d",
+               integration_ms, tick_per_us, tick_off_us);
+
     zsock_t* isock = NULL;
     if (!config["input"].is_null()) {
         std::string cfg = config["input"].dump();

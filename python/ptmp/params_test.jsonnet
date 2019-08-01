@@ -4,6 +4,13 @@ local pdsp_params = import "params_pdsp.jsonnet";
 
 pdsp_params {
 
+    cfg: super.cfg {
+        // force replayed tpsets to get recent past tstarts based on
+        // current real time.  Note, this will almost certainly mess
+        // up inter-message sync based on this tstart!
+        rewrite_tstart: 1,
+    },
+
     apas: [5],
 
     // For fileplay, need to provide some files.  This default is for
@@ -30,5 +37,6 @@ pdsp_params {
         
         tc: ["tcp://127.0.0.1:%d" %(7700 + apa) for apa in std.range(1,6)],
         td: "tcp://127.0.0.1:7999",
+        stats: ["tcp://127.0.0.1:%d" %(6660 + apa) for apa in std.range(0,6)],
     }
 }

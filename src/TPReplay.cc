@@ -37,10 +37,22 @@ void ptmp::actor::replay(zsock_t* pipe, void* vargs)
     if (config["speed"].is_number()) {
         speed = config["speed"];
     }
+    // if nonzore then rewrite the output message sequence number with our own
     int rewrite_count = 0;
     if (config["rewrite_count"].is_number()) {
         rewrite_count = config["rewrite_count"];
     }
+    // if nonzero, rewrite the tstart value to be
+    // (created-rewrite_start)*speed so that it looks like there is a
+    // fixed latency of rewrite_start us between hardware data time
+    // and message send real time.  If the default value of zero is
+    // given then leave tstart as is from input.  A negative value
+    // will violate causality.
+    int rewrite_tstart = 0;
+    if (config["rewrite_tstart"].is_number()) {
+        rewrite_tstart = config["rewrite_tstart"];
+    }
+    
 
     zsock_signal(pipe, 0);      // signal ready
 
@@ -89,6 +101,9 @@ void ptmp::actor::replay(zsock_t* pipe, void* vargs)
             if (rewrite_count) {
                 tpset.set_count(count);
             }
+            if (rewrite_tstart != 0) {
+                tpset.set_tstart((tpset.created() - rewrite_tstart)*speed);
+            }
 
             // fixme: kludge to avoid output block stopping shutdown
             while (! (zsock_events(osock) & ZMQ_POLLOUT)) {
@@ -124,6 +139,9 @@ void ptmp::actor::replay(zsock_t* pipe, void* vargs)
             tpset.set_created(ptmp::data::now());
             if (rewrite_count) {
                 tpset.set_count(count);
+            }
+            if (rewrite_tstart != 0) {
+                tpset.set_tstart((tpset.created() - rewrite_tstart)*speed);
             }
 
             // fixme: kludge to avoid output block stopping shutdown
