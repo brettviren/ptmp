@@ -38,5 +38,7 @@ pdsp_params {
         tc: ["tcp://127.0.0.1:%d" %(7700 + apa) for apa in std.range(1,6)],
         td: "tcp://127.0.0.1:7999",
         stats: ["tcp://127.0.0.1:%d" %(6660 + apa) for apa in std.range(0,6)],
+        // really it's "carbon" that receives the data.
+        graphite: "tcp://127.0.0.1:2003",
     }
 }

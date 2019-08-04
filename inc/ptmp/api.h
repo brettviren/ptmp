@@ -247,27 +247,36 @@ namespace ptmp {
     public:
         TPMonitorz(const std::string& config);
         virtual ~TPMonitorz();
-
     private:
         zactor_t* m_actor;
 
     };
 
+    // Collect integrated statistics on TPSets and periodically emit
+    // them as a JSON message type.
     class TPStats : public TPAgent {
     public:
         TPStats(const std::string& config);
         virtual ~TPStats();
-
     private:
         zactor_t* m_actor;
     };
 
-    /** Compose a number of other TPAgents.  See also the ptmper command line program */
+    // Adapt TPStats messages to Graphite protocol
+    class TPStatsGraphite : public TPAgent {
+    public:
+        TPStatsGraphite(const std::string& config);
+        virtual ~TPStatsGraphite();
+    private:
+        zactor_t* m_actor;
+    };
+
+    /** Compose a number of other TPAgents.  See also the ptmper
+     * command line program */
     class TPComposer : public TPAgent {
     public:
         TPComposer(const std::string& config);
         virtual ~TPComposer();
-
     private:
         zactor_t* m_actor;
 

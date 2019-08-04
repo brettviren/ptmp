@@ -14,6 +14,7 @@ local ptmp = import "ptmp.jsonnet";
                              ptmp.socket('bind','pub', params.addresses.stats[apa]))],
     } for apa in params.apas
 } + {
+    // accumulate stats to stdout
     ["%s-czmqat-stdout.json"%context]: {
         name: "stats-cat",
         proxies: [ptmp.czmqat("statscat-apa%d"%apa,
@@ -21,6 +22,17 @@ local ptmp = import "ptmp.jsonnet";
                               cfg={ofile:"/dev/stdout"}
                              )
                   for apa in params.apas],
+    }
+} + {
+    // accumulate stats to graphite
+    ["%s-graphite.json"%context]: {
+        name: "graphite",
+        proxies: [ptmp.graphite("graphite-export",
+                                ptmp.socket('connect','sub',
+                                            [params.addresses.stats[apa]
+                                             for apa in params.apas]),
+                                ptmp.socket('connect','stream',
+                                            params.addresses.graphite))]
     }
         
 }    

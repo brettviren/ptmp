@@ -2,16 +2,23 @@
 
 usage () {
     cat <<EOF
-usage: $BASH_SOURCE [/path/to/dump/files]
+usage: $BASH_SOURCE [/path/to/dump/files [/path/to/outcfgdir/] ]
 EOF
     exit 1
 }
 
-
-tmpdir=$(mktemp -d "/tmp/test-pdsp-XXXXX")
+datadir=$1
+tmpdir=$2
 testdir=$(dirname $(realpath $BASH_SOURCE))
 topdir=$(dirname $testdir)
 jdir=$topdir/python/ptmp
+
+if [ -z "$tmpdir" ] ; then
+    tmpdir="$(mktemp -d "/tmp/test-pdsp-XXXXX")"
+else
+    tmpdir=$(realpath $tmpdir)
+    mkdir -p "$tmpdir"
+fi
 
 jargs="-m $tmpdir"
 
@@ -24,7 +31,6 @@ argify_list () {
     echo "["${list// /,}"]"
 }
  
-datadir=$1
 if [ -z "$datadir" ] ; then
     context="test"
     datadir=/data/fast/bviren/ptmp-dumps/2019-07-19
@@ -67,18 +73,19 @@ if [ -z "$JSONNET" ] ; then
 fi
 
 if [ -z "$LD_LIBRARY_PATH" ] ; then
-    echo "This test requires the ptmp-tcs plugin and LD_LIBRARY_PATH is empty"
-    exit -1
+    echo "notice: the tests run with the generated configuration MAY require the ptmp-tcs plugin and LD_LIBRARY_PATH is currently empty"
 fi
 
 set -x
-for cfg in adjacency filesink fileplay
+for cfg in adjacency filesink fileplay tpstats
 do
     jsonnet $jargs $jdir/$cfg.jsonnet || exit -1
 done
 set +x
 
 cd $tmpdir
+
+echo "monsink: ptmper ${context}-graphite.json" > Procfile.mon
 
 echo 'filesink: ptmper sink-tps.json' > Procfile.tps
 tps_json=("sink-tps.json")
@@ -88,22 +95,33 @@ echo 'filesink: ptmper sink-tds.json' > Procfile.tds
 echo "tdfinder: ptmper ${context}-td.json" >> Procfile.tds
 tds_json=("sink-tds.json" "${context}-td.json")
 
-for tc in *-tc-apa?.json
+for apa in {1..6}
 do
-    echo "tcfinder: ptmper $tc" >> Procfile.tcs
-    tcs_json+=("$tc")
-    echo "tcfinder: ptmper $tc" >> Procfile.tds
-    tds_json+=("$tc")
-done
+    jfile="${context}-tpstats-${apa}.json"
+    if [ -f $jfile ] ; then
+        echo "tpstat${apa}: ptmper $jfile" >> Procfile.mon
+    fi
 
-for fp in fileplay-apa?.json
-do
-    echo "fileplay: ptmper $fp" >> Procfile.tps
-    tps_json+=("$fp")
-    echo "fileplay: ptmper $fp" >> Procfile.tcs
-    tcs_json+=("$fp")
-    echo "fileplay: ptmper $fp" >> Procfile.tds
-    tds_json+=("$fp")
+    tc="${context}-tc-apa${apa}.json"
+    if [ -f "$tc" ] ; then
+        line="tcfinder${apa}: ptmper $tc"
+        echo "$line" >> Procfile.tcs
+        tcs_json+=("$tc")
+        echo "$line" >> Procfile.tds
+        tds_json+=("$tc")
+    fi
+
+    fp="fileplay-apa${apa}.json"
+    if [ -f $fp ] ; then
+        line="fileplay${apa}: ptmper $fp"
+        echo "$line" >> Procfile.mon
+        echo "$line" >> Procfile.tps
+        tps_json+=("$fp")
+        echo "$line" >> Procfile.tcs
+        tcs_json+=("$fp")
+        echo "$line" >> Procfile.tds
+        tds_json+=("$fp")
+    fi
 done
 
 

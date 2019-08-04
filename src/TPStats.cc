@@ -10,45 +10,82 @@ using json = nlohmann::json;
 // fixme: internalize this
 const int json_message_type = 0x4a534f4e; // 1246973774 in decimal
 
-struct stream_stats_t {
+// Accumulate per channel statistics
+struct channel_stats_t {
+    uint32_t ntps{0};
+    uint64_t span{0};           // integral of TP tspans
+    uint64_t adcsum{0};         // integral of TP ADC
+    uint64_t adcpeak{0};        // integral of TP ADC peak values
+};
+
+struct link_stats_t {
     uint32_t ntpsets{0}, ntps{0};
     uint32_t total_adcsum{0}, total_adcpeak{0};
     uint64_t tstart{0}, tstart_span{0}, total_tp_tspan{0};
     int64_t tcreated{0}, tcreated_span{0};
     int64_t treceived{0}, treceived_span{0};
-    // sum of trecieved-tstart, tcreated-tstart.
+    // sum and sum squared used to calculate mean and rms
+    // sum of trecieved-tstart, tcreated-tstart.  
     int64_t dtr_sum{0}, dtc_sum{0};           
     // sum of (trecieved-tstart)^2, (tcreated-tstart)^2.
     int64_t dtr_sum2{0}, dtc_sum2{0};           
+    // min/max time between recieved and created relative to tstart
+    int64_t dtr_min{0}, dtr_max{0}, dtc_min{0}, dtc_max{0};
+    // channel number to channel stats
+    std::unordered_map<int, channel_stats_t> ch_stats;
 };
 static
-void to_json(json& j, const stream_stats_t& ss)
+void to_json(json& j, const link_stats_t& ls)
 {
+    uint64_t adcsum{0}, adcpeak{0};
+    for (const auto& chs : ls.ch_stats) {
+        adcsum += chs.second.adcsum;
+        adcpeak += chs.second.adcpeak;
+    }
+
     j = json{
-        {"ntpsets", ss.ntpsets},
-        {"ntps", ss.ntps},
-        {"total_adcsum", ss.total_adcsum},
-        {"total_adcpeak", ss.total_adcpeak},
-        {"tstart", ss.tstart},
-        {"tstart_span", ss.tstart_span},
-        {"total_tp_tspan", ss.total_tp_tspan},
-        {"tcreated", ss.tcreated},
-        {"tcreated_span", ss.tcreated_span},
-        {"treceived", ss.treceived},
-        {"treceived_span", ss.treceived_span},
-        {"dtr_sum", ss.dtr_sum},
-        {"dtc_sum", ss.dtc_sum},
-        {"dtr_sum2", ss.dtr_sum2},
-        {"dtc_sum2", ss.dtc_sum2}
+        {"ntpsets", ls.ntpsets},
+        {"ntpsperlink", ls.ntps},
+        {"total_adcsum", adcsum},
+        {"total_adcpeak", adcpeak},
+        {"tstart", ls.tstart},
+        {"tstart_span", ls.tstart_span},
+        {"total_tp_tspan", ls.total_tp_tspan},
+        {"tcreated", ls.tcreated},
+        {"tcreated_span", ls.tcreated_span},
+        {"treceived", ls.treceived},
+        {"treceived_span", ls.treceived_span},
+
+        {"dtr_sum", ls.dtr_sum},
+        {"dtc_sum", ls.dtc_sum},
+        {"dtr_sum2",ls.dtr_sum2},
+        {"dtc_sum2",ls.dtc_sum2},
+        {"dtr_min", ls.dtr_min},
+        {"dtc_min", ls.dtc_min},
+        {"dtr_max", ls.dtr_max},
+        {"dtc_max", ls.dtc_max},
     };
 
+    for (const auto& ccs : ls.ch_stats) {
+        const channel_stats_t& ch = ccs.second;
+        json jc{
+            {"ntps", ch.ntps},
+            {"span", ch.span},
+            {"adcsum", ch.adcsum},
+            {"adcpeak", ch.adcpeak}
+        };
+        char chname[32];
+        snprintf(chname, 32, "ch%d", ccs.first);
+        j[chname] = jc;
+    }
 }
 
 struct app_data_t {
     zsock_t* isock{NULL}, *osock{NULL};
     int tick_per_us{0}, tick_off_us{0};
     int sequence{0};
-    std::unordered_map<int, stream_stats_t> stats;
+
+    std::unordered_map<int, link_stats_t> stats;
     
     void add(ptmp::data::TPSet& tpset) {
         auto& s = stats[tpset.detid()];
@@ -77,13 +114,25 @@ struct app_data_t {
         s.dtc_sum += dtc;
         s.dtr_sum2 += dtr*dtr;
         s.dtc_sum2 += dtc*dtc;
-
+        if (s.ntpsets == 0) {
+            s.dtr_min = s.dtr_max = dtr;
+            s.dtc_min = s.dtc_max = dtc;
+        }
+        else {
+            s.dtr_min = std::min(s.dtr_min, dtr);
+            s.dtr_max = std::max(s.dtr_max, dtr);
+            s.dtc_min = std::min(s.dtc_min, dtc);
+            s.dtc_max = std::max(s.dtc_max, dtc);
+        }
         s.ntpsets += 1;
         s.ntps += tpset.tps_size();
         for (auto& tp : tpset.tps()) {
-            s.total_tp_tspan += tp.tspan();
-            s.total_adcsum += tp.adcsum();
-            s.total_adcpeak += tp.adcpeak();
+            const int ch = tp.channel();
+            auto& cs = s.ch_stats[ch];
+            cs.ntps += 1;
+            cs.span += tp.tspan();
+            cs.adcsum += tp.adcsum();
+            cs.adcpeak += tp.adcpeak();
         }
     }
 
@@ -118,21 +167,21 @@ int handle_timer(zloop_t* loop, int timer_id, void* varg)
 
     json jdat;
     for (const auto& sit : ad->stats) {
-        const stream_stats_t ss = sit.second;
-        json jss = ss; // magic
-        jss["seqno"]=ad->sequence;
+        const link_stats_t ls = sit.second;
+        json jls = ls; // magic
+        jls["seqno"]=ad->sequence;
 
         int detid = sit.first;
         char sdetid[32];
         snprintf(sdetid, 32, "0x%x", detid);
 
-        //zsys_debug("%s: %d", sdetid, jss["ntpsets"].get<int>());
 
-        jdat[sdetid] = jss;
+        jdat[sdetid] = jls;
     }
     std::string sdat = jdat.dump();
     // zsys_debug("%s", sdat.c_str());
 
+    // PTMP protocol puts a type as first frame.
     zsock_send(ad->osock, "is", json_message_type, sdat.c_str());
     ad->stats.clear();
     ++ ad->sequence;
