@@ -4,6 +4,14 @@ local pdsp_params = import "params_pdsp.jsonnet";
 
 pdsp_params {
 
+    cfg: super.cfg {
+        rewrite_tstart:1,       // start hardware data time 1us before
+                                // realtime.  This probably breaks
+                                // real TC finders but is useful for
+                                // testing monitoring...
+    },
+
+
     // index by APA number.  There is no APA 0.
     local infiles=std.extVar("infiles"),
 

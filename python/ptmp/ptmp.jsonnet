@@ -53,24 +53,29 @@
         data: cfg + $.maybe_sockets(isocket, osocket),
     },
 
-    replay(name, isocket, osocket, cfg={speed:50.0, rewrite_count:0})
-    :: $.nodeconfig('replay', name, isocket, osocket, cfg),
+    replay(name, isocket, osocket, cfg={})
+    :: $.nodeconfig('replay', name, isocket, osocket,
+                    {speed:50.0, rewrite_count:0, rewrite_tstart:0} + cfg),
 
     // Create a configuration for TPZipper. 
-    zipper(name, isocket, osocket, cfg={sync_time:5000/0.02, tardy_policy:"drop"})
-    :: $.nodeconfig('zipper', name, isocket, osocket, cfg),
+    zipper(name, isocket, osocket, cfg={})
+    :: $.nodeconfig('zipper', name, isocket, osocket,
+                    {sync_time:5000/0.02, tardy_policy:"drop"} + cfg),
 
     // Create a configuration for TPWindow
-    window(name, isocket, osocket, cfg={tspan:50/0.02, tbuf:5000/0.02, detid:-1, toffset:0})
-    :: $.nodeconfig('window', name, isocket, osocket, cfg),
+    window(name, isocket, osocket, cfg={})
+    :: $.nodeconfig('window', name, isocket, osocket,
+                    {tspan:50/0.02, tbuf:5000/0.02, detid:-1, toffset:0} + cfg),
 
     // Create a configuration for TPCat
-    czmqat(name, isocket=null, osocket=null, cfg={ifile:null, ofile:null, number:-1, delayus:-1})
-    :: $.nodeconfig('czmqat', name, isocket, osocket, cfg),
+    czmqat(name, isocket=null, osocket=null, cfg={})
+    :: $.nodeconfig('czmqat', name, isocket, osocket,
+                    {ifile:null, ofile:null, number:-1, delayus:-1} + cfg),
 
     // Create a configuration for TPStats
-    stats(name, isocket=null, osocket=null, cfg={integration_time:1000, tick_per_us:50, tick_per_off:0})
-    :: $.nodeconfig('stats', name, isocket, osocket, cfg),
+    stats(name, isocket=null, osocket=null, cfg={})
+    :: $.nodeconfig('stats', name, isocket, osocket,
+                    {integration_time:1000, tick_per_us:50, tick_per_off:0}+cfg),
 
     // stats->graphite adapter
     graphite(name, isocket=null, osocket=null, cfg={})

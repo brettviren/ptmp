@@ -11,7 +11,10 @@ local ptmp = import "ptmp.jsonnet";
         name: "tpstats-apa%d-tcs"%apa,
         proxies: [ptmp.stats("tpstats-apa%d"%apa,
                              ptmp.socket('connect','sub', params.addresses.tps[apa]),
-                             ptmp.socket('bind','pub', params.addresses.stats[apa]))],
+                             ptmp.socket('bind','pub', params.addresses.stats[apa]),
+                             cfg = {integration_time:10000}
+                            )],
+        
     } for apa in params.apas
 } + {
     // accumulate stats to stdout

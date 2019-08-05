@@ -35,8 +35,12 @@ std::string stringify(json& jdat, const std::string& prefix,
         for (auto& el : jdat.items()) {
             json& jval = el.value();
             std::stringstream key;
-            key << prefix << "." << el.key();
+            std::string thiskey = el.key();
+            key << prefix << "." << thiskey;
             ss << stringify(jval, key.str(), now_s);
+            if (thiskey == "ntpsperlink") {
+                std::cout << prefix << "." << thiskey << " = " << jval << std::endl;
+            }
         }
     }
     else if (jdat.is_array()) {
@@ -137,7 +141,6 @@ void stats_graphite(zsock_t* pipe, void* vargs)
         }
         zmsg_addstr(msg, sout.c_str());
         zmsg_send(&msg, osock);
-        zsys_debug("to graphite:\n%s", sout.c_str());
     }
 
   cleanup:

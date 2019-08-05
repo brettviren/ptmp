@@ -19,9 +19,10 @@ struct channel_stats_t {
 };
 
 struct link_stats_t {
-    uint32_t ntpsets{0}, ntps{0};
-    uint32_t total_adcsum{0}, total_adcpeak{0};
-    uint64_t tstart{0}, tstart_span{0}, total_tp_tspan{0};
+
+    uint64_t ntpsets{0}, ntps{0}, nskipped{0}, last_seqno{0};
+    uint64_t total_adcsum{0}, total_adcpeak{0};
+    uint64_t tstart{0}, tstart_span{0};
     int64_t tcreated{0}, tcreated_span{0};
     int64_t treceived{0}, treceived_span{0};
     // sum and sum squared used to calculate mean and rms
@@ -43,58 +44,113 @@ void to_json(json& j, const link_stats_t& ls)
         adcpeak += chs.second.adcpeak;
     }
 
+    const double dtdata = ls.tstart_span*1.0e-6;
+    const double dtrecv = ls.treceived_span*1.0e-6;
+    const double ntpsets = ls.ntpsets;
+    const double ntps = ls.ntps;
+    const double dtr_mean = ls.dtr_sum / ntpsets;
+    const double dtc_mean = ls.dtc_sum / ntpsets;
+    const double dtr_rms = sqrt(ls.dtr_sum2 / ntpsets - dtr_mean*dtr_mean);
+    const double dtc_rms = sqrt(ls.dtc_sum2 / ntpsets - dtc_mean*dtc_mean);
+
     j = json{
         {"ntpsets", ls.ntpsets},
         {"ntpsperlink", ls.ntps},
-        {"total_adcsum", adcsum},
-        {"total_adcpeak", adcpeak},
-        {"tstart", ls.tstart},
-        {"tstart_span", ls.tstart_span},
-        {"total_tp_tspan", ls.total_tp_tspan},
-        {"tcreated", ls.tcreated},
-        {"tcreated_span", ls.tcreated_span},
-        {"treceived", ls.treceived},
-        {"treceived_span", ls.treceived_span},
+        {"ntpskipped", ls.nskipped},
 
-        {"dtr_sum", ls.dtr_sum},
-        {"dtc_sum", ls.dtc_sum},
-        {"dtr_sum2",ls.dtr_sum2},
-        {"dtc_sum2",ls.dtc_sum2},
-        {"dtr_min", ls.dtr_min},
-        {"dtc_min", ls.dtc_min},
-        {"dtr_max", ls.dtr_max},
-        {"dtc_max", ls.dtc_max},
+        {"rates", {
+                {"tprecv", ls.ntps/dtrecv},
+                {"tpsetrecv", ls.ntpsets/dtrecv},
+                {"nseqskip", ls.nskipped/dtrecv}
+            }},
+
+        {"adcsum", {
+                {"total", adcsum},
+                {"rate", adcsum/dtrecv},
+                {"mean", adcsum/ntps}
+            }},
+
+        {"adcpeak", {
+                {"total", adcpeak},
+                {"rate", adcpeak/dtrecv},
+                {"mean", adcpeak/ntps}
+            }},
+
+        // {"time", {
+        //         {"data", {
+        //                 {"start", ls.tstart},
+        //                 {"span", ls.tstart_span}
+        //             }},
+        //         {"sent", {
+        //                 {"start", ls.tcreated},
+        //                 {"span", ls.tcreated_span}
+        //             }},
+        //         {"recv", {
+        //                 {"start", ls.treceived},
+        //                 {"span", ls.treceived_span}
+        //             }}}},
+        {"latency", {
+                {"data", {
+                        {"mean",    dtr_mean},
+                        {"rms",     dtr_rms},
+                        {"min",  ls.dtr_min},
+                        {"max",  ls.dtr_max}
+                    }},
+                {"trans", {
+                        {"mean",   dtc_mean},
+                        {"rms",    dtc_rms},
+                        {"min", ls.dtc_min},
+                        {"max", ls.dtc_max}}}}}
     };
+    assert (j.is_object());
 
+    json jchans = json::object();
     for (const auto& ccs : ls.ch_stats) {
         const channel_stats_t& ch = ccs.second;
+        const double chdtspan_s = ch.span*1e-6;
         json jc{
-            {"ntps", ch.ntps},
-            {"span", ch.span},
-            {"adcsum", ch.adcsum},
-            {"adcpeak", ch.adcpeak}
+            {"integ", {
+                    {"ntps", ch.ntps},
+                    {"span_us", ch.span},
+                    {"adcsum", ch.adcsum},
+                    {"adcpeak", ch.adcpeak}
+                }},
+            {"avg", {
+                    {"ntps", ch.ntps/dtdata}, 
+                    {"occupancy", chdtspan_s/dtdata},
+                    {"adcsum", ch.adcsum/dtdata},
+                    {"adcpeak", ch.adcpeak/dtdata}
+                }},
+            {"inst", {
+                    {"ntps", ch.ntps/chdtspan_s}, 
+                    {"adcsum", ch.adcsum/chdtspan_s},
+                    {"adcpeak", ch.adcpeak/chdtspan_s}
+                }}
         };
         char chname[32];
         snprintf(chname, 32, "ch%d", ccs.first);
-        j[chname] = jc;
+        jchans[chname] = jc;
     }
+    j["channels"] = jchans;
 }
 
 struct app_data_t {
     zsock_t* isock{NULL}, *osock{NULL};
     int tick_per_us{0}, tick_off_us{0};
-    int sequence{0};
+    uint64_t sequence{0};
 
     std::unordered_map<int, link_stats_t> stats;
     
     void add(ptmp::data::TPSet& tpset) {
         auto& s = stats[tpset.detid()];
+        auto seqno = tpset.count();
 
         auto tstart = tpset.tstart()/tick_per_us - tick_off_us;
         auto tcreat = tpset.created();
         auto trecv = ptmp::data::now();
 
         if (s.ntpsets == 0) {
+            s.last_seqno = seqno;
             s.tstart = tstart;
             s.tcreated = tcreat;
             s.treceived = trecv;
@@ -103,8 +159,13 @@ struct app_data_t {
         s.tcreated_span = tcreat - s.tcreated;
         s.treceived_span = trecv - s.treceived;
 
+        if (seqno - s.last_seqno > 1) {
+            ++s.nskipped;
+        }
+        s.last_seqno = seqno;
+
         int64_t dtr = trecv - tstart;
-        int64_t dtc = tcreat - tstart;
+        int64_t dtc = trecv - tcreat;
 
         // zsys_debug("0x%x ntpsets: %ld, tstart: %ld, tstart_span: %ld, dtr:%ld, dct:%ld",
         //            tpset.detid(),
@@ -130,7 +191,7 @@ struct app_data_t {
             const int ch = tp.channel();
             auto& cs = s.ch_stats[ch];
             cs.ntps += 1;
-            cs.span += tp.tspan();
+            cs.span += tp.tspan()/tick_per_us;
             cs.adcsum += tp.adcsum();
             cs.adcpeak += tp.adcpeak();
         }
