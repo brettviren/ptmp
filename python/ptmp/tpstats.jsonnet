@@ -12,7 +12,10 @@ local ptmp = import "ptmp.jsonnet";
         proxies: [ptmp.stats("tpstats-apa%d"%apa,
                              ptmp.socket('connect','sub', params.addresses.tps[apa]),
                              ptmp.socket('bind','pub', params.addresses.stats[apa]),
-                             cfg = {integration_time:10000}
+                             cfg = {topkey:"apa%s"%apa,
+                                    link_integration_time:10000,
+                                    chan_integration_time:0,
+                                   }
                             )],
         
     } for apa in params.apas

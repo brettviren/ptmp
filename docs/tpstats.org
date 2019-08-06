@@ -1,0 +1,53 @@
+#+title: PTMP Stats
+
+The ~TPStats~ actor collects and emits summary statistics derived from
+input ~TPSet~ streams.
+
+* Input
+
+The ~TPStats~ actor may attach to zero (boring) or more sources or ~TPSet~
+messages.  The source may provide TPs, TCs or TDs.
+
+* Output
+
+The output message is of type "JSON".  As such, the schema is not as
+controlled as messages that provide protobuf objects.  The likely
+consumer of ~TPStats~ is ~TPStatsGraphite~ which is schema-independent,
+forwarding on any structure it encounters to Graphite.  Likewise,
+Graphite can adapt as schema changes.
+
+While the detailed schema may change as ~TPStats~ evolves, the general
+structure of the output JSON is structure is
+
+#+begin_example
+ptmp.tpstats.<topkey>.[links|channels].....
+#+end_example
+
+The ~<topkey>~ is set in the ~TPStats~ configuration and can be used to
+identify the aggregation of all sources.  Eg, it may be set to ~apa5~
+for the ~TPSet~ instance that collects from that APA.  Under ~<topkey>~
+are two trees with stats relevant to per-link and per-channel
+information, respectively.  Here, a "link" is identified with a
+~TPSet.detid~ value.
+
+To further understand the data structure, read ~TPStats.cc~ or explore
+the resulting in Graphite via Grafana.
+
+* Test
+
+Use docker to set up Graphite+Grafana
+
+#+begin_example
+  $ cd ptmp-docker/monitoring
+  $ docker-compose up -d
+  $ firefox http://localhost:3000/
+#+end_example
+
+Run some data:
+
+#+begin_example
+  $ ./test/play-pdsp-file.sh /data/fast/bviren/ptmp-dumps/2019-07-19 test-mon
+  $ cd test-mon/
+  $ shoreman Procfile.mon
+#+end_example
+

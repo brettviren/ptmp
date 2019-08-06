@@ -75,7 +75,13 @@
     // Create a configuration for TPStats
     stats(name, isocket=null, osocket=null, cfg={})
     :: $.nodeconfig('stats', name, isocket, osocket,
-                    {integration_time:1000, tick_per_us:50, tick_per_off:0}+cfg),
+                    {link_integration_time:1000,
+                     chan_integration_time:10000,
+                     topkey:"tpsets",
+                     tick_per_us:50, tick_per_off:0
+                    }+cfg),
+
+
 
     // stats->graphite adapter
     graphite(name, isocket=null, osocket=null, cfg={})
