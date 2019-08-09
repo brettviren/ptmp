@@ -75,7 +75,7 @@ w.r.t. these considerations.
 A ~TPStats~ component can be positioned as a peer to another component
 by both components subscribing to the same source of messages.
 
-#+begin_src dot :cmd dot :cmdline -Tsvg :file tpstats-peer.svg
+#+begin_src dot :cmd dot :cmdline -Tsvg :file tpstats-peer.svg :exports results
   digraph peer {
           rankdir=LR
           node[shape=record]
@@ -113,7 +113,7 @@ by *stats*.
 A ~TPTap~ may be used to create an inline "T", the bottom of which a
 ~TPStats~ may attach.
 
-#+begin_src dot :cmd dot :cmdline -Tsvg :file tpstats-inlinet.svg
+#+begin_src dot :cmd dot :cmdline -Tsvg :file tpstats-inlinet.svg :exports results
   digraph inlinet {
           rankdir=LR
           node[shape=record]
@@ -154,7 +154,7 @@ Comments on this pattern
 At the expense of modifying existing code of the *peer* component it may
 gain a socket from which to send ~TPSets~ directly to a ~TPStats~.
 
-#+begin_src dot :cmd dot :cmdline -Tsvg :file tpstats-pushembed.svg
+#+begin_src dot :cmd dot :cmdline -Tsvg :file tpstats-pushembed.svg :exports results
   digraph embed {
           rankdir=LR
           node[shape=record]
