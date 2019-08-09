@@ -1,0 +1,191 @@
+* Questions raised DS WG meeting 2019-09-08
+
+https://indico.fnal.gov/event/21479/
+
+** What is the size of PTMP messages?
+
+The [[../src/ptmp.proto]] file defines the (v1) schema the payload object
+of PTMP messages in terms of protobuffer.  Despite the apparently
+concrete sizes of the individual elements, this is a conceptual
+schema.  The protobuf actually implements a [[https://developers.google.com/protocol-buffers/docs/encoding#varints]["varint encoding"]]
+compression mechanism where "small" numbers do not require the entire
+size implied by the number type.  For example a ~uint32~ holding the
+value ~5~ will not require 4 bytes.
+
+The number of messages in and the sizes of a sample of PTMP v1 message
+dump files for each link of APAs 5 and 6 taken 2019-07-19.
+
+| Link | messages |      bytes | bytes / messages |
+|------+----------+------------+------------------|
+|  501 |  1196733 |  479017537 |        400.27102 |
+|  502 |    54527 |    6310664 |        115.73466 |
+|  503 |  1174667 |  556293531 |        473.57552 |
+|  504 |    51021 |    6155441 |        120.64524 |
+|  505 |  2191539 | 1065234432 |        486.06684 |
+|  506 |   942802 |  115235165 |        122.22626 |
+|  507 |  1150309 |  546483773 |        475.07563 |
+|  508 |    49187 |    5964187 |        121.25535 |
+|  509 |  1185952 |  538370756 |        453.95662 |
+|  510 |        0 |          0 |              0/0 |
+|  601 |  2455153 | 1123348480 |        457.54724 |
+|  602 |    58314 |    6420209 |        110.09722 |
+|  603 |  1119616 |  526407081 |        470.16752 |
+|  604 |    53268 |    6145829 |        115.37563 |
+|  605 |  1155440 |  527772282 |        456.77169 |
+|  606 |    47927 |    5743637 |        119.84136 |
+|  607 |  1125736 |  554656533 |        492.70569 |
+|  608 |   700963 |  108459838 |        154.72976 |
+|  609 |  1128242 |  528213428 |        468.17387 |
+|  610 |    54511 |    6169425 |        113.17762 |
+#+TBLFM: $4=$3/$2
+
+** What is the semantic meaning of ~TPSet.tstart~ and ~TPSet.tspan~ and etc for ~TrigPrim~?
+
+Strictly speaking, any number can be put in these quantities as
+wished.  The PTMP algorithms (eg, ~TPWindow~ and ~TPZipper~) make these
+assumptions:
+
+- ~TPSet.tstart~ and ~TPSet.tspan~ mark the amount of data time that was
+  *examined* or *covered* by the ~TPSet~.  Eg, in the case of ~TPWindow~, a
+  ~TPSet~ spans a fixed data time in which ~TrigPrim~ "hits" started.
+
+- ~TrigPrim.tstart~ and ~TrigPrim.tspan~ mark temporal extent of "hits".
+  Ie, time, measured by hardware clock, over which an ADC waveform was
+  over threshold.
+
+** What is the semantic meaning of a ~TPSet~?
+
+It depends.  A ~TPSet~ object a "just" a collection of ~TrigPrim~ with
+some "header" attributes.  What it "means", like everything, depends
+on context.
+
+We currently use ~TPSet~ to represent a simple set of ~TrigPrim~ as well
+as a trigger candidate (TC) and a trigger decision (TD).  This means
+three general semantic interpretations of the same data type.  The v2
+PTMP message object schema makes these semantic interpretations more
+explicit.
+
+Another type of semantic interpretation which may occur, even w/in
+each of the general interpretations, is based on where in a pipeline a
+~TPSet~ is considered.  For example, the ~TPSet~ out of a hit finder has a
+somewhat different semantic meaning (and content) than the ~TPSet~ that
+comes out of a ~TPWindow~.  
+
+** What if my component connects to the wrong source?
+
+Well, don't do that.
+
+Currently, PTMP components may be configured with a unified mechanism.
+Prior to being applied, it may be validated.  For example, the network
+topology graph may be visualized.  An illustration of such a graph is
+[[test-file-replay-window-sorted-graph.svg]].  It's complex, but that
+complexity is real.  Any "misconnection" can be identified.
+
+Next generation of PTMP will include a "discovery" mechanism where
+connections will be formed through logical names.  Instead of trying
+to connect to a TC finder at ~tcp://10.73.136.51:7771~ the downstream
+component can connect with a name like "apa1-tcs".  This is harder to
+confuse with, eg, "apa1-link10-hitfinder".  Note, this is not a DNS
+name but more dynamic.  If there is a need to restart a component on a
+new address, the update to name resolution is automatic and
+contemporaneous with the restart.
+
+A cryptographically-strong method of authorization and authentication
+can be applied to socket connections if/where stronger connection
+assurance is required.
+
+** Why does TPWindow deconstruct input TPSets and reconstruct new output TPSets?
+
+~TPWindow~ inherently assert a repacking.  At PDSP, the input is from
+the hit finder which packs ~TrigPrim~ hits over a window which is chosen
+based on the requirements and input data.  The "horizontal muon"
+trigger candidate algorithm that runs downstream requires its own
+windowing which, not surprisingly, differs from what the hit finder
+initiates.  
+
+The ~TPWindow~ also naturally enacts another feature covered in the next question.
+
+** What is the buffer time for TPWindow?
+
+TPWindow has two times, "window" time and "buffer" time.  Both are
+measured in "data time".  The buffer is required in order to allow a
+"turn around" of the ~TrigPrims~ as they are collected in the input
+~TPSet~ based on the *end time* while downstream expects them to be
+provided based on their *begin time*.  This "turn around buffer" then
+needs to be as long as the longest "supported" ~TrigPrim~.  The longest
+physical ~TrigPrim~ time span is set by the maximum drift time of the
+TPC (about 2.25 ms for 500 V/cm PDSP).
+
+** PTMP lets data be dropped, what are you crazy?
+
+Yes, I am but that's not relevant.  In any asynchronous message
+passing system, when a receiver consumes messages more slowly than a
+sender produces them these messages will need somewhere to go.  In
+ZeroMQ there is an input message buffer in the consumer and an output
+message buffer in the producer.  If the relative speed of producer and
+consumer differ for a brief enough time, these buffers will never be
+fill and there is no crisis.  If a consumer is too slow relative to a
+producer, first its input buffer will fill, then the senders output
+buffer will fill.  At this point there is a crisis.
+
+There are only two possible responses to this crisis:
+
+- drop :: the sender does not place new messages into its full output
+          queue.  The message that would otherwise be placed is
+          *dropped*.
+
+- block :: the sender waits until its output queue is drained.  It
+           *blocks*.  This blocking can be done so that the producer
+           continues doing other work, but something has to give and
+           that blocking must telegraph upstream (back pressure).
+
+*** Oh, yeah, well, what about making the producer hold on to messages and send them later?
+
+This is equivalent to increasing the socket buffers.  If there is
+system memory, then by all means, make these buffers bigger.  Default
+is 1000 messages.
+
+*** Well, why not send the dropped messages somewhere else?
+
+Any "relief valve" requires some magic (more memory, more parallelism)
+to deal with.  If that magic exists, apply it to the primary stream.
+
+*** Okay, fine, at least you can log the drops.
+
+Yes, absolutely.  [[../src/TPStats.cc][TPStats]] is the initial start at adding metric based monitoring to PTMP.
+
+** Why no empty ~TPSets~
+
+Better to ask, why should there be empty ~TPSets~?  
+
+A ~TPSet~ has a sequence number ~count~ attribute which is incremented by
+the sender.  The receiver can use this to detect any messages which
+were dropped (if indeed *drop* policy is chosen, see FAQ above).
+
+So, why not send empty ~TPSets~ just for the hell of it?  That increases
+the message rate dramatically, particularly at the highest rate point
+(output of hit finders).  Even though the aggregate bandwidth of these
+empty ~TPSets~ will be small, their rate will cause a large and
+pointless CPU burden.
+
+** How do we keep track of dead time due to dropped messages?
+
+Monitoring the gaps in the sequence ~count~ is done now at some level.
+A summary is reported at exit which is sufficient for initial
+development.  The metric reporting (described above) includes this
+quantity.  It can be shown for "real time" monitoring and recorded as
+part of some conditions DB for archaeological use. 
+
+** I hate streaming, I want "frames", what do?
+
+LArTPC self-triggering is inherently a streaming process.  If some
+algorithm wants to consume large "frames" in order to contribute to
+the trigger process, that is inherently not disallowed.  It would of
+course have to properly handle "frame" boundaries, windowing and
+buffering.
+
+* General FAQ
+
+** Latency is the inverse of rate, right?
+
+Wrong.

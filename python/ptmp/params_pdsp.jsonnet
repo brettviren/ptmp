@@ -10,6 +10,18 @@
         sync_time: 10, // real time in ms to wait for tardy input streams
         detid: -1,              // use what's in TPSet
         tardy_policy:"drop",    // anything else destroys output ordering
+
+        // Force replayed tpsets to get recent past tstarts based on
+        // current real time.  Note, if set true, this will almost
+        // certainly mess up inter-message sync based on this tstart.
+        // It may both hide and introduce inter-link time shifts.
+        // Only use this if there is some absolute need to pretend
+        // like the data time is not what it really is.
+        rewrite_tstart: 0,
+
+        // time in ms for integrating link-level and channel-level stats
+        link_integration_time:10000,
+        chan_integration_time:20000,
     },
 
     outfiles: {

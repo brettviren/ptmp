@@ -47,19 +47,21 @@ void ptmp::actor::cat(zsock_t* pipe, void* vargs)
         }
     }
     FILE* ifp = NULL;
+    std::string ifname="";
     if (!config["ifile"].is_null()) {
-        std::string fname = config["ifile"];
-        ifp = fopen(fname.c_str(), "r");
+        ifname = config["ifile"];
+        ifp = fopen(ifname.c_str(), "r");
         if (ifp) {
-            zsys_info("czmqat: ifile: %s", fname.c_str());
+            zsys_info("czmqat: ifile: %s", ifname.c_str());
         }
     }
     FILE* ofp = NULL;
+    std::string ofname="";
     if (!config["ofile"].is_null()) {
-        std::string fname = config["ofile"];
-        ofp = fopen(fname.c_str(), "w");
+        ofname = config["ofile"];
+        ofp = fopen(ofname.c_str(), "w");
         if (ofp) {
-            zsys_info("czmqat: ofile: %s", fname.c_str());
+            zsys_info("czmqat: ofile: %s", ofname.c_str());
         }
     }
     zsock_signal(pipe, 0); // signal ready    
@@ -116,7 +118,7 @@ void ptmp::actor::cat(zsock_t* pipe, void* vargs)
         else if (ifp) {
             msg = ptmp::internals::read(ifp);
             if (!msg) {
-                zsys_info("czmqat: end of file after %d", count);
+                zsys_info("czmqat: end of file %s after %d", ifname.c_str(), count);
                 break;
             }
         }

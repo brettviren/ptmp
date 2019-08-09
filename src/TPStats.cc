@@ -59,6 +59,8 @@ struct link_stats_t {
     // min/max time between recieved and created relative to tstart
     int64_t dtr_min{0}, dtr_max{0}, dtc_min{0}, dtc_max{0};
     std::unordered_set<int> ch_seen;
+    // how much data received on from the link
+    uint64_t nbytes{0};
 
 };
 static
@@ -74,17 +76,25 @@ void to_json(json& j, const link_stats_t& ls)
     const double dtc_rms = sqrt(ls.dtc_sum2 / ntpsets - dtc_mean*dtc_mean);
 
     j = json{
+        {"now", (time_t)(ls.tstart/1000000)}, // the representative time.
+        {"time", {
+                {"received", ls.treceived * 1.0e-6},
+                {"created", ls.tcreated * 1.0e-6},
+                {"data", ls.tstart * 1.0e-6},
+            }},
         {"counts", {
                 {"ntpsets", ls.ntpsets},
                 {"ntps", ls.ntps},
                 {"ndropped", ls.nskipped},
-                {"nchannels", nchannels}
+                {"nchannels", nchannels},
+                {"nbytes", ls.nbytes}
             }},
 
         {"rates", {
                 {"tps", ls.ntps/dtrecv_s},
                 {"tpsets", ls.ntpsets/dtrecv_s},
-                {"dropped", ls.nskipped/dtrecv_s}
+                {"dropped", ls.nskipped/dtrecv_s},
+                {"byteps", ls.nbytes/dtrecv_s}
             }},
 
         {"adc", {
@@ -130,6 +140,7 @@ struct app_data_t {
         auto trecv = ptmp::data::now();
 
         ls.totaladc += tpset.totaladc();
+        ls.nbytes += tpset.ByteSize();
 
         if (ls.ntpsets == 0) {
             ls.last_seqno = seqno_in;

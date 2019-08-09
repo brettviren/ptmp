@@ -4,13 +4,6 @@ local pdsp_params = import "params_pdsp.jsonnet";
 
 pdsp_params {
 
-    cfg: super.cfg {
-        // force replayed tpsets to get recent past tstarts based on
-        // current real time.  Note, this will almost certainly mess
-        // up inter-message sync based on this tstart!
-        rewrite_tstart: 1,
-    },
-
     apas: [5],
 
     // For fileplay, need to provide some files.  This default is for

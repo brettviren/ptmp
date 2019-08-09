@@ -184,7 +184,7 @@ void ptmp::internals::recv(zmsg_t* msg, ptmp::data::TPSet& tps)
     }
 }
 
-void ptmp::internals::send(zsock_t* sock, const ptmp::data::TPSet& tps)
+void ptmp::internals::send(zsock_t* sock, const ptmp::data::TPSet& tpset)
 {
     const int topic = 0;
 
@@ -205,9 +205,9 @@ void ptmp::internals::send(zsock_t* sock, const ptmp::data::TPSet& tps)
         throw std::runtime_error("msg append failed");
     }
 
-    size_t siz = tps.ByteSize();
+    size_t siz = tpset.ByteSize();
     zframe_t* pay = zframe_new(NULL, siz);
-    tps.SerializeToArray(zframe_data(pay), zframe_size(pay));
+    tpset.SerializeToArray(zframe_data(pay), zframe_size(pay));
     rc = zmsg_append(msg, &pay);
     if (rc) {
         zsys_error(zmq_strerror (errno));

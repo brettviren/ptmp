@@ -32,6 +32,10 @@ std::string stringify(json& jdat, const std::string& prefix,
 
     std::stringstream ss;
     if (jdat.is_object()) {
+        if (jdat["now"].is_number()) {
+            now_s = jdat["now"];
+        }
+
         for (auto& el : jdat.items()) {
             json& jval = el.value();
             std::stringstream key;
