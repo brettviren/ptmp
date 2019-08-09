@@ -1,4 +1,6 @@
 #+title: PTMP Stats
+#+html_head_extra: <style>.svgfig {width: 50%; }</style>
+#+LATEX_HEADER: \usepackage{svg}
 
 The ~TPStats~ actor collects and emits summary statistics derived from
 input ~TPSet~ streams.
@@ -51,3 +53,149 @@ Run some data:
   $ shoreman Procfile.mon
 #+end_example
 
+* Topology
+
+~TPStats~ is itself a PTMP component which is a receiver and sink of
+~TPSet~ messages.  A question that must be answered is:
+
+#+begin_quote
+Where and how to attach any instance of ~TPStats~?
+#+end_quote
+There are two primary considerations that should govern the
+design of any network topology but in particular the addition of
+ancillary  components like ~TPStats~.
+
+- at what point(s) in some original network should stats be collected?
+- what behavior is acceptable should the stats component not keep up with input?
+Some potential connectivity patterns are described and discussed
+w.r.t. these considerations.  
+
+** Peer
+
+A ~TPStats~ component can be positioned as a peer to another component
+by both components subscribing to the same source of messages.
+
+#+begin_src dot :cmd dot :cmdline -Tsvg :file tpstats-peer.svg
+  digraph peer {
+          rankdir=LR
+          node[shape=record]
+          source[label="{source|<p>PUB}"]
+          stats[label="{<s>SUB|stats}"]
+          peer[label="{<s>SUB|peer}"]
+          source:p->stats:s
+          source:p->peer:s
+  }
+#+end_src
+
+#+attr_html: :class svgfig
+#+RESULTS:
+[[file:tpstats-peer.svg]]
+
+This pattern is best when it is considered as monitoring the output of
+*source* in a way which is *effectively* the same as monitoring the input
+to *peer*.  Every message made available to *stats* is in principle
+available to *peer*.  This pattern is well suited for monitoring the
+output of multiple *sources* and may place *stats* on different computers
+than those that host *peers* (in order to load balance).
+
+In the case that either of the PUB/SUB connections are configured with
+*drop* policy (the default) then there is the potential that the
+~TPSet.count~ monitoring by *stats* does not reflect *peer*.  This error can
+go either way. If *stats* is so slow as to allow drops it will report a
+false positive (*peer* may see no drops).  If *stats* is fast and *peer* is
+slow enough then false negative drops (ie, no drops) will be recorded
+by *stats*.
+
+
+
+** Inline-T
+
+A ~TPTap~ may be used to create an inline "T", the bottom of which a
+~TPStats~ may attach.
+
+#+begin_src dot :cmd dot :cmdline -Tsvg :file tpstats-inlinet.svg
+  digraph inlinet {
+          rankdir=LR
+          node[shape=record]
+          source[label="{source|<p>PUB}"]
+          tap[label="{<s>SUB|tap|<p>PUSH}|{<t>PUSH}"]
+          stats[label="{<s>PULL|stats}"]
+          peer[label="{<s>PULL|peer}"]
+          source:p->tap:s
+          tap:p->peer:s
+          tap:t->stats:s
+  }
+#+end_src
+
+#+RESULTS:
+[[file:tpstats-inlinet.svg]]
+
+The use of a tap is similar to the [[Peer]] pattern.  However, as
+PUSH/PULL is a block policy it may guarantee that *peer* and *stats* see
+the same messages.
+
+A potential negative consequence of this pattern is that either a slow
+*peer* or a slow *stats* will lead to drops at the input to *tap*.  
+
+Comments on this pattern
+
+- the *tap* component may not fully exist yet.  The actor function
+  exists in ~TPMonitorz~ but a static C++ interface may not yet exist.
+
+- instead of using an explicit *tap* proxy, it could be deleted in favor
+  of a [[https://github.com/zeromq/libzmq/blob/master/perf/proxy_thr.cpp][blocking PUB/SUB]].
+
+- the *source* can not simply use a PUSH as that would cause the output
+  message to be sent to only one PULL in round-robin fashion.
+
+
+** Embedded 
+
+At the expense of modifying existing code of the *peer* component it may
+gain a socket from which to send ~TPSets~ directly to a ~TPStats~.
+
+#+begin_src dot :cmd dot :cmdline -Tsvg :file tpstats-pushembed.svg
+  digraph embed {
+          rankdir=LR
+          node[shape=record]
+          source[label="{source|<p>PUB}"]
+          stats[label="{<s>PULL|stats}"]
+          peer[label="{<s>SUB|peer|OUT}|{<m>PUSH}"]
+          source:p->peer:s
+          peer:m->stats:s
+  }
+#+end_src
+
+#+RESULTS:
+[[file:tpstats-pushembed.svg]]
+
+
+The message sent to *stats* can be exactly as received or exactly as
+sent or both (*peer* output not diagrammed).  With a PUSH/PULL
+connection to *stats*, a guarantee may hold that monitoring reflects
+either the input or output (or both) of *peer*.
+
+Like Inline-T, this strong guarantee comes at the cost that a slow
+*stats* will be a source of back pressure on *peer*.  
+
+** What to use?
+
+As the above probably makes obvious, it depends mostly on the
+existence of back pressure.
+
+- If there is no concern about back pressure, use Peer.  It is simple,
+  scalable and non-intrusive.
+
+- If *stats* is a source of back pressure, then find out why and fix it:
+
+  - if it is the downstream consumer asserting back pressure increase
+    *stats* integration time so it sends less frequently
+
+  - if collection of the summary stats is too slow, reduce the number
+    of input streams and use more instances of *stats*.
+
+  - if stats is slower than a single input stream then some other
+    monitoring solution is needed.
+
+
+- If *peer* is too slow and can't be fixed use Inline-T or Embedded.  

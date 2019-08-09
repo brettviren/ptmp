@@ -44,6 +44,7 @@ single tap and is an object with these attributes:
 - ~input~ :: standard input socket description.  see [[configuration.org]]
 - ~output~ :: standard output socket description.  see [[configuration.org]]
 
+
 * Tapping topology
 
 Each tap runs in its own thread inside the monitor.  It may tap into
