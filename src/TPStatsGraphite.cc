@@ -3,6 +3,7 @@
 #include "ptmp/api.h"
 #include "ptmp/internals.h"
 #include "ptmp/factory.h"
+#include "ptmp/metrics.h"
 #include "json.hpp"
 
 #include <sstream>
@@ -19,48 +20,6 @@ const int json_message_type = 0x4a534f4e; // 1246973774 in decimal
 // are wanting the messages to stay inside ZeroMQ so we best protect
 // ourselves.
 const int graphite_message_type = 0x474c4f54; // 1196183380 in decimal
-
-// Flatten a nested JSON object into lines containing a dot-separated
-// key, a value and a Unix timestamp.
-static
-std::string stringify(json& jdat, const std::string& prefix,
-                      time_t now_s)
-{
-    if (jdat.is_null()) {
-        return "";
-    }
-
-    std::stringstream ss;
-    if (jdat.is_object()) {
-        if (jdat["now"].is_number()) {
-            now_s = jdat["now"];
-        }
-
-        for (auto& el : jdat.items()) {
-            json& jval = el.value();
-            std::stringstream key;
-            std::string thiskey = el.key();
-            key << prefix << "." << thiskey;
-            ss << stringify(jval, key.str(), now_s);
-            if (thiskey == "ntpsperlink") {
-                std::cout << prefix << "." << thiskey << " = " << jval << std::endl;
-            }
-        }
-    }
-    else if (jdat.is_array()) {
-        for (size_t ind = 0; ind<jdat.size(); ++ind) {
-            std::stringstream key;
-            key << prefix << "." << ind;
-            json& jele = jdat[ind];
-            ss << stringify(jele, key.str(), now_s);
-        }
-    }
-    else {                      // atom
-        ss << prefix << " " << jdat << " " << now_s << "\n";
-    }
-
-    return ss.str();
-}
 
 static
 void stats_graphite(zsock_t* pipe, void* vargs)
@@ -130,7 +89,7 @@ void stats_graphite(zsock_t* pipe, void* vargs)
         
         auto jdata = json::parse((const char*) sdat);
         freen(sdat);
-        std::string sout = stringify(jdata, "ptmp.tpstats", now_s);
+        std::string sout = ptmp::metrics::glot_stringify(jdata, "ptmp.tpstats", now_s);
         if (sout.empty()) {
             continue;
         }

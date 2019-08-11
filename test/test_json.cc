@@ -27,5 +27,15 @@ int main()
     std::cout << "cfg: " << cfg << std::endl;
 
 
+    std::string prefix = "/ptmp/metrics/";
+    std::string key = "thing";
+    int metric = 42;
+    json j;
+    j["/a/b"_json_pointer] = metric;
+    const std::string kk = prefix+key;
+    j[json::json_pointer(kk)] = metric;
+
+    std::cout << "prefix: " << j.dump(4) << std::endl;
+    
     return 0;
 }
