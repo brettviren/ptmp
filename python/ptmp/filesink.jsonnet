@@ -15,6 +15,8 @@ local output = std.extVar("output");
 local ptmp = import "ptmp.jsonnet";
 
 local tp_addrs = std.prune(std.flattenArrays(params.addresses.tps));
+local tc_addrs = std.prune(params.addresses.tc);
+
 
 {
     "sink-tps.json": {
@@ -26,13 +28,13 @@ local tp_addrs = std.prune(std.flattenArrays(params.addresses.tps));
     "sink-tcs.json": {
         name: "tc-sink",
         proxies: [ptmp.czmqat("sink-tcs",
-                              isocket = ptmp.socket('connect','sub',params.addresses.tc),
+                              isocket = ptmp.socket('connect','sub', tc_addrs),
                               cfg={name:"tc-sink-czmqat",ofile:params.outfiles.tcs})],
     },
     "sink-tds.json": {
         name: "td-sink",
         proxies: [ptmp.czmqat("sink-tds",
-                              isocket = ptmp.socket('connect','sub',params.addresses.td),
+                              isocket = ptmp.socket('connect','sub', params.addresses.td),
                               cfg={name:"tp-sink-czmqat",ofile:params.outfiles.tds})],
     },
 
