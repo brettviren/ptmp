@@ -77,10 +77,11 @@ int main(int argc, char* argv[])
         zclock_sleep(pause*1000);
     }
 
-    ptmp::AgentFactory& af = ptmp::agent_factory();
+    auto& pim = upif::plugins();
+
     for (auto jpi : config["plugins"]) {
         std::string pi = jpi;
-        auto ok = af.plugin_cache().add(pi);
+        auto ok = pim.add(pi);
         if (!ok) {
             zsys_error("composer: failed to add plugin: \"%s\"", pi.c_str());
             throw std::runtime_error("composer: failed to add plugin");

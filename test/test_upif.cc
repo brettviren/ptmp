@@ -4,8 +4,10 @@
 
 int main () {
     zsys_init();
-    upif::cache c;
-    auto plugin = c.add("ptmp");
+
+    auto& pim = upif::plugins();
+
+    auto plugin = pim.add("ptmp");
     assert(plugin);
     zsys_info("loaded ptmp plugin");
     auto raw = plugin->rawsym("funcs_test");

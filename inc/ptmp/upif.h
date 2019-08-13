@@ -9,12 +9,29 @@
 
 namespace upif {
 
+    // fixme: this class should probably go someplace more generic.
+    template <class T>
+    class Singleton
+    {
+    public:
+	static T& Instance() {
+	    static T instance;
+	    return instance;
+	}
+
+    private:
+	Singleton(){}
+	~Singleton(){}
+	Singleton(Singleton const&){}
+	Singleton& operator=(Singleton const&){}
+    };
+
     // Turn a library symbol name into symbol.  Symbol must be copyable.
-    class plugin {
+    class Plugin {
         void* m_lib;
     public:
-        plugin(void* lib): m_lib(lib) {}
-        ~plugin() { dlclose(m_lib); }
+        Plugin(void* lib): m_lib(lib) {}
+        ~Plugin() { dlclose(m_lib); }
 
         void* rawsym(const std::string& symbol_name) {
             return dlsym(m_lib, symbol_name.c_str());
@@ -29,18 +46,18 @@ namespace upif {
 	}        
     };
 
-    // Cache lookup from plugin name to plugin object
-    class cache {
-	std::unordered_map<std::string, plugin*> m_plugins;
+    // Plugin manager cache lookup from plugin name to plugin object
+    class PluginManager {
+	std::unordered_map<std::string, Plugin*> m_plugins;
     public:
-        ~cache() {
+        ~PluginManager() {
             for (auto pit : m_plugins) {
                 delete pit.second;
                 pit.second = nullptr;
             }
         }
-	plugin* add(const std::string& plugin_name, const std::string& libname = "") {
-            plugin* pi = get(plugin_name);
+	Plugin* add(const std::string& plugin_name, const std::string& libname = "") {
+            Plugin* pi = get(plugin_name);
             if (pi) { return pi; }
             std::string exts[2] = {".so",".dylib"};
             for (int ind=0; ind<2; ++ind) {
@@ -57,7 +74,7 @@ namespace upif {
 
                 void* lib = dlopen(lname.c_str(), RTLD_NOW);
                 if (lib) {
-                    plugin* pl = new plugin(lib);
+                    Plugin* pl = new Plugin(lib);
                     m_plugins[plugin_name] = pl;
                     return pl;
                 }
@@ -65,18 +82,18 @@ namespace upif {
             return nullptr;
         }
 
-        plugin* get(const std::string& plugin_name) {
+        Plugin* get(const std::string& plugin_name) {
             auto pit = m_plugins.find(plugin_name);
             if (pit == m_plugins.end()) {
                 return nullptr;
             }
             return pit->second;
         }
-        plugin* find(const std::string& symbol_name) {
+        Plugin* find(const std::string& symbol_name) {
             // zsys_debug("finding in %ld plugins", m_plugins.size());
             for (auto pit : m_plugins) {
                 // zsys_debug("checking plugin \"%s\"", pit.first.c_str());
-                plugin* maybe = pit.second;
+                Plugin* maybe = pit.second;
                 if (maybe->rawsym(symbol_name)) {
                     return maybe;
                 }
@@ -84,6 +101,12 @@ namespace upif {
             return nullptr;
         }
     };
+
+
+    inline
+    PluginManager& plugins() {
+        return Singleton<upif::PluginManager>::Instance();
+    }
 
 }
 

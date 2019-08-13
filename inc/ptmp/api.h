@@ -79,7 +79,6 @@ namespace ptmp {
         TPReceiver& operator=(const TPReceiver&) =delete;            
     };
 
-
     /** Base class for any "free agent" classes.  Such classes are
      * constructed and then simply kept alive as long as needed.  They
      * are expected to do their work in background threads.
@@ -88,10 +87,6 @@ namespace ptmp {
     public:
         virtual ~TPAgent();
     };
-
-    /** A factory method for agents */
-    TPAgent* agent_factory(const std::string& alias, const std::string& config);
-
 
     /**
        A "free agent" that accepts TPSets from N TPSenders on input
@@ -282,6 +277,15 @@ namespace ptmp {
 
     };
 
+
+    /** An agent which can run any filter engine */
+    class TPFilter {
+    public:
+        TPFilter(const std::string& config);
+        virtual ~TPFilter();
+    private:
+        zactor_t* m_actor;
+    };
 
 }
 #endif

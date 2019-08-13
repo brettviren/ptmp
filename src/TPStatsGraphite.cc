@@ -4,11 +4,11 @@
 #include "ptmp/internals.h"
 #include "ptmp/factory.h"
 #include "ptmp/metrics.h"
+#include "ptmp/actors.h"
 #include "json.hpp"
 
 #include <sstream>
 
-PTMP_AGENT(ptmp::TPStatsGraphite, stats_graphite)
 
 using json = nlohmann::json;
 
@@ -22,7 +22,7 @@ const int json_message_type = 0x4a534f4e; // 1246973774 in decimal
 const int graphite_message_type = 0x474c4f54; // 1196183380 in decimal
 
 static
-void stats_graphite(zsock_t* pipe, void* vargs)
+void graphite(zsock_t* pipe, void* vargs)
 {
     auto config = json::parse((const char*) vargs);
 
@@ -114,7 +114,7 @@ void stats_graphite(zsock_t* pipe, void* vargs)
 }
 
 ptmp::TPStatsGraphite::TPStatsGraphite(const std::string& config)
-    : m_actor(zactor_new(stats_graphite, (void*)config.c_str()))
+    : m_actor(zactor_new(graphite, (void*)config.c_str()))
 {
 }
 
@@ -125,3 +125,5 @@ ptmp::TPStatsGraphite::~TPStatsGraphite()
     zsock_signal(zactor_sock(m_actor), 0); // signal quit
     zactor_destroy(&m_actor);
 }
+
+PTMP_AGENT(ptmp::TPStatsGraphite, stats_graphite)

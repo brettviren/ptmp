@@ -1,9 +1,8 @@
 #include "ptmp/api.h"
 #include "ptmp/internals.h"
 #include "ptmp/factory.h"
+#include "ptmp/actors.h"
 #include "json.hpp"
-
-PTMP_AGENT(ptmp::TPStats, stats)
 
 using json = nlohmann::json;
 
@@ -372,3 +371,5 @@ ptmp::TPStats::~TPStats()
     zsock_signal(zactor_sock(m_actor), 0); // signal quit
     zactor_destroy(&m_actor);
 }
+PTMP_AGENT(ptmp::TPStats, stats)
+

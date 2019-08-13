@@ -178,6 +178,28 @@ either the input or output (or both) of *peer*.
 Like Inline-T, this strong guarantee comes at the cost that a slow
 *stats* will be a source of back pressure on *peer*.  
 
+Note, the Embedded pattern can pushed further to embed the
+functionality of ~TPStats~ completely.  
+
+#+begin_src dot :cmd dot :cmdline -Tsvg :file tpstats-pushembed.svg :exports results
+  digraph embed {
+          rankdir=LR
+          node[shape=record]
+          source[label="{source|<p>PUB}"]
+          stats[label="{<s>SUB|stats\nconsumer}"]
+          peer[label="{<s>SUB|peer|OUT}|{stats|<m>PUB}"]
+          source:p->peer:s
+          peer:m->stats:s
+  }
+#+end_src
+
+#+RESULTS:
+[[file:tpstats-pushembed.svg]]
+
+This lets a *peer* emit arbitrary metrics based on whatever elements of
+its internal state that is worth monitoring.  Future development will
+look at providing support code that will simplify this pattern.
+
 ** What to use?
 
 As the above probably makes obvious, it depends mostly on the
@@ -199,5 +221,4 @@ existence of back pressure.
 
 
 - If *peer* is too slow and can't be fixed use Inline-T or Embedded.  
-
 

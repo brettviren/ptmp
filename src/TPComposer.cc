@@ -28,8 +28,6 @@ void ptmp::actor::composer(zsock_t* pipe, void* vargs)
 
     zsock_signal(pipe, 0); // signal ready    
 
-    ptmp::AgentFactory& af = ptmp::agent_factory();
-
     std::vector<ptmp::TPAgent*> agents;
     std::unordered_map<ptmp::TPAgent*, std::string> agent_name;
     for (auto& jprox : config["proxies"]) {
@@ -37,7 +35,7 @@ void ptmp::actor::composer(zsock_t* pipe, void* vargs)
         const std::string type = jprox["type"];
         const std::string data = jprox["data"].dump();
 
-        ptmp::TPAgent* agent = af.make(type, data);
+        ptmp::TPAgent* agent = ptmp::factory::make<ptmp::TPAgent>(type, data);
         if (!agent) {
             zsys_error("composer: failed to create agent \"%s\" of type \"%s\"",
                        name.c_str(), type.c_str());
