@@ -1,26 +1,24 @@
-#+title: Aggregation
+#+title: PTMP Aggregation
 
 PTMP is designed to not dictate how its components may be used in a
 larger context.  Instead, the application developer or even end user
-may aggregate them in ways that solve whatever external needs they may
-have.  Here some guidance is provided.
+may aggregate PTMP components in ways that solve whatever external
+needs they may have.  Here, some guidance is provided.
 
 * Aggregation contexts
 
 PTMP components (by nature of ZeroMQ) may be aggregated in three broad
-contexts using (at least) the listed ZeroMQ transports:
+contexts using (at least) the listed ZeroMQ transports.  Sockets may
+exist in the same:
 
-- the same executable :: ~inproc://~, ~ipc://~, ~tcp://~
-- the same computer ::  ~ipc://~, ~tcp://~
-- the same network ::  ~tcp://~
+- executable :: ~inproc://~, ~ipc://~, ~tcp://~
+- computer ::  ~ipc://~, ~tcp://~
+- network ::  ~tcp://~
 
-In principle, ~inproc://~ is more performant than ~ipc://~,which is more
-performant ~tcp://~.  It is expected that the performance differences
-are not very relevant to a choice.
-
-Besides aggregating the code itself, connections between components
-specified by configuration.  That is, one need not modify code in
-order to use different transports.
+When a choice is available given other constraints, [[http://wiki.zeromq.org/area:results][benchmarks]] can
+help decide which to use.  Selecting different message transport in
+PTMP is a matter of changing end-user configuration.  No need to
+modify code.
 
 * Aggregation strategies
 
@@ -28,9 +26,17 @@ Some considerations for deciding how to aggregate
 
 ** Same executable
 
-- Aggregation is done by writing code.   A [[https://github.com/brettviren/digrex/blob/master/dexnet/inc/upif.h][plugin/factory]] method may be used to allow for dynamic executable aggregation.
+- Aggregation may done by writing code that hard-wires the
+  construction of some PTMP [[../inc/ptmp/api.h][API]] classes or user code based on them.
 
-- Can simplify end user configuration by not exposing details of how internal connections between components are formed.
+- Configuration-driven dynamic aggregation of PTMP [[actors.org][actor]] classes into
+  an application can be used by construing a ~TPComposer~ or from the
+  command line using [[ptmper.org][ptmper]].  Or, user code may utilize PTMP's lower
+  level [[factory.org][factory method]] to dynamically instantiate components,
+  potentially from [[plugin.org][plugin]] shared libraries.
+
+- Executable can elect to hide some structure by hard-wiring
+  configuration related to "internal" connections between components.
 
 - Can use all transport methods.
 
@@ -38,11 +44,13 @@ Some considerations for deciding how to aggregate
 
 ** Same computer
 
-- Aggregation is done by starting individual programs.  
+- Aggregation is done by starting individual programs and valid
+  configuration of endpoint addresses.
 
 - Programs may be developed independently and in different languages.
 
-- Functionality is spread over more executables (than "same executable") so managing program lifetime requires more effort. 
+- Functionality is spread over more executables (than "same
+  executable") so managing program lifetime requires more effort.
 
 - Can not use ~inproc://~ transport
 
@@ -54,9 +62,11 @@ Some considerations for deciding how to aggregate
 
 - Programs may be developed independently and in different languages.
 
-- Functionality is spread over more executables and host computers so managing program lifetime requires yet more effort. 
+- Functionality is spread over more executables and host computers so
+  managing program lifetime requires yet more effort.
 
-- Can only use ~tcp://~ transport
+- Can only use ~tcp://~ transport (PTMP does not yet support all ZeroMQ
+  network transports).
 
 - Load is limited by available CPU cores across multiple physical hosts
 

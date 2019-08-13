@@ -63,7 +63,7 @@ local make_tc = function(apa, inputs, output, params) {
                                      isocket = ptmp.socket('connect','pull', inproc_ztc),
                                      osocket = ptmp.socket('bind','pub', output,
                                                            hwm = params.pubsub_hwm),
-                                     cfg = {name:"apa%d-adj-tcs"%apa, method: "pdune-adjacency-tc"}),
+                                     cfg = {name:"apa%d-adj-tcs"%apa, engine: "pdune_adjacency_tc"}),
     components: windows + [zipper, tcfinder],
 }.components;
 
@@ -79,7 +79,7 @@ local make_td = function(inputs, output, params) {
                                      isocket = ptmp.socket('connect','pull', inproc_ztd),
                                      osocket = ptmp.socket('bind','pub', output,
                                                            hwm = params.pubsub_hwm),
-                                     cfg = {method: "pdune-adjacency-td"}),
+                                     cfg = {engine: "pdune_adjacency_td"}),
     components: [zipper, tdfinder],
 }.components;
 

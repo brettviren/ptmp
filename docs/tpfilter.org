@@ -1,0 +1,36 @@
+#+title: PTMP Filter
+
+The PTMP ~TPFilter~ component abstracts the job of running a function on
+a stream of ~TPSet~ bearing messages.  The function, or "engine" is
+provided as a dynamically constructed component selected through
+configuration.  The function call must accept an input ~TPSet~ object
+and provide zero or more output ~TPSet~ objects via a passed in
+~std::vector~.
+
+A filter engine is provided as a subclass of ~ptmp::filter::engine_t~.
+It may either provide a constructor that takes no arguments or a
+single ~std::string~.  Depending on the constructor signature the engine
+must be declared, respectively like:
+
+#+begin_src c++
+PTMP_FILTER_NOCONFIG(TypeName, alias_name)
+PTMP_FILTER(TypeName, alias_name)
+#+end_src
+
+As the name implies, the ~std::string~ to the constructor provides
+configuration information from the user.  This string is in JSON
+format and can be parsed into a ~nlohmann::json~ object like:
+
+#+begin_src c++
+class MyEngine : public ptmp::filter::engine_t {
+public:
+  MyEngine(const std::string& config) {
+    auto jcfg = json::parse(config);
+  }
+};
+PTMP_FILTER(MyEngine, my_cool_filter)
+#+end_src
+
+The configuration object contains top level attributes used by the
+~TPFilter~ that runs the engine.  They should be ignored if unneeded.
+The engine may require additional top level attributes as required.

@@ -23,7 +23,7 @@ Low level abstractions of ZeroMQ sockets:
 A number of higher level "proxy" or "actor" classes provide general
 utility algorithms.  They are all "free-running" in a background
 thread and may be constructed in user applications or aggregated and
-executed from the command line via [[ptmper.org][ptmper]].
+executed from the command line via [[./ptmper.org][ptmper]].
 
 - ~TPReplay~ :: accept an input ~TPSet~ stream and attempt to produce an
                 output stream at a pace indicated by the original
@@ -44,11 +44,11 @@ executed from the command line via [[ptmper.org][ptmper]].
                 re-implementation of ~TPSorted~.
 
 - ~TPSorted~ :: accept N asynchronous ~TPSet~ streams and emits one
-                merged, ordered stream.  See [[tpsorted.org]].
+                merged, ordered stream.  See [[tpsorted.org]]
                 Note this is obsoleted by TPZipper
 
 - ~TPCat~ :: a class version of the functionality available also in
-             [[czmqat.org][czmqat]] command line program.  It marshals messages to and
+             [[./czmqat.org][czmqat]] command line program.  It marshals messages to and
              from files and sockets as fast as possible.  Typically a
              ~TPReplay~ should be placed just downstream of ~TPCat~.
 
@@ -63,7 +63,7 @@ code to directly participate in the PTMP network.  The "proxy" classes
 run stand-alone background threads that an application instantiates
 and holds on to with little or no further action.  All PTMP proxy
 classes provided directly by PTMP or other libraries that support PTMP
-[[plugin.org][plugin factory]] method may be executed via the [[ptmper.org][ptmper]] application.
+[[./plugin.org][plugin]] and [[./factory.org][factory]] methods may be executed via the [[./ptmper.org][ptmper]] application.
 
 ** Message Schema
 
@@ -107,6 +107,6 @@ Some of the unit tests run by CI are:
 - [[../test/test_many_senders.sh]] :: run through all supported transports with a many-to-1 test of PUB/SUB.  Note, this pattern is what a "TC finder" will likely follow.
 
 Application programmers (and possibly their users) should also read
-the section on [[configuration.org][Configuration]].
+the section on [[./configuration.org][Configuration]].
 
 

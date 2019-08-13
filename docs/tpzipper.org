@@ -1,0 +1,46 @@
+#+title: PTMP Zipper
+
+The PTMP ~zipper~ component inputs multiple as synchronous streams and
+outputs a single synchronous stream while imparting a bounded latency.
+An input stream is expected to be in *data-time* order and output stream
+is kept likewise.  In order to bound the latency, when an input
+provides data which precedes (in *data time*) any message that has
+already be output, this "tardy" message is dropped.  Output messages
+are otherwise exactly as input and are not altered.
+
+
+The ~sync_time~ parameter, provided in milliseconds, sets the upper
+bound on the *real time* (not *data time*) latency through the zipper.
+
+When a ~TPSet~ is input to the zipper it is assigned an "overdue time"
+which is "sync time" in the future from when the message was received.
+This is an absolute *real time*.  The message is (softly) guaranteed to
+be output at or before this "overdue time".  The message is placed in
+a queue which is maintained in priority order according to its *data
+time*.
+
+Given the opportunity, the zipper will check the current "now" *real
+time* and examine the queue.  When an overdue message is found in the
+queue, then it is output after first "sweeping" any other messages in
+the priority queue with smaller *data time* (and regardless of their
+overdue time).
+
+It is this sweep that MAY lead to a future message to be tardy.  That
+is, if a message with a *data time* less than that of an overdue message
+hasn't been received before the sweep then it will be classified as
+tardy whenever it later arrives.  It is this point where the desired
+trade off in maximum latency and message loss is applied.
+
+A second output mechanism is also employed.  A message may be output
+prior to its overdue time if there is at least 1 message in all other
+input sources such that it can be assured that the message in question
+truly has the smallest *data time*.  That is, given all inputs
+reporting, it is possible to unambiguously and immediately know from
+which a message may be sent out.
+
+As a consequence of this algorithm, if the mean message (*real-time*)
+period is smaller than the sync time then this period governs the
+latency.  That is, the zipper will buffer only one message per input
+stream (unless it can't keep up!).  If the mean message period is
+longer than the sync time then it is the sync time that bounds the
+latency.  That is, all messages will be delayed by the sync time.

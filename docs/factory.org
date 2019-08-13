@@ -1,13 +1,13 @@
 #+title: PTMP Factory Method
 
-PTMP provides a dynamic component aggregation based on a factory
-method.  This allows a PTMP component to be constructed given its
-"type".  A type is a simple string, typically evocative of its C++
-type name.  Eg, ~TPZipper~ is of type ~zipper~.
+PTMP provides a way to construct components based on a name or alias
+for their C++ type.  The type is a simple string, typically evocative
+of its C++ type name.  Eg, ~TPZipper~ is of type ~zipper~.
 
 The binding of a type label and a C++ type is done in the
 implementation of the C++ using a top-level call to a CPP macro.  In
-the zipper example:
+the example of the zipper, it is an "agent" component and thus is
+registered with:
 
 #+BEGIN_SRC C++
 #include "ptmp/factory.h"
@@ -15,21 +15,23 @@ the zipper example:
 PTMP_AGENT(ptmp::TPZipper, zipper)
 #+END_SRC
 
+The ~TPFilter~ actor component itself delegates to a filter engine
+component.  These are declared, for example like:
+
+#+begin_src c++
+PTMP_FILTER(pdt_tc_engine, pdune_adjacency_tc)
+#+end_src
+See [[https://github.com/brettviren/ptmp-tcs][ptmp-tcs]] for one package providing filter engines.
+
 Code may then create a factory and construct components like:
 
 #+BEGIN_SRC C++
-  ptmp::AgentFactory af;
-
   std::string config = ...;       // filled with JSON config
-  ptmp::TPAgent* agent = af.make("zipper", config);
+  ptmp::TPAgent* agent = ptmp::factory:make<ptmp::TPAgent>("zipper", config);
 #+END_SRC
 
-Before making any components, the factory may be loaded with plugins.
-The ~ptmp~ library is itself a plugin and it is loaded by default.
-Others may be loaded, for example as:
+In order to successfully make an object with the PTMP factory the
+shared library providing the type must be loaded into the program.
+This can be done at build/link time or at run time using PTMP [[plugin.org][plugin]]
+facilities.
 
-#+BEGIN_SRC C++
-  ptmp::AgentFactory af;
-  auto ok = af.plugin_cache().add("ptmp-tcs");
-  assert(ok);                     // or more suitable error handling
-#+END_SRC
