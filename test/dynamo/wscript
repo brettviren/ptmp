@@ -1,0 +1,16 @@
+
+def build(bld):
+    bld.shlib(target='a', features='c cxx', source="liba.cc")
+    bld.shlib(target='b', features='c cxx', source="libb.cc")
+
+    bld.program(source="testa.cc", target="testa-nolink",
+                includes=['../../inc'], use='ptmp');
+
+    bld.program(source="testa.cc", target="testa-linka",
+                includes=['../../inc'],
+                use=['a', 'ptmp']);
+
+    bld.program(source="testa.cc", target="testa-linkb",
+                includes=['../../inc'],
+                use=['b', 'ptmp']);
+    

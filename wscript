@@ -34,6 +34,7 @@ def configure(cfg):
     #cfg.env.CXXFLAGS += ['-pg']
     cfg.env.CXXFLAGS += to_list(cfg.options.cxxflags)
 
+
 def build(bld):
     bld.load('utests')
 
@@ -59,3 +60,4 @@ def build(bld):
 
 
     bld.utesting('ptmp', uses)
+    bld.recurse("test/dynamo")
