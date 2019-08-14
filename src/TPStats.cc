@@ -4,6 +4,8 @@
 #include "ptmp/actors.h"
 #include "json.hpp"
 
+#include <unordered_set>
+
 using json = nlohmann::json;
 
 // fixme: internalize this

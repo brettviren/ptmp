@@ -36,9 +36,9 @@ std::string ptmp::metrics::glot_stringify(json& jdat, const std::string& prefix,
             std::string thiskey = el.key();
             key << prefix << "." << thiskey;
             ss << glot_stringify(jval, key.str(), now_s);
-            if (thiskey == "ntpsperlink") {
-                std::cout << prefix << "." << thiskey << " = " << jval << std::endl;
-            }
+            // if (thiskey == "ntpsperlink") {
+            //     std::cout << prefix << "." << thiskey << " = " << jval << std::endl;
+            // }
         }
     }
     else if (jdat.is_array()) {
