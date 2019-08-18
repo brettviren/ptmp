@@ -160,10 +160,10 @@ zmsg_t* ptmp::internals::Socket::msg(int timeout_msec)
 // [2] the payload as serialized TPSet
 void ptmp::internals::recv(zmsg_t** msg, ptmp::data::TPSet& tps)
 {
-    recv(*msg, tps);
+    recv_keep(*msg, tps);
     zmsg_destroy(msg);
 }
-void ptmp::internals::recv(zmsg_t* msg, ptmp::data::TPSet& tps)
+void ptmp::internals::recv_keep(zmsg_t* msg, ptmp::data::TPSet& tps)
 {
     zframe_t* fid = zmsg_first(msg);
     if (!fid) {

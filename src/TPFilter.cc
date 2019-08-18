@@ -55,7 +55,7 @@ void ptmp::actor::filter(zsock_t* pipe, void* vargs)
         }
 
         ptmp::data::TPSet tps;
-        ptmp::internals::recv(msg, tps); // throws
+        ptmp::internals::recv(&msg, tps); // throws
         int64_t latency = zclock_usecs() - tps.created();
 
         std::vector<ptmp::data::TPSet> output_tpsets;
