@@ -1,0 +1,18 @@
+#+title: PTMP Design Philosophy Guidelines
+
+Here briefly lists the "philosophy" guiding the design of PTMP
+
+- policy shall be in configuration not in C++ :: To the extent
+     feasible, no C++ code should handle issues such as socket type,
+     address, connect vs bind or other matters of "policy".  This
+     should be pushed out to user configuration.  This makes
+     configuration more complex which may require some tool to manage
+     but it allows for more flexibility to solve unanticipated future
+     problems.
+
+- upstream shall not care what is downstream :: A producer of PTMP
+     messages should not make assumptions about the message consumer.
+     Multiple or no consumers may exist.  Consumers may come and go
+     throughout the lifetime of the producer.
+
+

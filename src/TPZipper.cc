@@ -21,6 +21,8 @@
 
  */
 
+#include "ReactorApp.h"
+
 #include "ptmp/api.h"
 #include "ptmp/internals.h"
 #include "ptmp/factory.h"
@@ -216,6 +218,15 @@ struct zipper_queue_t {
         return std::max(0, (int)((toverdue - now)/1000));
     }
 
+};
+
+
+class ZipperApp : public ptmp::noexport::ReactorApp {
+public:
+    ZipperApp(zsock_t* pipe, json& config)
+        : ReactorApp(pipe, config, "zipper") {
+
+    }
 };
 
 

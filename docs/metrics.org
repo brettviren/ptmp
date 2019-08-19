@@ -1,0 +1,90 @@
+#+title: PTMP Metrics
+
+PTMP support emitting *metrics* on a ZeroMQ socket.  
+
+* Introduction
+
+Here, a "metric" is key/value pair where the value itself may be a
+structure of key/value pairs or an array of metrics.  Although a
+metric value may be a string, PTMP metrics are not intended to be used
+as a type of free-form logging.
+
+The ~ptmp::metrics::Metric~ class provides a simple interface to send
+metrics out of a socket.  Application code may construct a ~Metric~
+class and use the instance as a callable.  Each call will result in a
+ZeroMQ message to be emitted.  
+
+The socket used by a ~Metric~ is constructed, (as with all PTMP
+components), based on a configuration string.  The application code
+using a ~Metric~ object thus need not provide any explicit
+configuration.  When a ~Metric~ is used by a PTMP component the general
+convention is that the component configuration will provide a top
+level attribute named ~"metrics"~ and that it is optional.
+
+A ~Metric~ provides two variants of callable methods:
+
+1. send an arbitrary ~nlohmann::json~ object.  Generally preferred and
+   must be used in order to retain time correlation between multiple
+   metrics.
+
+2. send a single key/value pair with a scalar value.  This is mere
+   syntactic sugar when a single scalar is to be sent.
+
+
+An optional argument to both methods may provide an explicit time to
+associate with the metric.  The time is of type
+~ptmp::data::real_time_t~ which is absolute microseconds from the Unix
+Epoch.  By default the current computer system time will be used.
+Note, this time value does not preclude application code from sending
+other time values in the body of a metric.
+
+
+* Example
+
+The following sketch shows an example of constructing a ~Metric~ and
+calling both of its callable methods.
+
+#+begin_src c++
+  #include "ptmp/metrics.h"
+  #include "json.hpp"
+
+  using json = nlohmann::json;
+
+  void some_actor_function(...) {
+      std::string met_cfg = ...;
+      ptmp::metrics::Metric::Metric log(met_cfg);
+      // later...
+      while (!zsys_interupted) {
+          int something = ...;
+          float other = ...;
+          met({"something":something, "other":other});
+          // One liners (not efficient for many values)
+          met("something", something);
+      }
+      // met desctructs here
+  }
+#+end_src
+
+* Timing and rate
+
+Every call of a ~Metric~ object results in a message sent out its
+socket.  A common downstream consumer for such messages are ingest
+processes for time-series databases.  They typically work at a pace
+where 1 Hz of messages is considered "fast".  Emitting a metric every
+time an "unlikely error" occurs can result in MHz of messages when the
+"unlikely" becomes the "possible" and even the "common".  Thus, while
+strictly speaking, a fast pace of metrics is [[philosophy.org][not the problem of the
+producer]], a considerate developer will likely want to provide some
+rate limiting of outgoing messages.
+
+
+* Cautions
+
+The construction and destruction of a ~Metric~ object involves ZeroMQ
+socket construction, connect/bind and eventual socket destruction.  As
+such:
+
+- a ~Metric~ must only be used in the thread from which it was constructed.
+
+- a ~Metric~ should be constructed on order once and be long lived.
+

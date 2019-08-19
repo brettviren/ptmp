@@ -1,9 +1,8 @@
+#include "ReactorApp.h"
 #include "ptmp/api.h"
-#include "ptmp/internals.h"
+
 #include "ptmp/factory.h"
 #include "ptmp/actors.h"
-
-#include "json.hpp"
 
 #include <queue>
 
@@ -24,10 +23,20 @@ using json = nlohmann::json;
 struct time_window_t {
 
     ptmp::data::data_time_t wind;
-    const ptmp::data::data_time_t toff, tspan;
+    ptmp::data::data_time_t toff, tspan;
 
-    time_window_t(ptmp::data::data_time_t tspan, ptmp::data::data_time_t toff, ptmp::data::data_time_t wind = 0)
-        : tspan(tspan), toff(toff%tspan), wind(wind) { }
+    time_window_t(ptmp::data::data_time_t tspan_,
+                  ptmp::data::data_time_t toff_,
+                  ptmp::data::data_time_t wind_ = 0)
+        : tspan(tspan_), toff(toff_%tspan_), wind(wind_) { }
+    time_window_t() : tspan(0), toff(0), wind(0) { }
+    void init(ptmp::data::data_time_t tspan_,
+              ptmp::data::data_time_t toff_,
+              ptmp::data::data_time_t wind_ = 0) {
+        tspan = tspan_;
+        toff = toff_%tspan_;
+        wind = wind_;
+    }
 
     // return the begin time of the window
     ptmp::data::data_time_t tbegin() const {
@@ -62,6 +71,7 @@ struct tp_greater_t {
         return a.tstart() > b.tstart();
     }
 };
+
 
 // a priority queue of TPs ordered by tstart that also keeps track of
 // the highest tstart its seen.
@@ -100,128 +110,77 @@ private:
     ptmp::data::data_time_t m_recent{0};
 };
 
+class WindowApp : public ptmp::noexport::ReactorApp {
+    ptmp::data::data_time_t tspan{0}, toff{0}, tbuf{0};
 
-// The actor function
-void ptmp::actor::window(zsock_t* pipe, void* vargs)
-{
-    auto config = json::parse((const char*) vargs);
-    std::string name = "window";
-    if (config["name"].is_string()) {
-        name = config["name"];
-    }
-    ptmp::internals::set_thread_name(name);
-
-    int verbose=0;              // fixme, add log level support in internals.
-    if (config["verbose"].is_number()) {
-        verbose = config["verbose"];
-    }
-
-    int detid = -1;
-    if (config["detid"].is_number()) {
-        detid = config["detid"];
-    }
-    ptmp::data::data_time_t toff=0;
-    if (config["toffset"].is_number()) {
-        toff = config["toffset"];
-    }
-    ptmp::data::data_time_t tspan=0;
-    if (config["tspan"].is_number()) {
-        tspan = config["tspan"];
-    }
-    if (!tspan) {
-        zsys_error("window: requires finite tspan");
-        throw std::runtime_error("tpwindow requires finite tspan");
-
-    }
-    ptmp::data::data_time_t tbuf=0;
-    if (config["tbuf"].is_number()) {
-        tbuf = config["tbuf"].get<int>();
-    }
-    tbuf = std::max(tspan,tbuf);
-
-    zsock_t* isock = ptmp::internals::endpoint(config["input"].dump());
-    zsock_t* osock = ptmp::internals::endpoint(config["output"].dump());
-    if (!isock or !osock) {
-        zsys_error("window: requires socket configuration");
-        throw std::runtime_error("tpwindow requires socket configuration");
-
-    }
-    
-    zsock_signal(pipe, 0);      // signal ready
-    zpoller_t* poller = zpoller_new(pipe, isock, NULL);
-
-    // note, this starts at wind=0 which is way way in the past.
-    time_window_t window(tspan, toff);
+    time_window_t window;
     priority_tp_span_t buffer;
 
-    bool got_quit = false;
-    size_t count_in = 0;
-    size_t count_out = 0;
+    // fodder for additional metrics with window semantics not held in
+    // base
+    size_t count_tardy_tps{0};
 
-    while (!zsys_interrupted) {
+public:
 
-        void* which = zpoller_wait(poller, -1);
-        if (zpoller_terminated(poller)) {
-            zsys_info("window: interrupted in poll");
-            break;
+    WindowApp(zsock_t* pipe, json& config)
+        : ReactorApp(pipe, config, "window") {
+
+        if (config["toffset"].is_number()) {
+            toff = config["toffset"];
         }
-        if (which == pipe) {
-            zsys_info("window: got quit after %ld", count_in);
-            got_quit = true;
-            goto cleanup;
+        if (config["tspan"].is_number()) {
+            tspan = config["tspan"];
         }
-
-        zmsg_t* msg = zmsg_recv(isock);
-        if (!msg) {
-            zsys_info("window: interrupted in recv");
-            break;
+        if (!tspan) {
+            zsys_error("window (%s): requires finite tspan", name.c_str());
+            throw std::runtime_error("tpwindow requires finite tspan");
         }
-        ++count_in;
+        if (config["tbuf"].is_number()) {
+            tbuf = config["tbuf"].get<int>();
+        }
+        tbuf = std::max(tspan, tbuf);
+        window.init(tspan, toff);
 
-        {                       // input handling
-            ptmp::data::TPSet tpset;
-            ptmp::internals::recv(&msg, tpset); // throws
-            if (tpset.tps_size() == 0) {
-                zsys_error("receive empty TPSet from det #0x%x", tpset.detid());
-                continue;
+        set_osock(ptmp::internals::endpoint(config["output"].dump()));
+        set_isock(ptmp::internals::endpoint(config["input"].dump()));
+
+    } // ctor
+
+    int add_input(ptmp::data::TPSet& tpset) {
+        
+
+        // If we don't know when we are, buffer takes precedence and sets window.
+        if (window.wind == 0) { 
+            for (const auto& tp : tpset.tps()) {
+                buffer.add(tp);
             }
-
-            if (detid < 0) {        // forward if user doesn't provide
-                detid = tpset.detid();
-            }            
-
-            // If we don't know when wer are, buffer takes precedence and sets window.
-            if (window.wind == 0) { 
-                for (const auto& tp : tpset.tps()) {
-                    buffer.add(tp);
-                }
-                window.set_bytime(buffer.top().tstart());
-            }
-            else {
-                for (const auto& tp : tpset.tps()) {
-                    if (window.cmp(tp.tstart()) < 0) {
-                        if (verbose) {
-                            zsys_debug("window: channel %d tardy TP at -%ld + %ld data time ticks",
-                                       tp.channel(), window.tbegin()-tp.tstart(), tp.tspan());
-                        }
-                        // tardy
-                        continue;
+            window.set_bytime(buffer.top().tstart());
+        }
+        else {
+            for (const auto& tp : tpset.tps()) {
+                if (window.cmp(tp.tstart()) < 0) {
+                    if (verbose) {
+                        zsys_debug("window: channel %d tardy TP at -%ld + %ld data time ticks",
+                                   tp.channel(), window.tbegin()-tp.tstart(), tp.tspan());
                     }
-                    buffer.add(tp);
+                    ++count_tardy_tps;
+                    return 0;
                 }
+                buffer.add(tp);
             }
         }
+        // finished processing fresh input.
+        return 0;
+    }
 
+    int send_output() {
         // Drain if we have buffered past the current window by tbuf amount
         while (buffer.covers(window.tbegin()) >= tbuf+tspan) {
-            
-            ptmp::data::TPSet tpset;
-            tpset.set_count(count_out++);
-            tpset.set_detid(detid);
-            tpset.set_created(ptmp::data::now());
-            tpset.set_tstart(window.tbegin());
-            tpset.set_tspan(tspan);
-            tpset.set_totaladc(0);
+
+            ptmp::data::TPSet otpset;
+            otpset.set_tstart(window.tbegin());
+            otpset.set_tspan(tspan);
+            otpset.set_totaladc(0);
             bool first = true;
 
             // fill outgoing TPSet
@@ -230,63 +189,62 @@ void ptmp::actor::window(zsock_t* pipe, void* vargs)
                 if (!window.in(tp.tstart())) {
                     break;
                 }
-                ptmp::data::TrigPrim* newtp = tpset.add_tps();
+                ptmp::data::TrigPrim* newtp = otpset.add_tps();
                 *newtp = tp;
                 buffer.pop();
-                tpset.set_totaladc(tpset.totaladc() + newtp->adcsum());
+                otpset.set_totaladc(otpset.totaladc() + newtp->adcsum());
                 const auto chan = newtp->channel();
-                if (first or tpset.chanbeg() > chan) {
-                    tpset.set_chanbeg(chan);
+                if (first or otpset.chanbeg() > chan) {
+                    otpset.set_chanbeg(chan);
                 }
-                if (first or tpset.chanend() < chan) {
-                    tpset.set_chanend(chan);
+                if (first or otpset.chanend() < chan) {
+                    otpset.set_chanend(chan);
                 }
                 first = false;
             }
-            if (buffer.empty() or tpset.tps_size() == 0) {
+            if (buffer.empty() or otpset.tps_size() == 0) {
                 zsys_error("window: logic error, buffer or tpset empty, should not happen");
-                assert(tpset.tps_size() > 0); // logic error, should not happen
+                assert(otpset.tps_size() > 0); // logic error, should not happen
             }
             window.set_bytime(buffer.top().tstart());
             
-            // send carefully in case we are blocked we still want to be able to get shutdown
-            while (! (zsock_events(osock) & ZMQ_POLLOUT)) {
-                if (zsock_events(pipe) & ZMQ_POLLIN) {
-                    got_quit = true;
-                    if (verbose) {
-                        zsys_debug("window: got quit while waiting to output");
-                    }
-                    goto cleanup;
-                }
-                zclock_sleep(1); // ms
+            int rc = this->send(otpset);
+            if (rc != 0) {
+                return rc;
             }
-            ptmp::internals::send(osock, tpset); // fixme: can throw
-
         } // go around to see if enough left in the buffer.
 
-    } // message loop
+        return 0;
+    }
 
-  cleanup:
+    virtual int add(ptmp::data::TPSet& tpset) {
 
-    if (verbose) {
-        zsys_debug("window: finishing with %ld in, %ld out and %ld still in the buffer",
-                   count_in, count_out, buffer.size());
-        while (buffer.size() > 0) {
-            auto tp = buffer.top(); buffer.pop();
-            zsys_debug("window:\t channel %d, tstart %ld", tp.channel(), tp.tstart());
+        int rc = this->add_input(tpset);
+        if (rc != 0) {
+            return rc;
         }
-    }
-    zpoller_destroy(&poller);
-    zsock_destroy(&isock);
-    zsock_destroy(&osock);
 
-    if (got_quit) {
-        return;
+        return this->send_output();
     }
-    if (verbose) {
-        zsys_debug("window: waiting for quit");
+
+    virtual void metrics(json& jmet, ptmp::data::real_time_t dtr, ptmp::data::data_time_t dtd) {
+        double dt = dtd;
+        jmet["rates"]["tardytps"] = count_tardy_tps/dt;
+        count_tardy_tps = 0;
     }
-    zsock_wait(pipe);
+
+    virtual ~WindowApp () {
+    }
+};
+
+
+// The actor function (reactor pattern)
+void ptmp::actor::window(zsock_t* pipe, void* vargs)
+{
+    auto jcfg = json::parse((const char*) vargs);
+    WindowApp app(pipe, jcfg);
+    zsock_signal(pipe, 0);      // signal ready
+    app.start();
 }
 
 ptmp::TPWindow::TPWindow(const std::string& config)
