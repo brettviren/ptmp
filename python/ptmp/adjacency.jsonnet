@@ -45,13 +45,19 @@ local ptmp = import "ptmp.jsonnet";
 
 
 local make_tc = function(apa, inputs, output, params) {
+    local metagg = 'inproc://tc-metric-aggregator-apa%d'%apa,
+    local spigot = ptmp.graphite("tc-metrics",
+                                 ptmp.socket('bind', 'sub', metagg), 
+                                 ptmp.socket('connect', 'stream', params.addresses.graphite)),
     local iota = std.range(0, std.length(inputs)-1),
     local inproc_wz = ["inproc://tc-window-zipper-apa%d-link%02d"%[apa,link] for link in iota],
     local windows = [ptmp.window('tc-window-apa%d-link%02d'%[apa, link],
                                  isocket = ptmp.socket('connect', 'sub', inputs[link],
                                                        hwm = params.pubsub_hwm),
                                  osocket = ptmp.socket('bind', 'push', inproc_wz[link]),
-                                 cfg = {name:"tp-window-apa%d-link%02d"%[apa,link]}+params.cfg)
+                                 cfg = {name:"tp-window-apa%d-link%02d"%[apa,link],
+                                        metrics:ptmp.metrics('tc.window.apa.%d.links.%d'%[apa, link],
+                                                             ptmp.socket('connect', 'pub', metagg))}+params.cfg)
                      for link in iota],
     local inproc_ztc = "inproc://tc-zipper-tcfinder-apa%d" % apa,
     local zipper = ptmp.zipper("tc-zipper-apa%d"%apa,
@@ -64,7 +70,7 @@ local make_tc = function(apa, inputs, output, params) {
                                      osocket = ptmp.socket('bind','pub', output,
                                                            hwm = params.pubsub_hwm),
                                      cfg = {name:"apa%d-adj-tcs"%apa, engine: "pdune_adjacency_tc"}),
-    components: windows + [zipper, tcfinder],
+    components: windows + [spigot, zipper, tcfinder],
 }.components;
 
 local make_td = function(inputs, output, params) {

@@ -43,6 +43,7 @@ void ptmp::actor::composer(zsock_t* pipe, void* vargs)
         }
         agents.push_back(agent);
         agent_name[agent] = name;
+        zsys_info("composer: starting %s agent \"%s\"", type.c_str(), name.c_str());
     }
     
 

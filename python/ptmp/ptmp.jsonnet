@@ -15,7 +15,6 @@
     },
 
 
-
     // A socket description object is used by most TP proxy/agent
     // classes.  The bind or connect arguments should pass an
     // array of endpoint addresses, each in ZMQ string format.
@@ -46,6 +45,14 @@
     // factory method of TPAgent.
     //
 
+    // Build a mixin if a node has a source of metrics.  The result is
+    // usually held in a "metrics" attribute of the data cfg object.
+    metrics(prefix, osocket, proto="JSON", period=10000) : {
+        prefix: prefix,  // deliminate a tree path with "." or "/", implicitily appended to "ptmp."  
+        proto: proto,    // usually "JSON" with a converter or "GLOT" to go directly to Graphite
+        period: period,  // ms
+        output: {socket:osocket}, // must be STREAM if using GLOT, o.w. any sending ZMQ socket, but usually PUB.
+    },
 
     nodeconfig(type, name, isocket, osocket, cfg) :: {
         name: name,

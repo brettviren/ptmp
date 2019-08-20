@@ -58,13 +58,12 @@ std::string ptmp::metrics::glot_stringify(json& jdat, const std::string& prefix,
 static
 std::string make_prefix_dot(json& topcfg)
 {
-    std::string ret = "ptmp.";
     if ( topcfg["prefix"].is_string() ) {
         std::string mid = topcfg["prefix"];
         mid = ptmp::stringutil::trim(mid, ".");
-        ret += mid + ".";
+        return "ptmp." + mid;
     }
-    return ret;
+    return "ptmp";
 }
 
 static
@@ -86,15 +85,19 @@ zsock_t* make_sock(json& topcfg)
             zsys_info("metric: osock: %s", cfg.c_str());
             return sock;
         }
+        zsys_error("metric: failed to make socket with: %s", cfg.c_str());
+        throw std::runtime_error("metric: failed to make socket");        
     }
-    throw std::runtime_error("metric: failed to make socket");
+    throw std::runtime_error("metric: no output socket defined");        
 }
 
 
-struct JsonProto : ptmp::metrics::Metric::Proto {
+class JsonProto : public ptmp::metrics::Metric::Proto {
 
     std::string prefix;
     zsock_t* sock;
+
+public:
 
     JsonProto(json& cfg) : prefix(make_prefix_slash(cfg)), sock(make_sock(cfg)) {
         
@@ -105,14 +108,15 @@ struct JsonProto : ptmp::metrics::Metric::Proto {
 
     std::string pathify(std::string path) {
         ptmp::stringutil::find_replace(path, ".", "/");
-        return prefix + path;
+        return prefix + "/" + path;
     }
 
+    // m is not scalar
     void send(json& m, ptmp::data::real_time_t now_us) {
         if (!now_us) {
             now_us = ptmp::data::now();
         }
-        json j;
+        json j = json::object();
         j[json::json_pointer(prefix)] = m;
         std::string s = j.dump();
         zsock_send(sock, "is", ptmp::metrics::json_message_type, s.c_str());
@@ -120,12 +124,12 @@ struct JsonProto : ptmp::metrics::Metric::Proto {
 };
 
 
-struct GlotProto : ptmp::metrics::Metric::Proto {
+struct GlotProto : public ptmp::metrics::Metric::Proto {
     std::string prefix;
     zsock_t* sock;
     uint8_t oid [256];
     size_t oid_size = 256;
-
+public:
     GlotProto(json& cfg) : prefix(make_prefix_dot(cfg)), sock(make_sock(cfg)) {
         if (streq(zsock_type_str(sock), "STREAM")) {
             int rc = zmq_getsockopt(zsock_resolve(sock), ZMQ_IDENTITY,
@@ -142,7 +146,7 @@ struct GlotProto : ptmp::metrics::Metric::Proto {
 
     std::string pathify(std::string path) {
         ptmp::stringutil::find_replace(path, "/", ".");
-        return prefix + path;
+        return prefix + "." + path;
     }
     void send(json& m, ptmp::data::real_time_t now_us) {
         if (!now_us) { now_us = ptmp::data::now(); }

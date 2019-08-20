@@ -37,5 +37,10 @@ int main()
 
     std::cout << "prefix: " << j.dump(4) << std::endl;
     
+    json jj = json::object();
+    prefix = "/ptmp/tc/window/apa/5/links/3";
+    jj[json::json_pointer(prefix)] = cfg;
+    std::cout << "jj: " << jj.dump(4) << std::endl;
+
     return 0;
 }
