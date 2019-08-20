@@ -14,15 +14,18 @@ class FilterApp : public ptmp::noexport::ReactorApp {
 
 public:
     FilterApp(zsock_t* pipe, json& config) 
-        : ReactorApp(pipe, config, config["engine"]) {
+        : ReactorApp(pipe, config, "filter") {
 
-        engine = ptmp::factory::make<ptmp::filter::engine_t>(name, config.dump());
+        std::string ename = config["engine"];
+        engine = ptmp::factory::make<ptmp::filter::engine_t>(ename, config.dump());
         if (!engine) {
-            zsys_error("No such filter engine: \"%s\"", name.c_str());
+            zsys_error("filter: no such engine type: %s (name: \"%s\")",
+                       ename.c_str(), name.c_str());
             throw std::runtime_error("filter: failed to locate engine");
             return;
         }
-
+        zsys_info("filter: using engine type: %s (name: \"%s\")",
+                  ename.c_str(), name.c_str());
         set_isock(ptmp::internals::endpoint(config["input"].dump()));
         set_osock(ptmp::internals::endpoint(config["output"].dump()));
     }

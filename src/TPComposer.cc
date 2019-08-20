@@ -35,6 +35,7 @@ void ptmp::actor::composer(zsock_t* pipe, void* vargs)
         const std::string type = jprox["type"];
         const std::string data = jprox["data"].dump();
 
+        zsys_info("composer: starting %s agent \"%s\"", type.c_str(), name.c_str());
         ptmp::TPAgent* agent = ptmp::factory::make<ptmp::TPAgent>(type, data);
         if (!agent) {
             zsys_error("composer: failed to create agent \"%s\" of type \"%s\"",
@@ -43,7 +44,6 @@ void ptmp::actor::composer(zsock_t* pipe, void* vargs)
         }
         agents.push_back(agent);
         agent_name[agent] = name;
-        zsys_info("composer: starting %s agent \"%s\"", type.c_str(), name.c_str());
     }
     
 
