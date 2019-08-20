@@ -227,9 +227,8 @@ public:
         return this->send_output();
     }
 
-    virtual void metrics(json& jmet, ptmp::data::real_time_t dtr, ptmp::data::data_time_t dtd) {
-        double dt = dtd;
-        jmet["rates"]["tardytps"] = count_tardy_tps/dt;
+    virtual void metrics(json& jmet) {
+        jmet["rates"]["tardytps"] = count_tardy_tps * stats.iss.data.hz;
         count_tardy_tps = 0;
     }
 

@@ -221,15 +221,6 @@ struct zipper_queue_t {
 };
 
 
-class ZipperApp : public ptmp::noexport::ReactorApp {
-public:
-    ZipperApp(zsock_t* pipe, json& config)
-        : ReactorApp(pipe, config, "zipper") {
-
-    }
-};
-
-
 // The actor function
 void ptmp::actor::zipper(zsock_t* pipe, void* vargs)
 {
