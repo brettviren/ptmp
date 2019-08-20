@@ -74,6 +74,8 @@ void ptmp::actor::filter(zsock_t* pipe, void* vargs)
             
     }
 
+    delete engine; engine=nullptr;
+
     zpoller_destroy(&pipe_poller);
     zsock_destroy(&isock);
     zsock_destroy(&osock);
