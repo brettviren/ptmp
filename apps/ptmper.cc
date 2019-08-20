@@ -83,7 +83,7 @@ int main(int argc, char* argv[])
         std::string pi = jpi;
         auto ok = pim.add(pi);
         if (!ok) {
-            zsys_error("composer: failed to add plugin: \"%s\"", pi.c_str());
+            zsys_error("ptmper: failed to add plugin: \"%s\"", pi.c_str());
             throw std::runtime_error("composer: failed to add plugin");
         }
         //zsys_debug("composer: adding plugin \"%s\"", pi.c_str());

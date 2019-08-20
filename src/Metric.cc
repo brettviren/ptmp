@@ -78,8 +78,8 @@ std::string make_prefix_slash(json& topcfg)
 static
 zsock_t* make_sock(json& topcfg)
 {
-    if (!topcfg["output"].is_null()) {
-        std::string cfg = topcfg["output"].dump();
+    if (!topcfg["socket"].is_null()) {
+        std::string cfg = topcfg.dump();
         zsock_t* sock = ptmp::internals::endpoint(cfg);
         if (sock) {
             zsys_info("metric: osock: %s", cfg.c_str());

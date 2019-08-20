@@ -114,6 +114,8 @@ zsock_t* ptmp::internals::endpoint(const std::string& config)
 // function is like endpoint() but provides a per-endpoint socket interpretation.
 std::vector<zsock_t*> ptmp::internals::perendpoint(const std::string& config)
 {
+    // fixme: I made a mistake to have config contain the attribute
+    // "socket" instead of being the value....
     auto jcfg = json::parse(config)["socket"];
     const std::vector<std::string> bcs{"bind","connect"};
     std::vector<zsock_t*> ret;

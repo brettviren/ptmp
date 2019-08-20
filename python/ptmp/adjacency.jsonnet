@@ -43,7 +43,6 @@ local params = all_params[context];
 
 local ptmp = import "ptmp.jsonnet";
 
-
 local make_tc = function(apa, inputs, output, params) {
     local metagg = 'inproc://tc-metric-aggregator-apa%d'%apa,
     local spigot = ptmp.graphite("tc-metrics",
@@ -55,38 +54,62 @@ local make_tc = function(apa, inputs, output, params) {
                                  isocket = ptmp.socket('connect', 'sub', inputs[link],
                                                        hwm = params.pubsub_hwm),
                                  osocket = ptmp.socket('bind', 'push', inproc_wz[link]),
-                                 cfg = {name:"tp-window-apa%d-link%02d"%[apa,link],
-                                        metrics:ptmp.metrics('tc.window.apa.%d.links.%d'%[apa, link],
-                                                             ptmp.socket('connect', 'pub', metagg))}+params.cfg)
+                                 cfg = {
+                                     name:"tp-window-apa%d-link%02d"%[apa,link],
+                                     metrics:ptmp.metrics('tc.window.apa%d.link%02d'%[apa, link],
+                                                          ptmp.socket('connect', 'pub', metagg))
+                                 }+params.cfg)
                      for link in iota],
     local inproc_ztc = "inproc://tc-zipper-tcfinder-apa%d" % apa,
     local zipper = ptmp.zipper("tc-zipper-apa%d"%apa,
                                isocket = ptmp.socket('connect','pull', inproc_wz),
                                osocket = ptmp.socket('bind','push', inproc_ztc),
-                               cfg = {name:"apa%d-zipper"%apa}+params.cfg),
+                               cfg = {
+                                   name:"apa%d-zipper"%apa,
+                                   metrics:ptmp.metrics('tc.zipper.apa%d'%apa,
+                                                        ptmp.socket('connect', 'pub', metagg))                                   
+                               }+params.cfg),
 
     local tcfinder = ptmp.nodeconfig("filter", "tc-finder-apa%d"%apa,
                                      isocket = ptmp.socket('connect','pull', inproc_ztc),
                                      osocket = ptmp.socket('bind','pub', output,
                                                            hwm = params.pubsub_hwm),
-                                     cfg = {name:"apa%d-adj-tcs"%apa, engine: "pdune_adjacency_tc"}),
+                                     cfg = {
+                                         name:"apa%d-adj-tcs"%apa,
+                                         engine: "pdune_adjacency_tc",
+                                         metrics:ptmp.metrics('tc.filter.apa%d'%apa,
+                                                              ptmp.socket('connect', 'pub', metagg))                                   
+                                     }),
     components: windows + [spigot, zipper, tcfinder],
 }.components;
 
 local make_td = function(inputs, output, params) {
+    local metagg = 'inproc://td-metric-aggregator-apa',
+    local spigot = ptmp.graphite("td-metrics",
+                                 ptmp.socket('bind', 'sub', metagg), 
+                                 ptmp.socket('connect', 'stream', params.addresses.graphite)),
+
     local inproc_ztd = "inproc://td-zipper-tdfinder",
     local zipper = ptmp.zipper("td-zipper",
                                isocket = ptmp.socket('connect', 'sub', inputs,
                                                      hwm = params.pubsub_hwm),
                                osocket = ptmp.socket('bind','push', inproc_ztd),
-                               cfg = {name:"td-zipper"}+params.cfg),
+                               cfg = {
+                                   name:"td-zipper",
+                                   metrics:ptmp.metrics('td.zipper',
+                                                        ptmp.socket('connect', 'pub', metagg))
+                               }+params.cfg),
 
     local tdfinder = ptmp.nodeconfig("filter", "td-finder",
                                      isocket = ptmp.socket('connect','pull', inproc_ztd),
                                      osocket = ptmp.socket('bind','pub', output,
                                                            hwm = params.pubsub_hwm),
-                                     cfg = {engine: "pdune_adjacency_td"}),
-    components: [zipper, tdfinder],
+                                     cfg = {
+                                         engine: "pdune_adjacency_td",
+                                         metrics:ptmp.metrics('td.filter',
+                                                              ptmp.socket('connect', 'pub', metagg))
+                                     }),
+    components: [spigot, zipper, tdfinder],
 }.components;
 
 

@@ -29,30 +29,30 @@
     },
 
     // Some simplified socket makers.  (sock it to me) 
-    sitm : {
-        tcp :: function(bc, stype, num) $.socket(bc, stype, ['tcp://127.0.0.1:%d'%num]),
-        inproc :: function(bc, stype, num) $.socket(bc, stype, ['inproc://thread%05d'%num]),
-        ipc :: function(bc, stype, num) $.socket(bc, stype, ['ipc://pipe%05d.ipc'%num]),
-    },
-
+    // sitm : {
+    //     tcp :: function(bc, stype, num) $.socket(bc, stype, ['tcp://127.0.0.1:%d'%num]),
+    //     inproc :: function(bc, stype, num) $.socket(bc, stype, ['inproc://thread%05d'%num]),
+    //     ipc :: function(bc, stype, num) $.socket(bc, stype, ['ipc://pipe%05d.ipc'%num]),
+    // },
 
     maybe_socket(io, s) :: if std.type(s) == 'null' then {} else { [io]: { socket: s } },
     maybe_sockets(is, os) :: $.maybe_socket('input', is) + $.maybe_socket('output', os),
 
 
-    //
-    // Create actor configurations.  The 'type' values must be in the
-    // factory method of TPAgent.
-    //
-
-    // Build a mixin if a node has a source of metrics.  The result is
-    // usually held in a "metrics" attribute of the data cfg object.
+    // Build a mixin to describe a node with an auxiliary socket
+    // providing a source of metrics.  The result is usually held in a
+    // "metrics" attribute of the node data cfg object.
     metrics(prefix, osocket, proto="JSON", period=10000) : {
         prefix: prefix,  // deliminate a tree path with "." or "/", implicitily appended to "ptmp."  
         proto: proto,    // usually "JSON" with a converter or "GLOT" to go directly to Graphite
         period: period,  // ms
-        output: {socket:osocket}, // must be STREAM if using GLOT, o.w. any sending ZMQ socket, but usually PUB.
+        socket:osocket,  // must be STREAM if using GLOT, o.w. any sending ZMQ socket, but usually PUB.
     },
+
+    //
+    // Create actor configurations.  The 'type' values must be what is
+    // used to register a factory method.
+    //
 
     nodeconfig(type, name, isocket, osocket, cfg) :: {
         name: name,
