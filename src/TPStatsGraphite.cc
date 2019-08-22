@@ -84,12 +84,11 @@ void graphite(zsock_t* pipe, void* vargs)
             continue;
         }
 
-        auto now = ptmp::data::now();
-        time_t now_s = now/1000000;
+        auto now_s = ptmp::data::now() / 1000000;
         
         auto jdata = json::parse((const char*) sdat);
         freen(sdat);
-        std::string sout = ptmp::metrics::glot_stringify(jdata, "ptmp.tpstats", now_s);
+        std::string sout = ptmp::metrics::glot_stringify(jdata, "", now_s);
         if (sout.empty()) {
             continue;
         }

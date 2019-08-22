@@ -242,7 +242,7 @@ int handle_timer_chan(zloop_t* loop, int timer_id, void* varg)
 
     jdat["seqno"] = ad.chan_seqno++;
     json jtop;
-    jtop[ad.topkey]["chans"] = jdat;
+    jtop["ptmp"][ad.topkey]["chans"] = jdat;
     std::string sdat = jtop.dump();
 
     // PTMP protocol puts a type as first frame.

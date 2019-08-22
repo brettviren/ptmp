@@ -43,7 +43,7 @@ namespace ptmp {
 
         public:
             struct Proto {
-                virtual void send(nlohmann::json&, ptmp::data::real_time_t now_us) = 0;
+                virtual void send(nlohmann::json&, time_t now_s) = 0;
                 virtual std::string pathify(std::string) = 0;
             };
 
@@ -53,12 +53,13 @@ namespace ptmp {
             // Destroy metric socket.
             ~Metric();
 
-            // Emit an structured object of metrics.  If now_us is zero,
-            // it will be set to the current system time in microseconds.
-            // A "now" attribute in any part of the metricts structure
-            // will override.  The metrics structure is emitted in an
-            // object rooted on the attribute given by "/ptmp/<prefix>".
-            void operator()(nlohmann::json& metrics, ptmp::data::real_time_t now_us=0);
+            // Emit an structured object of metrics.  If now_s is zero
+            // seconds, it will be set to the current system time in
+            // microseconds.  A "now" attribute in any part of the
+            // metricts structure will override.  The metrics
+            // structure is emitted in an object rooted on the
+            // attribute given by "/ptmp/<prefix>".
+            void operator()(nlohmann::json& metrics, time_t now_s=0);
 
             // Emit a one-off metric.  This sends an individual metric in
             // it's own message and might be good for reporting isolated,
@@ -67,11 +68,11 @@ namespace ptmp {
             // The path may be "."-delimited.
             template<typename TYPE>
             void operator()(const std::string& path, const TYPE& value, 
-                            ptmp::data::real_time_t now_us=0) {
+                            time_t now_s=0) {
                 using json = nlohmann::json;
                 json j;
                 j[json::json_pointer(m_proto->pathify(path))] = value;
-                (*this)(j, now_us);
+                (*this)(j, now_s);
             }
         private:
             Proto* m_proto;

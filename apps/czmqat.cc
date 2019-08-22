@@ -46,7 +46,7 @@ int make_sock(sock_opt_t& sopt)
         return 0;               // allowed
     }
     const std::unordered_map<std::string, int> socktypemap{
-        {"PUB",ZMQ_PUB},{"SUB",ZMQ_SUB},{"PUSH",ZMQ_PUSH},{"PULL",ZMQ_PULL}
+        {"PUB",ZMQ_PUB},{"SUB",ZMQ_SUB},{"PUSH",ZMQ_PUSH},{"PULL",ZMQ_PULL},{"STREAM",ZMQ_STREAM}
     };
     const auto& st = socktypemap.find(sopt.socktype);
     if (st == socktypemap.end()) {

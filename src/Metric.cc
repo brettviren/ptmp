@@ -17,9 +17,8 @@ using json = nlohmann::json;
 // key, a value and a Unix timestamp.
 
 std::string ptmp::metrics::glot_stringify(json& jdat, const std::string& prefix,
-                                          ptmp::data::real_time_t now_us)
+                                          time_t now_s)
 {
-    time_t now_s = now_us / 1000000;
     if (jdat.is_null()) {
         return "";
     }
@@ -34,7 +33,10 @@ std::string ptmp::metrics::glot_stringify(json& jdat, const std::string& prefix,
             json& jval = el.value();
             std::stringstream key;
             std::string thiskey = el.key();
-            key << prefix << "." << thiskey;
+            if (!prefix.empty()) {
+                key << prefix << ".";
+            }
+            key << thiskey;
             ss << glot_stringify(jval, key.str(), now_s);
             // if (thiskey == "ntpsperlink") {
             //     std::cout << prefix << "." << thiskey << " = " << jval << std::endl;
@@ -44,7 +46,10 @@ std::string ptmp::metrics::glot_stringify(json& jdat, const std::string& prefix,
     else if (jdat.is_array()) {
         for (size_t ind = 0; ind<jdat.size(); ++ind) {
             std::stringstream key;
-            key << prefix << "." << ind;
+            if (!prefix.empty()) {
+                key << prefix << ".";
+            }
+            key << ind;
             json& jele = jdat[ind];
             ss << glot_stringify(jele, key.str(), now_s);
         }
@@ -112,9 +117,9 @@ public:
     }
 
     // m is not scalar
-    void send(json& m, ptmp::data::real_time_t now_us) {
-        if (!now_us) {
-            now_us = ptmp::data::now();
+    void send(json& m, time_t now_s) {
+        if (!now_s) {
+            now_s = ptmp::data::now() / 1000000;
         }
         json j = json::object();
         j[json::json_pointer(prefix)] = m;
@@ -148,8 +153,8 @@ public:
         ptmp::stringutil::find_replace(path, "/", ".");
         return prefix + "." + path;
     }
-    void send(json& m, ptmp::data::real_time_t now_us) {
-        if (!now_us) { now_us = ptmp::data::now(); }
+    void send(json& m, time_t now_s) {
+        if (!now_s) { now_s = ptmp::data::now() / 1000000; }
 
         zmsg_t* msg = zmsg_new();
         if (oid) {              // STREAM requires an ID for routing
@@ -160,7 +165,7 @@ public:
                         sizeof(ptmp::metrics::glot_message_type));
         }
 
-        std::string sout = ptmp::metrics::glot_stringify(m, prefix, now_us);
+        std::string sout = ptmp::metrics::glot_stringify(m, prefix, now_s);
 
         zmsg_addstr(msg, sout.c_str());
         zmsg_send(&msg, sock);
@@ -194,8 +199,8 @@ ptmp::metrics::Metric::~Metric()
     delete m_proto; m_proto=0;
 }
 
-void ptmp::metrics::Metric::operator()(json& metrics, ptmp::data::real_time_t now_us)
+void ptmp::metrics::Metric::operator()(json& metrics, time_t now_s)
 {
-    m_proto->send(metrics, now_us);
+    m_proto->send(metrics, now_s);
 }
 

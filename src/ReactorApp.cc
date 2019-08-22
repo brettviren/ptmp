@@ -54,6 +54,7 @@ ptmp::noexport::ReactorApp::ReactorApp(zsock_t* pipe_, json& config, const std::
         if (!config["tickperus"].is_null()) {
             tickperus = config["tickperus"];
         }
+        zsys_debug("metrics from %s on 0x%x every %d ms", name.c_str(), detid, integ_time_ms);
         zloop_timer(looper, integ_time_ms, 0, handle_timer_link, this);
     }
 }
@@ -122,6 +123,8 @@ int ReactorApp::metrics_base()
         { "count", stats.waits.count}
         ,{"duty", (stats.waits.time_ms/1000.0)* stats.oss.real.hz}
     };
+
+    zsys_debug("metric %d from 0x%x", out_tpset_count, detid);
 
     this->metrics(j);
     (*met)(j);

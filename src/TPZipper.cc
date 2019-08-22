@@ -21,7 +21,6 @@
 
  */
 
-#include "ReactorApp.h"
 
 #include "ptmp/api.h"
 #include "ptmp/internals.h"
@@ -219,7 +218,6 @@ struct zipper_queue_t {
     }
 
 };
-
 
 // The actor function
 void ptmp::actor::zipper(zsock_t* pipe, void* vargs)
