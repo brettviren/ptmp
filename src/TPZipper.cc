@@ -284,6 +284,9 @@ void ptmp::actor::zipper(zsock_t* pipe, void* vargs)
     std::vector<size_t> total_counts(ninputs, 0);
     std::vector<size_t> tardy_counts(ninputs, 0);
 
+    int count_recv=0;
+    ptmp::data::real_time_t start_time = ptmp::data::now();
+
     int wait_ms = -1;
     bool got_quit = false;
     while (!zsys_interrupted) {
@@ -308,6 +311,14 @@ void ptmp::actor::zipper(zsock_t* pipe, void* vargs)
                 if (pollitems[ind].revents & ZMQ_POLLIN) {
                     //zsys_debug("got input on %d", ind);
                     zq.recv(ind, inputs[ind]);
+                    ++count_recv;
+                    if (verbose) {
+                        if (count_recv % 100000 == 1) {
+                            double dt = ptmp::data::now() - start_time;
+                            double hz = 1e6*count_recv/dt;
+                            zsys_debug("zipper \"%s\" received %.1f Hz", name.c_str(), hz);
+                        }
+                    }
                 }
             }
         }

@@ -62,12 +62,12 @@ local make_tc = function(apa, inputs, output, params) {
                      for link in iota],
     local inproc_ztc = "inproc://tc-zipper-tcfinder-apa%d" % apa,
     local zipper = ptmp.zipper("tc-zipper-apa%d"%apa,
-                               isocket = ptmp.socket('connect','pull', inproc_wz),
+                               isocket = ptmp.socket('connect','pull', inproc_wz, hwm=100000),
                                osocket = ptmp.socket('bind','push', inproc_ztc),
                                cfg = {
                                    name:"apa%d-zipper"%apa,
-                                   metrics:ptmp.metrics('tc.zipper.apa%d'%apa,
-                                                        ptmp.socket('connect', 'pub', metagg))                                   
+                                   // metrics:ptmp.metrics('tc.zipper.apa%d'%apa,
+                                   //                      ptmp.socket('connect', 'pub', metagg))
                                }+params.cfg),
 
     local tcfinder = ptmp.nodeconfig("filter", "tc-finder-apa%d"%apa,
