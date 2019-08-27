@@ -107,6 +107,7 @@ struct zipper_queue_t {
     // keep track of highest tstart time of returned punctual
     // messages.
     ptmp::data::data_time_t last_tstart{0};
+    ptmp::data::TPSet tpset;    // reuse
 
     zipper_queue_t(int ninputs, int sync_ms) : counts(ninputs, 0), sync_ms(sync_ms) {}
 
@@ -124,7 +125,7 @@ struct zipper_queue_t {
         zmsg_t* msg = zmsg_recv(sock);
         zmsg_first(msg);        // msg id
         zframe_t* pay = zmsg_next(msg);
-        ptmp::data::TPSet tpset;
+        //ptmp::data::TPSet tpset;        
         tpset.ParseFromArray(zframe_data(pay), zframe_size(pay));
         ptmp::data::data_time_t tstart = tpset.tstart();
         meta_msg_t mm = {ind, trecv+1000*sync_ms, tstart, msg};
@@ -303,7 +304,7 @@ void ptmp::actor::zipper(zsock_t* pipe, void* vargs)
             }
 
             // slurp in all available
-            for (size_t ind=0; ind<ninputs; ++ind) {
+            for (size_t ind=0; ind<(ninputs-1); ++ind) {
                 if (pollitems[ind].revents & ZMQ_POLLIN) {
                     //zsys_debug("got input on %d", ind);
                     zq.recv(ind, inputs[ind]);
