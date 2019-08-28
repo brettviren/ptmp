@@ -67,7 +67,7 @@
     // Create a configuration for TPZipper. 
     zipper(name, isocket, osocket, cfg={})
     :: $.nodeconfig('zipper', name, isocket, osocket,
-                    {sync_time:5000/0.02, tardy_policy:"drop"} + cfg),
+                    {nap_time: 100, sync_time:5000/0.02, tardy_policy:"drop"} + cfg),
 
     // Create a configuration for TPWindow
     window(name, isocket, osocket, cfg={})

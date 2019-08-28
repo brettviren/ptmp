@@ -87,6 +87,7 @@ ptmp::noexport::ReactorApp::~ReactorApp()
 
 void ptmp::noexport::ReactorApp::start()
 {
+    start_time = ptmp::data::now();
     zloop_start(looper);
 }
 
@@ -160,5 +161,14 @@ int ptmp::noexport::ReactorApp::send(ptmp::data::TPSet& tpset)
     if (met) {
         stats.oss.update(tpset, tickperus);
     }
+
+    if (verbose>0) {
+        if (out_tpset_count % 100000 == 1) {
+            double dt = ptmp::data::now() - start_time;
+            double hz = 1e6 * out_tpset_count/dt;
+            zsys_debug("%s: output at %.1f Hz", name.c_str(), hz);
+        }
+    }
+
     return 0;
 }

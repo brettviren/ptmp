@@ -54,24 +54,26 @@ local make_tc = function(apa, inputs, output, params) {
                                  isocket = ptmp.socket('connect', 'sub', inputs[link],
                                                        hwm = params.pubsub_hwm),
                                  osocket = ptmp.socket('bind', 'push', inproc_wz[link]),
-                                 cfg = {
+                                 cfg = params.cfg + {
                                      name:"tp-window-apa%d-link%02d"%[apa,link],
+                                     // verbose: 1,
                                      metrics:ptmp.metrics('tc.window.apa%d.link%02d'%[apa, link],
                                                           ptmp.socket('connect', 'pub', metagg))
-                                 }+params.cfg)
+                                 })
                      for link in iota],
     local inproc_ztc = "inproc://tc-zipper-tcfinder-apa%d" % apa,
     local zipper = ptmp.zipper("tc-zipper-apa%d"%apa,
-                               isocket = ptmp.socket('connect','pull', inproc_wz, hwm=100000),
-                               osocket = ptmp.socket('bind','push', inproc_ztc),
+                               isocket = ptmp.socket('connect','pull', inproc_wz),
+                               osocket = ptmp.socket('bind','pub', inproc_ztc),
                                cfg = {
                                    name:"apa%d-zipper"%apa,
+                                   // verbose: 1,
                                    // metrics:ptmp.metrics('tc.zipper.apa%d'%apa,
                                    //                      ptmp.socket('connect', 'pub', metagg))
                                }+params.cfg),
 
     local tcfinder = ptmp.nodeconfig("filter", "tc-finder-apa%d"%apa,
-                                     isocket = ptmp.socket('connect','pull', inproc_ztc),
+                                     isocket = ptmp.socket('connect','sub', inproc_ztc),
                                      osocket = ptmp.socket('bind','pub', output,
                                                            hwm = params.pubsub_hwm),
                                      cfg = {

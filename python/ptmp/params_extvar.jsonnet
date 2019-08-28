@@ -9,6 +9,9 @@ pdsp_params {
         rewrite_tstart: 1,
         link_integration_time:20000,
         chan_integration_time:20000,
+
+        tspan: 50/0.02,         // window span in data time
+
     },
 
     // index by APA number.  There is no APA 0.

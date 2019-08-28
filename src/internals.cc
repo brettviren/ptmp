@@ -167,12 +167,25 @@ void ptmp::internals::recv(zmsg_t** msg, ptmp::data::TPSet& tps)
 }
 void ptmp::internals::recv_keep(zmsg_t* msg, ptmp::data::TPSet& tps)
 {
+    size_t nframes = zmsg_size(msg);
+
+    // message schema version 0
+    if (nframes != 2) {
+        zmsg_destroy(&msg);
+        throw std::runtime_error("unknown message size");
+    }
+
     zframe_t* fid = zmsg_first(msg);
     if (!fid) {
-        zsys_error(zmq_strerror (errno));
-        throw std::runtime_error("null id frame");
+        zmsg_destroy(&msg);
+        throw std::runtime_error("null message ID frame");
     }
-    int topic = *(int*)zframe_data(fid);
+    int version = *(int*)zframe_data(fid);
+    
+    if (version != 0) {
+        zmsg_destroy(&msg);
+        throw std::runtime_error("unknown message schema version");
+    }
 
     zframe_t* pay = zmsg_next(msg);
     if (!pay) {
@@ -188,7 +201,7 @@ void ptmp::internals::recv_keep(zmsg_t* msg, ptmp::data::TPSet& tps)
 
 void ptmp::internals::send(zsock_t* sock, const ptmp::data::TPSet& tpset)
 {
-    const int topic = 0;
+    const int version = 0;
 
     // the message ID:
     zmsg_t* msg = zmsg_new();
@@ -196,27 +209,32 @@ void ptmp::internals::send(zsock_t* sock, const ptmp::data::TPSet& tpset)
         zsys_error(zmq_strerror (errno));
         throw std::runtime_error("new msg failed");
     }
-    zframe_t* fid = zframe_new(&topic, sizeof(int));
-    if (!fid) {
-        zsys_error(zmq_strerror (errno));
-        throw std::runtime_error("new frame failed");
-    }
-    int rc = zmsg_append(msg, &fid);
-    if (rc) {
-        zsys_error(zmq_strerror (errno));
-        throw std::runtime_error("msg append failed");
+    
+    {
+        zframe_t* fid = zframe_new(&version, sizeof(int));
+        if (!fid) {
+            zsys_error(zmq_strerror (errno));
+            throw std::runtime_error("new ID frame failed");
+        }
+        int rc = zmsg_append(msg, &fid);
+        if (rc) {
+            zsys_error(zmq_strerror (errno));
+            throw std::runtime_error("msg ID append failed");
+        }
     }
 
-    size_t siz = tpset.ByteSize();
-    zframe_t* pay = zframe_new(NULL, siz);
-    tpset.SerializeToArray(zframe_data(pay), zframe_size(pay));
-    rc = zmsg_append(msg, &pay);
-    if (rc) {
-        zsys_error(zmq_strerror (errno));
-        throw std::runtime_error("msg append failed");
+    {
+        size_t siz = tpset.ByteSize();
+        zframe_t* pay = zframe_new(NULL, siz);
+        tpset.SerializeToArray(zframe_data(pay), zframe_size(pay));
+        int rc = zmsg_append(msg, &pay);
+        if (rc) {
+            zsys_error(zmq_strerror (errno));
+            throw std::runtime_error("msg append failed");
+        }
     }
-        
-    rc = zmsg_send(&msg, sock);
+    
+    int rc = zmsg_send(&msg, sock);
     if (rc) {
         zsys_error(zmq_strerror (errno));
         throw std::runtime_error("msg send failed");

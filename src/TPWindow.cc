@@ -16,7 +16,7 @@ using json = nlohmann::json;
 //
 // - wind :: an index locating the window absolutely in time.  The start of wind=0 is at toff.
 // 
-// - tspan :: the duration of the window in HW clock tricks
+// - tspan :: the duration of the window in HW clock ticks
 //
 // - toff :: an offset in HW clock ticks from if t=0 was a boundary.
 //

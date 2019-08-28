@@ -41,6 +41,7 @@ namespace ptmp {
             std::string name{""};
             int verbose{0};
             int detid{-1};
+            ptmp::data::real_time_t start_time;
             uint64_t out_tpset_count{0};
             uint32_t tickperus{50};
 
