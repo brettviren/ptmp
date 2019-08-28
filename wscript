@@ -1,5 +1,6 @@
 #!/usr/bin/env waf
 
+import os
 import sys
 from waflib.Utils import to_list
 
@@ -9,6 +10,10 @@ sys.path.append('tools')
 # list packages found by tools/*
 pkg_deps = ['libzmq','libczmq','protobuf','dynamo']
 
+# version guidance from:
+# https://funcptr.net/2014/06/10/build-numbers-in-binaries-using-waf/
+APPNAME = "ptmp"
+VERSION = "0.0.0"
 
 def options(opt):
     opt.load('compiler_c compiler_cxx')
@@ -17,8 +22,25 @@ def options(opt):
         opt.load(pkg)
     opt.add_option('--cxxflags', default='-O2 -ggdb3')
 
+def set_version(cfg):
+    version = ""
+    try:
+        gitcmd='git describe --always --dirty --long'
+        version = os.popen(gitcmd).read().strip()
+    except Exception as e:
+        print (e)
+        
+    if version:
+        VERSION = version
+    cfg.env.VERSION = VERSION
+    cfg.env.APPNAME = APPNAME
+    print ("using version: \"%s\"" % cfg.env.VERSION)
+
     
 def configure(cfg):
+    set_version(cfg)
+
+
     cfg.load('compiler_c compiler_cxx')
     cfg.load('utests')
 
@@ -37,6 +59,11 @@ def configure(cfg):
 
 def build(bld):
     bld.load('utests')
+    bld(features='subst',
+        source='inc/ptmp/version.h.in',
+        target='inc/ptmp/version.h',
+        VERSION = bld.env['VERSION'],
+    )
 
     uses = [p.upper() for p in pkg_deps + ["pthread"]]
     rpath = [bld.env["PREFIX"] + '/lib']

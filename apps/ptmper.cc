@@ -28,6 +28,7 @@
 
 #include "ptmp/api.h"
 #include "ptmp/factory.h"
+#include "ptmp/version.h"
 
 #include <iostream>
 #include <fstream>
@@ -41,7 +42,9 @@ using json = nlohmann::json;
 int main(int argc, char* argv[])
 {
     if (argc != 2) {
-        std::cerr << "usage: ptmper config.json\n";
+        std::cerr << "PTMP version " << ptmp::VERSION << "\n"
+                  << "https://github.com/brettviren/ptmp\n"
+                  << "usage: ptmper <config.json>\n";
         return -1;
     }
 

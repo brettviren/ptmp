@@ -1,0 +1,8 @@
+#ifndef PTMP_VERSION_H
+#define PTMP_VERSION_H
+
+namespace ptmp {
+    char VERSION[] = "@VERSION@";
+}
+
+#endif
