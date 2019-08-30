@@ -10,7 +10,7 @@ namespace ptmp {
         // generic fodder for metrics based on TPSet in -> TPSet out
         struct time_stats_t {
             // time stored in microseconds
-            int64_t t0{0}, tf{0}, dt{0}, lat{0}, lat2{0};
+            int64_t num{0}, t0{0}, tf{0}, dt{0}, lat{0}, lat2{0};
 
             // derived
 
@@ -19,7 +19,7 @@ namespace ptmp {
             double lat_mean{0.0}, lat_rms{0.0};
 
             void update(int64_t now, int64_t then);
-            void finalize(double n);
+            void finalize();
                 
             nlohmann::json jsonify();
         };

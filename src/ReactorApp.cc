@@ -130,7 +130,7 @@ int ReactorApp::metrics_base()
     this->metrics(j);
     (*met)(j);
 
-    stats = stats_t();
+    stats = stats_t();          // resets
 
     return 0;
 }
