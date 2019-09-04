@@ -98,6 +98,9 @@ struct zipper_queue_t {
     // source.  
     std::unordered_map<int, int> counts;
 
+    // Keep track of last TPSet.count() seen to detect dropped messages
+    std::unordered_map<int, int> last_in_count;
+
     // Expected number of sources
     int nsources;
 
@@ -137,6 +140,21 @@ struct zipper_queue_t {
         tpset.ParseFromArray(zframe_data(pay), zframe_size(pay));
         const ptmp::data::data_time_t tstart = tpset.tstart();
         const int detid = tpset.detid();
+
+        {
+            const auto this_count = tpset.count();
+            auto& last_count = last_in_count[detid];
+            if (last_count == 0) {
+                last_count = this_count;
+            }
+            else {
+                const int n_missed = this_count - last_count - 1;
+                if (n_missed > 0) {
+                    zsys_warning("zipper: detid: 0x%x lost %d", detid, n_missed);
+                }
+                last_count = this_count;
+            }
+        }
 
         meta_msg_t mm = {trecv+1000*sync_ms, tstart, detid, msg};
         messages.push_back(mm);

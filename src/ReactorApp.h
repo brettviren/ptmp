@@ -44,6 +44,7 @@ namespace ptmp {
             ptmp::data::real_time_t start_time;
             uint64_t out_tpset_count{0};
             uint32_t tickperus{50};
+            uint32_t last_in_count{0};
 
             ptmp::metrics::Metric* met{nullptr};
 
@@ -56,6 +57,7 @@ namespace ptmp {
             struct stats_t {
                 socket_stats_t iss, oss;
                 wait_stats_t waits;
+                uint32_t n_in_lost{0};
             };
 
             stats_t stats;

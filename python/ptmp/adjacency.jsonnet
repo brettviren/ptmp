@@ -53,7 +53,7 @@ local make_tc = function(apa, inputs, output, params) {
     local windows = [ptmp.window('tc-window-apa%d-link%02d'%[apa, link],
                                  isocket = ptmp.socket('connect', 'sub', inputs[link],
                                                        hwm = params.pubsub_hwm),
-                                 osocket = ptmp.socket('bind', 'push', inproc_wz[link]),
+                                 osocket = ptmp.socket('bind', 'pub', inproc_wz[link]),
                                  cfg = params.cfg + {
                                      name:"tp-window-apa%d-link%02d"%[apa,link],
                                      // verbose: 1,
@@ -63,7 +63,7 @@ local make_tc = function(apa, inputs, output, params) {
                      for link in iota],
     local inproc_ztc = "inproc://tc-zipper-tcfinder-apa%d" % apa,
     local zipper = ptmp.zipper("tc-zipper-apa%d"%apa,
-                               isocket = ptmp.socket('connect','pull', inproc_wz),
+                               isocket = ptmp.socket('connect','sub', inproc_wz),
                                osocket = ptmp.socket('bind','pub', inproc_ztc),
                                cfg = {
                                    name:"apa%d-zipper"%apa,

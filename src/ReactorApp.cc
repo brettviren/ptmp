@@ -93,6 +93,18 @@ void ptmp::noexport::ReactorApp::start()
 
 int ptmp::noexport::ReactorApp::add_base(ptmp::data::TPSet& tpset)
 {
+    const auto this_count = tpset.count();
+    if (last_in_count == 0) {
+        last_in_count = this_count;
+    }
+    else {
+        const auto n_missed = this_count - last_in_count - 1;
+        if (n_missed) {
+            stats.n_in_lost += n_missed;
+        }
+        last_in_count = this_count;
+    }
+
     if (met) {
         stats.iss.update(tpset, tickperus);
     }
@@ -124,8 +136,10 @@ int ReactorApp::metrics_base()
         { "count", stats.waits.count}
         ,{"duty", (stats.waits.time_ms/1000.0)* stats.oss.real.hz}
     };
+    j["lost"]["input"] = stats.n_in_lost;
 
-    zsys_debug("metric %d from 0x%x", out_tpset_count, detid);
+
+    //zsys_debug("metric %d from 0x%x", out_tpset_count, detid);
 
     this->metrics(j);
     (*met)(j);
