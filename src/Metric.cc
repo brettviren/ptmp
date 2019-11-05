@@ -108,6 +108,7 @@ public:
         
     }
     ~JsonProto() {
+        //zsys_debug("JSON destroy socket");
         zsock_destroy(&sock);
     }
 
@@ -146,6 +147,7 @@ public:
         }
     }
     ~GlotProto() {
+        //zsys_debug("GLOT destroy socket");
         zsock_destroy(&sock);
     }
 
@@ -196,6 +198,7 @@ ptmp::metrics::Metric::Metric(const std::string& config)
 
 ptmp::metrics::Metric::~Metric()
 {
+    //zsys_debug("Metric deleting proto");
     delete m_proto; m_proto=0;
 }
 

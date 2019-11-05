@@ -135,19 +135,20 @@ int main(int argc, char* argv[])
     zipper_config["output"]["socket"]["bind"].push_back(output_address.c_str());
     zipper_config["sync_time"]=sync_ms;
 
-    ptmp::TPZipper zipper(zipper_config.dump());
+    {
+        ptmp::TPZipper zipper(zipper_config.dump());
 
-    // Give all the sockets a chance to connect
-    std::this_thread::sleep_for(std::chrono::milliseconds(300));
+        // Give all the sockets a chance to connect
+        std::this_thread::sleep_for(std::chrono::milliseconds(300));
 
-    // Tell all the threads to start sending messages
-    goFlag.store(true);
+        // Tell all the threads to start sending messages
+        goFlag.store(true);
 
-    for(auto& thread: threads) thread.join();
+        for(auto& thread: threads) thread.join();
 
-    // Wait for at a sync time to allow for last messages to flush
-    // before causing zipper to shutdown through destruction.
-    std::this_thread::sleep_for(std::chrono::milliseconds(2*sync_ms));
-
+        // Wait for at a sync time to allow for last messages to flush
+        // before causing zipper to shutdown through destruction.
+        std::this_thread::sleep_for(std::chrono::milliseconds(2*sync_ms));
+    }
     return 0;
 }

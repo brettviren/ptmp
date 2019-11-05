@@ -83,6 +83,11 @@ ptmp::noexport::ReactorApp::~ReactorApp()
     zloop_destroy(&looper);
     zsock_destroy(&isock);
     zsock_destroy(&osock);
+    if (met) {
+        //zsys_debug("ReactorApp deleting metrics");
+        delete met;
+        met = nullptr;
+    }
 }
 
 void ptmp::noexport::ReactorApp::start()

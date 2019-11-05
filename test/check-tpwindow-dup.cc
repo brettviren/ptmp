@@ -57,7 +57,12 @@ int main(int argc, char** argv)
     window_config["tspan"]=window_size; 
     window_config["tbuf"]=buffer;
     window_config["verbose"] = 1;
-
+    window_config["metrics"]["prefix"] = "ptmp/testing";
+    window_config["metrics"]["proto"] = "JSON";    
+    window_config["metrics"]["period"] = 1000;
+    window_config["metrics"]["socket"]["type"] = "PUB";
+    window_config["metrics"]["socket"]["bind"].push_back("tcp://127.0.0.1:12345");
+    std::cout << window_config << std::endl;
 
     ptmp::data::real_time_t proc_start = ptmp::data::now();
 

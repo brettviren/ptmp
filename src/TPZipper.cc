@@ -315,7 +315,7 @@ void ptmp::actor::zipper(zsock_t* pipe, void* vargs)
     };
     std::unordered_map<int, counters_t> counters;
 
-    zpoller_t* poller = zpoller_new(input, pipe, NULL);
+    zpoller_t* poller = zpoller_new(pipe, input, NULL);
 
     int loop_count{0};
     ptmp::data::real_time_t start_time = ptmp::data::now();
@@ -332,14 +332,16 @@ void ptmp::actor::zipper(zsock_t* pipe, void* vargs)
         ptmp::internals::microsleep(100);
         //if (wait_ms == 0) { wait_ms = 1; }
         void *which = zpoller_wait(poller, wait_ms);
+        //zsys_debug("zipper: wait_ms=%d, which=%lx", wait_ms, which);
 
         t2 = ptmp::data::now();
         time_poll += t2-t1;
         t1=t2;
 
         if (which) {
+            //zsys_debug("zipper: got input");
             if (which == pipe) {
-                //zsys_debug("zipper: got quit on input");
+                zsys_debug("zipper: got quit on input");
                 got_quit = true;
                 goto cleanup;
             }
@@ -348,6 +350,16 @@ void ptmp::actor::zipper(zsock_t* pipe, void* vargs)
                     zmsg_t* msg = zmsg_recv(input);
                     zq.recv(msg);
                 } while (zsock_events(input) & ZMQ_POLLIN);
+            }
+        }
+        else {
+            // if (zpoller_expired(poller)) {
+            //     zsys_debug("zipper: poll expired");
+            //     goto cleanup;
+            // }
+            if (zpoller_terminated(poller)) {
+                zsys_debug("zipper: poll terminated");
+                goto cleanup;
             }
         }
 
@@ -435,10 +447,12 @@ void ptmp::actor::zipper(zsock_t* pipe, void* vargs)
     zsock_destroy(&input);
     sender.destroy();
     if (got_quit) {
+        zsys_debug("zipper: got quit");
         return;
     }
     zsys_debug("zipper: waiting for quit");
     zsock_wait(pipe);
+    zsys_debug("zipper: actor done");
 }
 
 
@@ -452,5 +466,7 @@ ptmp::TPZipper::~TPZipper()
 {
     zsys_debug("zipper: signaling done");
     zsock_signal(zactor_sock(m_actor), 0); // signal quit
+    zclock_sleep(1000);
+    zsys_debug("zipper: destroying actor");
     zactor_destroy(&m_actor);
 }

@@ -43,6 +43,7 @@ namespace ptmp {
 
         public:
             struct Proto {
+                virtual ~Proto() {}
                 virtual void send(nlohmann::json&, time_t now_s) = 0;
                 virtual std::string pathify(std::string) = 0;
             };
