@@ -1,0 +1,5 @@
+Name: ptmp
+Description: Prototype Trigger Message Passing for (proto)DUNE DAQ
+Version: @VERSION@
+Libs: -L${libdir} @LIBS@
+Cflags: -I${includedir}

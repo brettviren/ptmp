@@ -31,6 +31,7 @@ def set_version(cfg):
         print (e)
         
     if version:
+        global VERSION
         VERSION = version
     cfg.env.VERSION = VERSION
     cfg.env.APPNAME = APPNAME
@@ -58,6 +59,7 @@ def configure(cfg):
 
 
 def build(bld):
+    set_version(bld)
     bld.load('utests')
     bld(features='subst',
         source='inc/ptmp/version.h.in',
@@ -88,3 +90,5 @@ def build(bld):
 
     bld.utesting('ptmp', uses)
     bld.recurse("test/dynamo")
+
+    bld(source='ptmp.pc.in', VERSION=VERSION, LIBS='ptmp')
