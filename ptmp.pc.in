@@ -1,3 +1,7 @@
+prefix=@prefix@
+libdir=@libdir@
+includedir=${prefix}/include
+
 Name: ptmp
 Description: Prototype Trigger Message Passing for (proto)DUNE DAQ
 Version: @VERSION@
