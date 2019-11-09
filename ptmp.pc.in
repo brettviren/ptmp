@@ -5,5 +5,6 @@ includedir=${prefix}/include
 Name: ptmp
 Description: Prototype Trigger Message Passing for (proto)DUNE DAQ
 Version: @VERSION@
-Libs: -L${libdir} @LIBS@
+Libs: -L${libdir} @LLIBS@
 Cflags: -I${includedir}
+Requires: @REQUIRES@

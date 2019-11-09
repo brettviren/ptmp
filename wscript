@@ -91,4 +91,5 @@ def build(bld):
     bld.utesting('ptmp', uses)
     bld.recurse("test/dynamo")
 
-    bld(source='ptmp.pc.in', VERSION=VERSION, LIBS='ptmp')
+    bld(source='ptmp.pc.in', VERSION=VERSION,
+        LLIBS='-lptmp', REQUIRES='libczmq libzmq protobuf')
