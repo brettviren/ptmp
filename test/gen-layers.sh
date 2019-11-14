@@ -36,5 +36,5 @@ jsonnet -S $defargs -e 'local p=import "ptmper.jsonnet"; p.procgen' > $outdir/Pr
 
 echo $outdir/Procfile
 
-echo "now maybe do: cd $outdir; shorman"
+echo "now maybe do: cd $outdir; shoreman"
 

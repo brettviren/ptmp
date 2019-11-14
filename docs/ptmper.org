@@ -1,7 +1,7 @@
 #+title: ~ptmper~
 
 The PTMP package provides a generic application called ~ptmper~ which
-can execute an arbitrary set of PTMP "proxy" classes as driven by a
+can execute an arbitrary set of PTMP components as driven by a
 single configuration file.  This allows a complex network topology of
 PTMP actors to be defined in a consistent manner in the configuration
 while making the execution of this topology very simple.
@@ -24,26 +24,26 @@ follow a particular schema.  At top level the JSON should represent a
 single object with these attributes:
 
 - [ptmper options] :: described below
-- ~proxies~ :: a list of JSON objects, each identifying and configuring one PTMP "proxy" class configuration
+- ~proxies~ :: a list of JSON objects, each identifying and configuring one PTMP component class configuration
 
 ** ~ptmper~ options
 
 - name :: optional name to use for the main thread
-- pause :: number of seconds to wait before creating any proxy instances
-- reprieve :: number of seconds to wait after destroying all proxy instances before ~ptmper~ exits
+- pause :: number of seconds to wait before creating any component instances
+- reprieve :: number of seconds to wait after destroying all component instances before ~ptmper~ exits
 - ttl :: number of second to continue executing
 - snooze :: number of millisecond to sleep between checking if the time to live has expired
 
-** Proxy configuration
+** Component configuration
 
-Each proxy configuration object has three attributes
+Each component configuration object has three attributes
 
 - name :: some unique, human-oriented identifier
-- type :: label the proxy type (C++ type or its alias)
-- data :: proxy-specific configuration as documented elsewhere
+- type :: label the component type (C++ type or its alias)
+- data :: component-specific configuration as documented elsewhere
 
 The ~data~ object may also be given a ~name~ attribute which will be used
-to name the actor thread in which the proxy runs.
+to name the actor thread in which the component runs.
 
 
 * Generating JSON Configuration with Jsonnet
@@ -197,6 +197,59 @@ The ~Procfile.*~ can be used with [[https://github.com/brettviren/shoreman][a mo
 #+END_EXAMPLE
 
 The produced ~monfile~ can be used to make plots showing the performance of the various processes and threads.
+
+** Layered approach
+
+Another configuration approach is provided via [[file:../test/gen-layers.sh][gen-layers.sh]] and some
+included Jsonnet.  This interprets some high-level configuration in a
+Jsonnet file as describing a PTMP graph which is shaped as a number of
+similar layers.  Eg layers of: replay, window, zipper, TC finding,
+another zipper, TD finding.
+
+To customize, create a layers description file such as
+[[file:../test/met-layers.jsonnet][met-layers.jsonnet]].  This file should produce JSON in the form of an
+array of "layer" objects.  Each "layer" object has a layer type as the
+~layer~ attribute and a sub-layer structure given by an array held in
+the attribute ~units~.  A unit is a division of a layer, eg covering one
+APA.  A unit may itself have substructure called "streams" for
+example, describing the PTMP components to service the TPs from one
+FELIX link.
+
+Example:
+
+#+begin_example
+  $ ./test/gen-layers.sh
+#+end_example
+
+This generates configuration to run a PTMP graph featuring the Michel
+trigger algorithm and using offline file "replay" as the input.  The
+input files and other parameters are provided in a simplified Jsonnet
+file which can be copied and customized:
+
+#+begin_example
+  $ cp test/met-layers.jsonnet mylayers.jsonnet
+  $ emacs mylayers.jsonnet
+  $ ./test/gen-layers.sh mylayers.jsonnet myrun
+  Output to myrun
+  myrun/fileplay-apa5.json
+  myrun/fileplay-apa6.json
+  myrun/filtalg-apa5.json
+  myrun/filtalg-apa6.json
+  myrun/sink-pdsp.json
+  myrun/winzip-apa5.json
+  myrun/winzip-apa6.json
+  myrun/zip-pdsp.json
+  myrun/Procfile
+  now maybe do: cd myrun; shorman
+  $ cd myrun
+  $ shorman
+  ...output of many PTMP components...
+  13:09:56 fileplay-apa5	| I: 19-11-14 13:09:56 czmqat: end of file /data/fast/bviren/ptmp-dumps/2019-07-19/FELIX_BR_509.dump after 1185952
+  13:09:56 fileplay-apa5	| D: 19-11-14 13:09:56 czmqat: finished after 1185952
+  13:09:56 fileplay-apa5	| D: 19-11-14 13:09:56 czmqat: waiting for quit
+  ...more running as graph is drained...
+  ...Ctrl-C if impatient
+#+end_example
 
 
 * Writing your own PTMP Jsonnet

@@ -21,10 +21,15 @@ local link_zip_dfo  = "tcp://127.0.0.1:5300";
                 output: link_tp_wz % {apa:apa, link:link},
                 file_cfg: {
                     name: "file-apa%d-link%d" % [apa, link],
-                    ifile: datapat % {apa:apa, link:link}
+                    ifile: datapat % {apa:apa, link:link},
+                    number: -1, // number of TPSets to read, -1 means all
+                    delayus: 0, // us delay after a read
                 },
                 replay_cfg: {
                     name: "replay-apa%d-link%d"%[apa, link],
+                    rewrite_count: 0,
+                    rewrite_tstart: 1,
+                    speed: 50,
                 },
             } for link in links],
         } for apa in apas],
@@ -38,10 +43,19 @@ local link_zip_dfo  = "tcp://127.0.0.1:5300";
                 link:link,
                 input: link_tp_wz % {apa:apa, link:link},
                 window_cfg: {
-                    name: 'win-apa%d-link%d'%[apa, link]
+                    name: 'win-apa%d-link%d'%[apa, link],
+                    detid: -1,
+                    toffset: 0, // hw clock ticks offset from modulo
+                    tspan: 2500, // hw clock ticks window span
+                    tbuf: 250000, // hw clock ticks buffer size
+                    //metrics: {}
                 },
             } for link in links],
-            zipper_cfg: { name: 'zip-apa%d'%apa },
+            zipper_cfg: {
+                name: 'zip-apa%d'%apa,
+                sync_time: 10,  // ms, max time to wait for a tardy input stream
+                tardy_policy: "drop", // what to do when a tardy input arrives
+            },
             output: link_wz_tc % {apa:apa},
         } for apa in apas],
     },
@@ -66,7 +80,11 @@ local link_zip_dfo  = "tcp://127.0.0.1:5300";
                 input: link_tc_zip % {apa:apa}
             } for apa in apas],
             output: link_zip_dfo,
-            cfg: {name:"mlt-zipper"}
+            cfg: {
+                name:"mlt-zipper",
+                sync_time: 100,  // ms, max time to wait for a tardy input stream
+                tardy_policy: "drop", // what to do when a tardy input arrives
+            }
         }],
     },
 
