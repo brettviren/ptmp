@@ -81,7 +81,7 @@ void fillBuffer(void* buffer, size_t buffer_size, std::vector<uint64_t>& sizes)
 {
     size_t total_size=0;
     ptmp::data::TPSet tpset=random_tpset();
-    size_t tpset_size=tpset.ByteSizeLong();
+    size_t tpset_size=tpset.ByteSize();
     char* current=(char*)buffer;
     while(total_size+tpset_size<buffer_size){
         tpset.SerializeToArray(current, tpset_size);
@@ -89,7 +89,7 @@ void fillBuffer(void* buffer, size_t buffer_size, std::vector<uint64_t>& sizes)
         sizes.push_back(tpset_size);
         current+=tpset_size;
         tpset=random_tpset();
-        tpset_size=tpset.ByteSizeLong();
+        tpset_size=tpset.ByteSize();
     }
 }
 
