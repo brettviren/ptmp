@@ -93,3 +93,9 @@ def build(bld):
 
     bld(source='ptmp.pc.in', VERSION=VERSION,
         LLIBS='-lptmp', REQUIRES='libczmq libzmq protobuf')
+    bld(features='subst',
+        source='libptmp.la.in', target='libptmp.la',
+        **bld.env)
+    bld.install_files('${PREFIX}/lib', bld.path.find_or_declare("libptmp.la"))
+
+    print (bld.env)
